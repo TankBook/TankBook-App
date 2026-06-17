@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Layers, Fish, Leaf, Bell, Clock, Plus, AlertTriangle, Timer, type LucideIcon } from 'lucide-react'
+import { Layers, Fish, Leaf, Bug, Waves, Bell, Clock, Plus, AlertTriangle, Timer, type LucideIcon } from 'lucide-react'
 import { useTanks } from '../hooks'
 import { api } from '../api/client'
 import { useSettings, formatDate, toMM, dimInputProps } from '../context/SettingsContext'
@@ -19,7 +19,10 @@ interface DashboardStats {
   }>
   tanks: Array<{
     id: string; name: string; volume_litres: number; water_type: string; co2_injection: boolean
-    substrate: string | null; fish_count: number; fish_species: number
+    substrate: string | null
+    fish_count: number; fish_species: number
+    invertebrate_count: number; invertebrate_species: number
+    amphibian_count: number; amphibian_species: number
     plant_species: number; unack_alerts: number; overdue_tasks: number
     latest_ph: number | null; latest_temp: number | null
     latest_ammonia: number | null; latest_nitrite: number | null; latest_nitrate: number | null
@@ -113,15 +116,34 @@ function TankOverviewCard({ tank }: { tank: DashboardStats['tanks'][0] }) {
 
       {/* Footer */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 6 }}>
-        <div style={{ display: 'flex', gap: 12, fontSize: 12, color: 'var(--text-2)' }}>
-          <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-            <Fish size={12} />
-            {tank.fish_count} fish · {tank.fish_species} sp
-          </span>
-          <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-            <Leaf size={12} />
-            {tank.plant_species} plant sp
-          </span>
+        <div style={{ display: 'flex', gap: 10, fontSize: 12, color: 'var(--text-2)', flexWrap: 'wrap' }}>
+          {tank.fish_count > 0 && (
+            <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+              <Fish size={12} />
+              {tank.fish_count} fish · {tank.fish_species} sp
+            </span>
+          )}
+          {tank.invertebrate_count > 0 && (
+            <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+              <Bug size={12} />
+              {tank.invertebrate_count} inv · {tank.invertebrate_species} sp
+            </span>
+          )}
+          {tank.amphibian_count > 0 && (
+            <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+              <Waves size={12} />
+              {tank.amphibian_count} amp · {tank.amphibian_species} sp
+            </span>
+          )}
+          {tank.plant_species > 0 && (
+            <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+              <Leaf size={12} />
+              {tank.plant_species} plant sp
+            </span>
+          )}
+          {tank.fish_count === 0 && tank.invertebrate_count === 0 && tank.amphibian_count === 0 && tank.plant_species === 0 && (
+            <span style={{ color: 'var(--text-4)' }}>No inhabitants yet</span>
+          )}
         </div>
         {tank.latest_recorded && (
           <span style={{ fontSize: 10, color: 'var(--text-4)' }}>

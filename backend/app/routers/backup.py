@@ -47,8 +47,8 @@ def export_backup(db: Session = Depends(get_db)):
             "co2_injection": tank.co2_injection,
             "setup_date": _dt(tank.setup_date), "created_at": _dt(tank.created_at),
             "fish": [{"id": r.id, "species_slug": r.species_slug, "quantity": r.quantity,
-                      "fish_status": r.fish_status, "health_status": r.health_status,
-                      "notes": r.notes, "added_at": _dt(r.added_at)}
+                      "organism_type": r.organism_type, "fish_status": r.fish_status,
+                      "health_status": r.health_status, "notes": r.notes, "added_at": _dt(r.added_at)}
                      for r in fish],
             "plants": [{"id": r.id, "species_slug": r.species_slug, "quantity": r.quantity,
                         "notes": r.notes, "added_at": _dt(r.added_at)}
@@ -127,8 +127,8 @@ def import_backup(payload: dict, db: Session = Depends(get_db)):
         for f in t.get("fish", []):
             db.add(TankFish(
                 id=f["id"], tank_id=tank.id, species_slug=f["species_slug"],
-                quantity=f["quantity"], fish_status=f.get("fish_status", "added"),
-                health_status=f.get("health_status", "healthy"),
+                quantity=f["quantity"], organism_type=f.get("organism_type", "fish"),
+                fish_status=f.get("fish_status", "added"), health_status=f.get("health_status", "healthy"),
                 notes=f.get("notes"), added_at=_parse_dt(f.get("added_at")) or datetime.utcnow(),
             ))
         db.flush()

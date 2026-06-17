@@ -29,6 +29,7 @@ class TankOut(TankCreate):
 class TankFishCreate(BaseModel):
     species_slug: str
     quantity: int
+    organism_type: str = "fish"
     fish_status: str = "added"
     health_status: str = "healthy"
     notes: str | None = None
@@ -36,6 +37,7 @@ class TankFishCreate(BaseModel):
 
 class TankFishUpdate(BaseModel):
     quantity: int | None = None
+    organism_type: str | None = None
     fish_status: str | None = None
     health_status: str | None = None
     notes: str | None = None
