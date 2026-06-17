@@ -446,6 +446,15 @@ export default function TankDetail() {
   const [dtDays, setDtDays] = useState<number[]>([0, 1, 2, 3, 4, 5, 6])
   const [dtColor, setDtColor] = useState(DAILY_COLORS[0])
 
+  const [isMobile, setIsMobile] = useState(() => window.matchMedia('(max-width: 768px)').matches)
+
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 768px)')
+    const handler = (e: MediaQueryListEvent) => setIsMobile(e.matches)
+    mq.addEventListener('change', handler)
+    return () => mq.removeEventListener('change', handler)
+  }, [])
+
   const [galleryImages, setGalleryImages] = useState<{ filename: string; url: string }[]>([])
   const [lightboxIdx, setLightboxIdx] = useState<number | null>(null)
   const [galleryUploading, setGalleryUploading] = useState(false)
@@ -652,9 +661,10 @@ export default function TankDetail() {
               key={t}
               title={label}
               onClick={() => setTab(t)}
-              style={{ ...tabStyle(tab === t), position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '7px 10px' }}
+              style={{ ...tabStyle(tab === t), position: 'relative', display: 'flex', alignItems: 'center', gap: 5, justifyContent: 'center', padding: isMobile ? '7px 10px' : '6px 12px' }}
             >
-              <Icon size={16} />
+              <Icon size={isMobile ? 16 : 13} />
+              {!isMobile && label}
               {t === 'alerts' && unackAlerts.length > 0 && (
                 <span style={{
                   position: 'absolute', top: 2, right: 2,
