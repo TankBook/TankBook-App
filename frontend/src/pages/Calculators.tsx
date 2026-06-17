@@ -382,8 +382,8 @@ function DosageCalculator() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
       <p style={{ margin: 0, fontSize: 13, color: 'var(--text-2)', lineHeight: 1.6 }}>
-        Select an <strong style={{ color: 'var(--text)', fontWeight: 500 }}>API</strong> product and enter your net water
-        volume to calculate the correct dose.
+        Select an <strong style={{ color: 'var(--text)', fontWeight: 500 }}>API</strong> product and enter the
+        volume of water being treated — the full tank for a new setup, or just the water being added for a water change.
       </p>
 
       {/* Category filter */}
@@ -425,18 +425,18 @@ function DosageCalculator() {
 
       {/* Volume input */}
       <Card>
-        <FieldLabel>Net water volume (litres)</FieldLabel>
+        <FieldLabel>Volume of water to treat (litres)</FieldLabel>
         <input
           type="number" min="0" step="1"
           value={volume} onChange={e => setVolume(e.target.value)}
-          placeholder="e.g. 200"
+          placeholder="e.g. 50"
           style={{ width: '100%', boxSizing: 'border-box' }}
         />
-        {!selectedId && (
-          <p style={{ margin: '8px 0 0', fontSize: 12, color: 'var(--text-3)' }}>
-            Select a product above to see the dose.
-          </p>
-        )}
+        <p style={{ margin: '6px 0 0', fontSize: 11, color: 'var(--text-3)' }}>
+          {!selectedId
+            ? 'Select a product above to see the dose.'
+            : 'Enter the full tank volume for a new setup, or just the volume of water being added for a water change.'}
+        </p>
       </Card>
 
       {/* Result */}
