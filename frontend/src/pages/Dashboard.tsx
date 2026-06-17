@@ -269,24 +269,30 @@ export default function Dashboard() {
 
   return (
     <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-        <h1 style={{ margin: 0, fontSize: 22, fontWeight: 500, color: 'var(--text)' }}>Dashboard</h1>
-        <button onClick={() => setShowForm(true)} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 14, padding: '8px 16px', borderRadius: 8, border: '0.5px solid var(--blue-border)', background: 'var(--blue-bg)', cursor: 'pointer', color: 'var(--blue)' }}>
-          <Plus size={14} />
-          Add Tank
-        </button>
-      </div>
+      <h1 style={{ margin: '0 0 20px', fontSize: 22, fontWeight: 500, color: 'var(--text)' }}>Dashboard</h1>
 
       {isMobile && <div style={{ marginBottom: 20 }}>{statsSidebar}</div>}
 
       <div style={{ display: 'flex', gap: 20, alignItems: 'flex-start' }}>
         <div style={{ flex: 1, minWidth: 0 }}>
           <p style={{ fontWeight: 500, fontSize: 15, margin: '0 0 12px', color: 'var(--text)' }}>Your Tanks</p>
-          {stats.tanks.length === 0 && (
-            <p style={{ color: 'var(--text-2)', fontSize: 14 }}>No tanks yet. Add your first one above.</p>
-          )}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 16 }}>
             {stats.tanks.map(t => <TankOverviewCard key={t.id} tank={t} />)}
+            <button
+              onClick={() => setShowForm(true)}
+              style={{
+                display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                gap: 8, minHeight: 160,
+                background: 'transparent', borderRadius: 14, cursor: 'pointer',
+                border: '1.5px dashed var(--border)', color: 'var(--text-3)',
+                transition: 'border-color 0.15s, color 0.15s',
+              }}
+              onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--blue-border)'; e.currentTarget.style.color = 'var(--blue)' }}
+              onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.color = 'var(--text-3)' }}
+            >
+              <Plus size={24} />
+              <span style={{ fontSize: 13, fontWeight: 500 }}>Add Tank</span>
+            </button>
           </div>
         </div>
 
