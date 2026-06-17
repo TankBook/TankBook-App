@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#0d1b2a" />
+    <meta name="description" content="TankBook — self-hosted aquarium management" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="TankBook" />
+    <title>TankBook</title>
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="apple-touch-icon" href="/icon-192.png" />
+    <style>
+      :root {
+        --bg: #f5f7fa;
+        --surface: #ffffff;
+        --surface-2: #eef2f7;
+        --tag-bg: #e4ecf4;
+        --border: #d5dfe9;
+        --border-sub: #e8eef5;
+        --btn-border: #b0bfcc;
+        --text: #0d1b2a;
+        --text-2: #4a6070;
+        --text-3: #7a90a0;
+        --text-4: #a8bbc6;
+        --text-label: #2a3a4a;
+        --blue: #1e88e5;
+        --blue-bg: #e3f2fd;
+        --blue-border: #1e88e5;
+        --focus-ring: rgba(30,136,229,0.25);
+        --cyan: #26c6da;
+        --cyan-bg: #e0f7fa;
+        --cyan-border: #00acc1;
+        --green: #388e3c;
+        --green-bg: #e8f5e9;
+        --green-border: #43a047;
+        --amber: #e65100;
+        --amber-bg: #fff3e0;
+        --amber-border: #fb8c00;
+        --amber-dark: #bf360c;
+        --orange: #ef6c00;
+        --orange-bg: #fbe9e7;
+        --red: #c62828;
+        --red-bg: #ffebee;
+        --red-border: #e63946;
+        --red-dark: #b71c1c;
+        --overlay: rgba(0,0,0,0.35);
+      }
+
+      :root[data-theme="dark"] {
+        --bg: #0d1b2a;
+        --surface: #1b263b;
+        --surface-2: #1e2f47;
+        --tag-bg: #182437;
+        --border: #253550;
+        --border-sub: #1f2e45;
+        --btn-border: #2d4060;
+        --text: #f5f7fa;
+        --text-2: #8aa4b8;
+        --text-3: #5a7480;
+        --text-4: #3a5260;
+        --text-label: #b8ccd8;
+        --blue: #42a5f5;
+        --blue-bg: #0d2540;
+        --blue-border: #1565c0;
+        --focus-ring: rgba(66,165,245,0.25);
+        --cyan: #4dd0e1;
+        --cyan-bg: #072029;
+        --cyan-border: #00616a;
+        --green: #66bb6a;
+        --green-bg: #0d2010;
+        --green-border: #2e7d32;
+        --amber: #ffa726;
+        --amber-bg: #2d1e06;
+        --amber-border: #7a4500;
+        --amber-dark: #ffb74d;
+        --orange: #ff8a65;
+        --orange-bg: #2a1205;
+        --red: #ef5350;
+        --red-bg: #1a0808;
+        --red-border: #c62828;
+        --red-dark: #ff8a80;
+        --overlay: rgba(0,0,0,0.65);
+      }
+
+      *, *::before, *::after { box-sizing: border-box; }
+
+      body {
+        margin: 0;
+        font-family: system-ui, sans-serif;
+        background: var(--bg);
+        color: var(--text);
+      }
+
+      input, select, textarea {
+        font-family: inherit;
+        font-size: 13px;
+        padding: 6px 10px;
+        border-radius: 8px;
+        border: 0.5px solid var(--btn-border);
+        outline: none;
+        background: var(--surface);
+        color: var(--text);
+      }
+
+      input:focus, select:focus, textarea:focus {
+        border-color: var(--blue-border);
+        box-shadow: 0 0 0 2px var(--focus-ring);
+      }
+
+      button {
+        font-family: inherit;
+        font-size: 13px;
+        padding: 6px 10px;
+        border-radius: 8px;
+        border: 0.5px solid var(--btn-border);
+        outline: none;
+        cursor: pointer;
+        background: transparent;
+        color: var(--text);
+      }
+
+      button:active { transform: scale(0.98); }
+
+      ::-webkit-scrollbar { width: 5px; height: 5px; }
+      ::-webkit-scrollbar-track { background: transparent; }
+      ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 99px; }
+      ::-webkit-scrollbar-thumb:hover { background: var(--text-3); }
+      * { scrollbar-width: thin; scrollbar-color: var(--border) transparent; }
+
+      .species-option {
+        padding: 8px 12px;
+        cursor: pointer;
+        border-bottom: 0.5px solid var(--border-sub);
+      }
+      .species-option:hover { background: var(--surface-2); }
+    </style>
+    <script>
+      const t = localStorage.getItem('theme')
+      if (t) document.documentElement.setAttribute('data-theme', t)
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

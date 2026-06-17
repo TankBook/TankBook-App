@@ -1,0 +1,305 @@
+import { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { Layers, Fish, Leaf, Bell, Clock, Plus, type LucideIcon } from 'lucide-react'
+import { useTanks } from '../hooks'
+import { api } from '../api/client'
+import { useSettings, formatDate, toMM, dimInputProps } from '../context/SettingsContext'
+import { Card, FieldLabel, Tag, SectionTitle, ConfirmDialog } from '../components/ui'
+
+interface DashboardStats {
+  total_tanks: number
+  total_fish: number
+  total_species: number
+  total_plants: number
+  unack_alerts: number
+  overdue_tasks: number
+  upcoming_tasks: Array<{
+    id: string; tank_id: string; task_type: string
+    description: string | null; due_at: string; is_recurring: boolean
+  }>
+  tanks: Array<{
+    id: string; name: string; volume_litres: number; co2_injection: boolean
+    substrate: string | null; fish_count: number; fish_species: number
+    plant_species: number; unack_alerts: number; overdue_tasks: number
+    latest_ph: number | null; latest_temp: number | null; latest_recorded: string | null
+  }>
+}
+
+function StatCard({ label, value, accent, icon: Icon }: {
+  label: string; value: string | number; accent?: string
+  icon?: LucideIcon
+}) {
+  return (
+    <div style={{ background: 'var(--surface)', border: '0.5px solid var(--border)', borderRadius: 12, padding: '14px 16px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 4 }}>
+        <p style={{ fontSize: 12, color: 'var(--text-2)', margin: 0 }}>{label}</p>
+        {Icon && <Icon size={14} color="var(--text-3)" />}
+      </div>
+      <p style={{ fontSize: 24, fontWeight: 500, margin: 0, color: accent ?? 'var(--text)' }}>{value}</p>
+    </div>
+  )
+}
+
+function TankOverviewCard({ tank, onDelete }: { tank: DashboardStats['tanks'][0]; onDelete: () => void }) {
+  const navigate = useNavigate()
+  return (
+    <div
+      onClick={() => navigate(`/tanks/${tank.id}`)}
+      style={{ background: 'var(--surface)', border: '0.5px solid var(--border)', borderRadius: 12, padding: '1rem 1.25rem', cursor: 'pointer' }}
+    >
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 }}>
+        <div>
+          <p style={{ fontWeight: 500, fontSize: 15, margin: '0 0 4px', color: 'var(--text)' }}>{tank.name}</p>
+          <p style={{ fontSize: 13, color: 'var(--text-2)', margin: 0 }}>
+            {tank.volume_litres}L{tank.co2_injection ? ' · CO₂' : ''}{tank.substrate ? ` · ${tank.substrate}` : ''}
+          </p>
+        </div>
+        <button
+          onClick={e => { e.stopPropagation(); onDelete() }}
+          style={{ fontSize: 12, padding: '2px 8px', borderRadius: 6, border: '0.5px solid var(--border)', background: 'transparent', cursor: 'pointer', color: 'var(--text-2)', flexShrink: 0 }}
+        >Remove</button>
+      </div>
+
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: tank.unack_alerts || tank.overdue_tasks ? 10 : 0 }}>
+        <Tag bg="var(--tag-bg)" color="var(--text-2)">{tank.fish_count} fish ({tank.fish_species} species)</Tag>
+        <Tag bg="var(--tag-bg)" color="var(--text-2)">{tank.plant_species} plant species</Tag>
+        {tank.latest_ph != null && (
+          <Tag bg="var(--blue-bg)" color="var(--blue)">pH {tank.latest_ph.toFixed(1)}</Tag>
+        )}
+        {tank.latest_temp != null && (
+          <Tag bg="var(--orange-bg)" color="var(--orange)">{tank.latest_temp.toFixed(1)}°C</Tag>
+        )}
+      </div>
+
+      {(tank.unack_alerts > 0 || tank.overdue_tasks > 0) && (
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          {tank.unack_alerts > 0 && (
+            <Tag bg="var(--amber-bg)" color="var(--amber)">{tank.unack_alerts} alert{tank.unack_alerts > 1 ? 's' : ''}</Tag>
+          )}
+          {tank.overdue_tasks > 0 && (
+            <Tag bg="var(--red-bg)" color="var(--red)">{tank.overdue_tasks} overdue task{tank.overdue_tasks > 1 ? 's' : ''}</Tag>
+          )}
+        </div>
+      )}
+
+      {!tank.latest_recorded && (
+        <p style={{ fontSize: 11, color: 'var(--text-4)', margin: '8px 0 0' }}>No parameter readings logged yet</p>
+      )}
+    </div>
+  )
+}
+
+export default function Dashboard() {
+  const { loading, reload } = useTanks()
+  const { dateFormat, unitSystem } = useSettings()
+  const dimProps = dimInputProps(unitSystem)
+  const [stats, setStats] = useState<DashboardStats | null>(null)
+  const [showForm, setShowForm] = useState(false)
+  const [completingId, setCompletingId] = useState<string | null>(null)
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null)
+
+  const [name, setName] = useState('')
+  const [volume, setVolume] = useState('')
+  const [co2, setCo2] = useState(false)
+  const [substrate, setSubstrate] = useState('')
+  const [lighting, setLighting] = useState('')
+  const [filterFlow, setFilterFlow] = useState('')
+  const [width, setWidth] = useState('')
+  const [height, setHeight] = useState('')
+  const [depth, setDepth] = useState('')
+
+  async function loadStats() {
+    const r = await fetch('/api/dashboard')
+    setStats(await r.json())
+  }
+
+  useEffect(() => { loadStats() }, [])
+
+  async function createTank() {
+    if (!name || !volume) return
+    await api.tanks.create({
+      name,
+      volume_litres: Number(volume),
+      co2_injection: co2,
+      substrate: substrate || null,
+      lighting: lighting || null,
+      filter_flow_lph: filterFlow ? Number(filterFlow) : null,
+      width_mm: width ? toMM(Number(width), unitSystem) : null,
+      height_mm: height ? toMM(Number(height), unitSystem) : null,
+      depth_mm: depth ? toMM(Number(depth), unitSystem) : null,
+      setup_date: null,
+    })
+    setName(''); setVolume(''); setCo2(false); setSubstrate(''); setLighting(''); setFilterFlow('')
+    setWidth(''); setHeight(''); setDepth('')
+    setShowForm(false)
+    reload(); loadStats()
+  }
+
+  async function deleteTank(id: string) {
+    setPendingDeleteId(id)
+  }
+
+  async function confirmDeleteTank() {
+    if (!pendingDeleteId) return
+    await api.tanks.delete(pendingDeleteId)
+    setPendingDeleteId(null)
+    reload(); loadStats()
+  }
+
+  async function completeTask(tankId: string, taskId: string) {
+    setCompletingId(taskId)
+    try {
+      await fetch(`/api/tanks/${tankId}/maintenance/${taskId}/complete`, { method: 'PATCH' })
+      await loadStats()
+    } finally {
+      setCompletingId(null)
+    }
+  }
+
+  if (loading || !stats) return <p style={{ color: 'var(--text-2)' }}>Loading dashboard…</p>
+
+  return (
+    <div>
+      {pendingDeleteId && (
+        <ConfirmDialog
+          title="Remove tank"
+          message="This will permanently delete the tank and all its fish, plants, parameters, and history."
+          confirmLabel="Remove tank"
+          danger
+          onConfirm={confirmDeleteTank}
+          onCancel={() => setPendingDeleteId(null)}
+        />
+      )}
+
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+        <h1 style={{ margin: 0, fontSize: 22, fontWeight: 500, color: 'var(--text)' }}>Dashboard</h1>
+        <button onClick={() => setShowForm(true)} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 14, padding: '8px 16px', borderRadius: 8, border: '0.5px solid var(--blue-border)', background: 'var(--blue-bg)', cursor: 'pointer', color: 'var(--blue)' }}>
+          <Plus size={14} />
+          Add tank
+        </button>
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: 12, marginBottom: 20 }}>
+        <StatCard label="Tanks" value={stats.total_tanks} icon={Layers} />
+        <StatCard label="Fish" value={stats.total_fish} icon={Fish} />
+        <StatCard label="Fish species" value={stats.total_species} icon={Fish} />
+        <StatCard label="Plant species" value={stats.total_plants} icon={Leaf} />
+        <StatCard label="Unacknowledged alerts" value={stats.unack_alerts} icon={Bell} accent={stats.unack_alerts > 0 ? 'var(--amber)' : undefined} />
+        <StatCard label="Overdue tasks" value={stats.overdue_tasks} icon={Clock} accent={stats.overdue_tasks > 0 ? 'var(--red)' : undefined} />
+      </div>
+
+      {stats.upcoming_tasks.length > 0 && (
+        <div style={{ marginBottom: 20 }}>
+          <Card>
+            <SectionTitle>Upcoming maintenance</SectionTitle>
+            {stats.upcoming_tasks.map(t => {
+              const tank = stats.tanks.find(tk => tk.id === t.tank_id)
+              return (
+                <div key={t.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: '0.5px solid var(--border-sub)' }}>
+                  <div>
+                    <span style={{ fontSize: 13, color: 'var(--text)', fontWeight: 500 }}>{t.task_type}</span>
+                    <span style={{ fontSize: 12, color: 'var(--text-2)', marginLeft: 8 }}>{tank?.name}</span>
+                    {t.is_recurring && <span style={{ fontSize: 11, color: 'var(--blue)', marginLeft: 8 }}>↻</span>}
+                    {t.description && <span style={{ fontSize: 12, color: 'var(--text-3)', marginLeft: 8 }}>{t.description}</span>}
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <span style={{ fontSize: 12, color: 'var(--text-3)' }}>{formatDate(t.due_at, dateFormat)}</span>
+                    <button
+                      onClick={() => completeTask(t.tank_id, t.id)}
+                      disabled={completingId === t.id}
+                      style={{
+                        fontSize: 11, padding: '3px 10px', borderRadius: 6,
+                        border: '0.5px solid var(--green-border)', background: 'var(--green-bg)', color: 'var(--green)',
+                        cursor: 'pointer', opacity: completingId === t.id ? 0.5 : 1,
+                      }}
+                    >
+                      {completingId === t.id ? '…' : 'Done'}
+                    </button>
+                  </div>
+                </div>
+              )
+            })}
+          </Card>
+        </div>
+      )}
+
+      {showForm && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}
+          onClick={e => { if (e.target === e.currentTarget) { setShowForm(false) } }}>
+          <div style={{ background: 'var(--surface)', borderRadius: 12, border: '0.5px solid var(--border)', width: '100%', maxWidth: 520, maxHeight: '90vh', display: 'flex', flexDirection: 'column' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 20px', borderBottom: '0.5px solid var(--border)' }}>
+              <span style={{ fontWeight: 600, fontSize: 15, color: 'var(--text)' }}>New tank</span>
+              <button onClick={() => setShowForm(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-2)', fontSize: 18, lineHeight: 1, padding: 4 }}>✕</button>
+            </div>
+            <div style={{ padding: '16px 20px', overflowY: 'auto', overflowX: 'hidden', display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                <div>
+                  <FieldLabel>Tank name *</FieldLabel>
+                  <input value={name} onChange={e => setName(e.target.value)} placeholder="e.g. Community tank" style={{ width: '100%', boxSizing: 'border-box' }} />
+                </div>
+                <div>
+                  <FieldLabel>Volume (litres) *</FieldLabel>
+                  <input type="number" value={volume} onChange={e => setVolume(e.target.value)} placeholder="e.g. 120" style={{ width: '100%', boxSizing: 'border-box' }} />
+                </div>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
+                <div>
+                  <FieldLabel>Substrate</FieldLabel>
+                  <input value={substrate} onChange={e => setSubstrate(e.target.value)} placeholder="e.g. Fine sand" style={{ width: '100%', boxSizing: 'border-box' }} />
+                </div>
+                <div>
+                  <FieldLabel>Lighting</FieldLabel>
+                  <input value={lighting} onChange={e => setLighting(e.target.value)} placeholder="e.g. LED full spectrum" style={{ width: '100%', boxSizing: 'border-box' }} />
+                </div>
+                <div>
+                  <FieldLabel>Filter flow (L/h)</FieldLabel>
+                  <input type="number" value={filterFlow} onChange={e => setFilterFlow(e.target.value)} placeholder="e.g. 600" style={{ width: '100%', boxSizing: 'border-box' }} />
+                </div>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
+                <div>
+                  <FieldLabel>Width ({unitSystem})</FieldLabel>
+                  <input type="number" min="0" step={dimProps.step} value={width} onChange={e => setWidth(e.target.value)} placeholder={dimProps.placeholder} style={{ width: '100%', boxSizing: 'border-box' }} />
+                </div>
+                <div>
+                  <FieldLabel>Height ({unitSystem})</FieldLabel>
+                  <input type="number" min="0" step={dimProps.step} value={height} onChange={e => setHeight(e.target.value)} placeholder={dimProps.placeholder} style={{ width: '100%', boxSizing: 'border-box' }} />
+                </div>
+                <div>
+                  <FieldLabel>Depth ({unitSystem})</FieldLabel>
+                  <input type="number" min="0" step={dimProps.step} value={depth} onChange={e => setDepth(e.target.value)} placeholder={dimProps.placeholder} style={{ width: '100%', boxSizing: 'border-box' }} />
+                </div>
+              </div>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: 'var(--text-label)' }}>
+                <input type="checkbox" checked={co2} onChange={e => setCo2(e.target.checked)} />
+                CO₂ injection
+              </label>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, padding: '12px 20px', borderTop: '0.5px solid var(--border)' }}>
+              <button onClick={() => setShowForm(false)} style={{ fontSize: 13, padding: '7px 16px', borderRadius: 8, border: '0.5px solid var(--border)', background: 'transparent', cursor: 'pointer', color: 'var(--text-2)' }}>
+                Cancel
+              </button>
+              <button
+                onClick={createTank}
+                disabled={!name || !volume}
+                style={{ fontSize: 13, padding: '7px 18px', borderRadius: 8, border: '0.5px solid var(--blue-border)', background: !name || !volume ? 'var(--surface-2)' : 'var(--blue-bg)', cursor: !name || !volume ? 'default' : 'pointer', color: !name || !volume ? 'var(--text-3)' : 'var(--blue)', fontWeight: 500 }}
+              >
+                Create tank
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <p style={{ fontWeight: 500, fontSize: 15, margin: '0 0 12px', color: 'var(--text)' }}>Your tanks</p>
+
+      {stats.tanks.length === 0 && (
+        <p style={{ color: 'var(--text-2)', fontSize: 14 }}>No tanks yet. Add your first one above.</p>
+      )}
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 16 }}>
+        {stats.tanks.map(t => <TankOverviewCard key={t.id} tank={t} onDelete={() => deleteTank(t.id)} />)}
+      </div>
+    </div>
+  )
+}
