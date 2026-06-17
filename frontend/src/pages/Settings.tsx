@@ -5,7 +5,7 @@ import { Card } from '../components/ui'
 import { api, Tank } from '../api/client'
 
 const APP_VERSION = '0.5.0'
-const GITHUB_REPO = 'ThatTom/Aqua-Log'
+const GITHUB_REPO = 'TankBook/TankBook-App'
 
 function semverNewer(current: string, latest: string): boolean {
   const c = current.split('.').map(Number)

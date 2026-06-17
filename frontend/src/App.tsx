@@ -149,7 +149,7 @@ function Footer() {
         <span style={{ fontSize: 12, color: 'var(--text-2)' }}>© {new Date().getFullYear()}</span>
       </span>
       <a
-        href="https://github.com/ThatTom/Aqua-Log"
+        href="https://github.com/TankBook/TankBook-App"
         target="_blank"
         rel="noopener noreferrer"
         style={{
