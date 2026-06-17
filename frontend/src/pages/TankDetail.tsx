@@ -643,20 +643,33 @@ export default function TankDetail() {
         </div>
       )}
 
-      <div style={{ display: 'flex', gap: 4, marginBottom: 20, flexWrap: 'wrap' }}>
+      <div style={{ display: 'flex', gap: 4, marginBottom: 20 }}>
         {(['fish', 'plants', 'parameters', 'schedule', 'daily', 'alerts', 'gallery', 'edit'] as Tab[]).map(t => {
           const Icon = TAB_ICONS[t]
+          const label = t.charAt(0).toUpperCase() + t.slice(1)
           return (
-            <button key={t} style={{ ...tabStyle(tab === t), display: 'flex', alignItems: 'center', gap: 5 }} onClick={() => setTab(t)}>
-              <Icon size={13} />
-              {t.charAt(0).toUpperCase() + t.slice(1)}
+            <button
+              key={t}
+              title={label}
+              onClick={() => setTab(t)}
+              style={{ ...tabStyle(tab === t), position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '7px 10px' }}
+            >
+              <Icon size={16} />
               {t === 'alerts' && unackAlerts.length > 0 && (
-                <span style={{ marginLeft: 2, background: '#e24b4a', color: '#fff', borderRadius: 10, fontSize: 10, padding: '1px 6px' }}>
+                <span style={{
+                  position: 'absolute', top: 2, right: 2,
+                  background: '#e24b4a', color: '#fff', borderRadius: 10,
+                  fontSize: 9, padding: '1px 4px', lineHeight: 1.4,
+                }}>
                   {unackAlerts.length}
                 </span>
               )}
               {t === 'schedule' && overdueTasks.length > 0 && (
-                <span style={{ marginLeft: 2, background: 'var(--red-border)', color: '#fff', borderRadius: 10, fontSize: 10, padding: '1px 6px' }}>
+                <span style={{
+                  position: 'absolute', top: 2, right: 2,
+                  background: 'var(--red-border)', color: '#fff', borderRadius: 10,
+                  fontSize: 9, padding: '1px 4px', lineHeight: 1.4,
+                }}>
                   {overdueTasks.length}
                 </span>
               )}
