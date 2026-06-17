@@ -1,8 +1,8 @@
 <p align="center">
-  <img src="aqua-log/frontend/public/favicon.svg" width="80" alt="Aqua Log logo" />
+  <img src="frontend/public/favicon.svg" width="80" alt="TankBook logo" />
 </p>
 
-<h1 align="center">Aqua Log</h1>
+<h1 align="center">TankBook</h1>
 
 <p align="center">
   A self-hosted aquarium management application.<br/>
