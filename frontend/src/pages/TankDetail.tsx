@@ -450,6 +450,7 @@ export default function TankDetail() {
   const [lightboxIdx, setLightboxIdx] = useState<number | null>(null)
   const [galleryUploading, setGalleryUploading] = useState(false)
   const galleryInputRef = useRef<HTMLInputElement>(null)
+  const cameraInputRef = useRef<HTMLInputElement>(null)
 
   const [tasks, setTasks] = useState<any[]>([])
   const [taskType, setTaskType] = useState(TASK_TYPES[0])
@@ -1216,12 +1217,20 @@ export default function TankDetail() {
       {/* GALLERY TAB */}
       {tab === 'gallery' && (
         <div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16, flexWrap: 'wrap' }}>
             <input
               ref={galleryInputRef}
               type="file"
               accept="image/jpeg,image/png,image/webp,image/gif"
               multiple
+              style={{ display: 'none' }}
+              onChange={handleGalleryUpload}
+            />
+            <input
+              ref={cameraInputRef}
+              type="file"
+              accept="image/*"
+              capture="environment"
               style={{ display: 'none' }}
               onChange={handleGalleryUpload}
             />
@@ -1236,6 +1245,18 @@ export default function TankDetail() {
               }}
             >
               <Camera size={13} />{galleryUploading ? 'Uploading…' : 'Upload photos'}
+            </button>
+            <button
+              onClick={() => cameraInputRef.current?.click()}
+              disabled={galleryUploading}
+              style={{
+                display: 'inline-flex', alignItems: 'center', gap: 6,
+                fontSize: 13, padding: '7px 16px', borderRadius: 8, fontWeight: 500,
+                border: '0.5px solid var(--btn-border)', background: 'transparent', color: 'var(--text-2)',
+                cursor: galleryUploading ? 'not-allowed' : 'pointer', opacity: galleryUploading ? 0.6 : 1,
+              }}
+            >
+              <Camera size={13} />Take photo
             </button>
             <span style={{ fontSize: 12, color: 'var(--text-3)' }}>JPEG, PNG, WebP or GIF · multiple files supported</span>
           </div>
