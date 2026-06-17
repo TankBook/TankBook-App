@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { NotebookPen, Trash2, Plus } from 'lucide-react'
+import { NotebookPen, Trash2, Plus, Pencil } from 'lucide-react'
 import { Tag, Card, FieldLabel, SectionTitle } from '../components/ui'
 import { api, JournalEntry, Tank, TankFish } from '../api/client'
 import { useSettings, formatDate } from '../context/SettingsContext'
@@ -40,6 +40,42 @@ export default function LivestockJournal() {
   })
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
+
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [editForm, setEditForm] = useState({ tank_fish_id: '', event_type: 'observation', notes: '', occurred_at: '' })
+  const [editSaving, setEditSaving] = useState(false)
+  const [editError, setEditError] = useState<string | null>(null)
+
+  function startEdit(entry: JournalEntry) {
+    setEditingId(entry.id)
+    setEditForm({
+      tank_fish_id: entry.tank_fish_id ?? '',
+      event_type: entry.event_type,
+      notes: entry.notes,
+      occurred_at: new Date(entry.occurred_at).toISOString().slice(0, 16),
+    })
+    setEditError(null)
+  }
+
+  async function handleEdit(entry: JournalEntry) {
+    if (!editForm.notes.trim()) return
+    setEditSaving(true)
+    setEditError(null)
+    try {
+      const updated = await api.journal.update(selectedTank, entry.id, {
+        tank_fish_id: editForm.tank_fish_id || null,
+        event_type: editForm.event_type,
+        notes: editForm.notes.trim(),
+        occurred_at: new Date(editForm.occurred_at).toISOString(),
+      })
+      setEntries(prev => prev.map(e => e.id === entry.id ? updated : e))
+      setEditingId(null)
+    } catch (e: any) {
+      setEditError(e.message ?? 'Save failed')
+    } finally {
+      setEditSaving(false)
+    }
+  }
 
   useEffect(() => {
     api.tanks.list().then(list => {
@@ -225,33 +261,87 @@ export default function LivestockJournal() {
           <div
             key={entry.id}
             style={{
-              background: 'var(--surface)', border: '0.5px solid var(--border)',
+              background: 'var(--surface)', border: `0.5px solid ${editingId === entry.id ? 'var(--blue-border)' : 'var(--border)'}`,
               borderRadius: 12, padding: '12px 16px',
             }}
           >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 6, flexWrap: 'wrap' }}>
-                  <EventBadge type={entry.event_type} />
-                  {entry.common_name && (
-                    <Tag bg="var(--tag-bg)" color="var(--text-2)">{entry.common_name}</Tag>
-                  )}
-                  <span style={{ fontSize: 11, color: 'var(--text-3)' }}>
-                    {formatDate(entry.occurred_at, dateFormat)}
-                    {' '}
-                    {new Date(entry.occurred_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                  </span>
+            {editingId === entry.id ? (
+              <div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
+                  <div>
+                    <FieldLabel>Event type</FieldLabel>
+                    <select value={editForm.event_type} onChange={e => setEditForm(f => ({ ...f, event_type: e.target.value }))} style={{ width: '100%' }}>
+                      {EVENT_TYPES.map(t => <option key={t} value={t}>{t.charAt(0).toUpperCase() + t.slice(1)}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <FieldLabel>Date &amp; time</FieldLabel>
+                    <input type="datetime-local" value={editForm.occurred_at} onChange={e => setEditForm(f => ({ ...f, occurred_at: e.target.value }))} style={{ width: '100%', boxSizing: 'border-box' }} />
+                  </div>
                 </div>
-                <p style={{ fontSize: 13, color: 'var(--text)', margin: 0, lineHeight: 1.5 }}>{entry.notes}</p>
+                <div style={{ marginBottom: 10 }}>
+                  <FieldLabel>Species (optional)</FieldLabel>
+                  <select value={editForm.tank_fish_id} onChange={e => setEditForm(f => ({ ...f, tank_fish_id: e.target.value }))} style={{ width: '100%' }}>
+                    <option value="">— tank-wide entry —</option>
+                    {fishList.map(f => <option key={f.id} value={f.id}>{f.common_name ?? f.species_slug} ×{f.quantity}</option>)}
+                  </select>
+                </div>
+                <div style={{ marginBottom: 10 }}>
+                  <FieldLabel>Notes</FieldLabel>
+                  <textarea value={editForm.notes} onChange={e => setEditForm(f => ({ ...f, notes: e.target.value }))} rows={3} style={{ width: '100%', boxSizing: 'border-box', resize: 'vertical' }} />
+                </div>
+                {editError && <p style={{ fontSize: 12, color: 'var(--red)', margin: '0 0 8px' }}>{editError}</p>}
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button
+                    onClick={() => handleEdit(entry)}
+                    disabled={!editForm.notes.trim() || editSaving}
+                    style={{
+                      fontSize: 12, padding: '6px 16px', borderRadius: 8, fontWeight: 500,
+                      border: '0.5px solid var(--blue-border)', background: 'var(--blue-bg)', color: 'var(--blue)',
+                      cursor: editForm.notes.trim() && !editSaving ? 'pointer' : 'not-allowed',
+                      opacity: editForm.notes.trim() && !editSaving ? 1 : 0.45,
+                    }}
+                  >{editSaving ? 'Saving…' : 'Save changes'}</button>
+                  <button
+                    onClick={() => setEditingId(null)}
+                    style={{ fontSize: 12, padding: '6px 12px', borderRadius: 8, border: '0.5px solid var(--btn-border)', background: 'transparent', color: 'var(--text-2)', cursor: 'pointer' }}
+                  >Cancel</button>
+                </div>
               </div>
-              <button
-                onClick={() => handleDelete(entry)}
-                title="Delete entry"
-                style={{ padding: '4px 6px', borderRadius: 6, border: '0.5px solid var(--border)', background: 'transparent', cursor: 'pointer', color: 'var(--text-3)', flexShrink: 0 }}
-              >
-                <Trash2 size={13} />
-              </button>
-            </div>
+            ) : (
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 6, flexWrap: 'wrap' }}>
+                    <EventBadge type={entry.event_type} />
+                    {entry.common_name && (
+                      <Tag bg="var(--tag-bg)" color="var(--text-2)">{entry.common_name}</Tag>
+                    )}
+                    <span style={{ fontSize: 11, color: 'var(--text-3)' }}>
+                      {formatDate(entry.occurred_at, dateFormat)}
+                      {' '}
+                      {new Date(entry.occurred_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    </span>
+                  </div>
+                  <p style={{ fontSize: 13, color: 'var(--text)', margin: 0, lineHeight: 1.5 }}>{entry.notes}</p>
+                </div>
+                <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
+                  <button
+                    onClick={() => startEdit(entry)}
+                    title="Edit entry"
+                    style={{ padding: '4px 6px', borderRadius: 6, border: '0.5px solid var(--border)', background: 'transparent', cursor: 'pointer', color: 'var(--text-3)' }}
+                  >
+                    <Pencil size={13} />
+                  </button>
+                  <button
+                    onClick={() => handleDelete(entry)}
+                    title="Delete entry"
+                    style={{ padding: '4px 6px', borderRadius: 6, border: '0.5px solid var(--border)', background: 'transparent', cursor: 'pointer', color: 'var(--text-3)' }}
+                  >
+                    <Trash2 size={13} />
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         ))}
       </div>

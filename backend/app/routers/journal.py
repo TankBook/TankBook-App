@@ -3,7 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models.models import JournalEntry, TankFish
-from app.schemas.schemas import JournalEntryCreate, JournalEntryOut
+from app.schemas.schemas import JournalEntryCreate, JournalEntryUpdate, JournalEntryOut
 from app.services.species import species_service
 
 router = APIRouter()
@@ -53,6 +53,26 @@ def add_journal(tank_id: str, body: JournalEntryCreate, db: Session = Depends(ge
         data["occurred_at"] = datetime.utcnow()
     entry = JournalEntry(tank_id=tank_id, **data)
     db.add(entry)
+    db.commit()
+    db.refresh(entry)
+    return _enrich(entry, db)
+
+
+@router.patch("/{tank_id}/journal/{entry_id}")
+def update_journal(tank_id: str, entry_id: str, body: JournalEntryUpdate, db: Session = Depends(get_db)):
+    entry = db.query(JournalEntry).filter_by(id=entry_id, tank_id=tank_id).first()
+    if not entry:
+        raise HTTPException(404, "Journal entry not found")
+    if body.tank_fish_id is not None:
+        if body.tank_fish_id != "" and not db.query(TankFish).filter_by(id=body.tank_fish_id, tank_id=tank_id).first():
+            raise HTTPException(404, "Fish entry not found in this tank")
+        entry.tank_fish_id = body.tank_fish_id or None
+    if body.event_type is not None:
+        entry.event_type = body.event_type
+    if body.notes is not None:
+        entry.notes = body.notes
+    if body.occurred_at is not None:
+        entry.occurred_at = body.occurred_at
     db.commit()
     db.refresh(entry)
     return _enrich(entry, db)

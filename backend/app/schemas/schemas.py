@@ -157,6 +157,13 @@ class JournalEntryCreate(BaseModel):
     occurred_at: datetime | None = None
 
 
+class JournalEntryUpdate(BaseModel):
+    tank_fish_id: str | None = None
+    event_type: str | None = None
+    notes: str | None = None
+    occurred_at: datetime | None = None
+
+
 class JournalEntryOut(BaseModel):
     id: str
     tank_id: str

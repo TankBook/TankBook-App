@@ -242,6 +242,8 @@ export const api = {
     list: (tankId: string) => get<JournalEntry[]>(`/tanks/${tankId}/journal`),
     add: (tankId: string, body: { tank_fish_id?: string | null; event_type: string; notes: string; occurred_at?: string }) =>
       post<JournalEntry>(`/tanks/${tankId}/journal`, body),
+    update: (tankId: string, entryId: string, body: { tank_fish_id?: string | null; event_type?: string; notes?: string; occurred_at?: string }) =>
+      patch<JournalEntry>(`/tanks/${tankId}/journal/${entryId}`, body),
     delete: (tankId: string, entryId: string) => del(`/tanks/${tankId}/journal/${entryId}`),
   },
   images: {
