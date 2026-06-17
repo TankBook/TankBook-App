@@ -14,7 +14,7 @@ const EVENT_TYPES = [
 ]
 
 const EVENT_LABELS: Record<string, string> = {
-  water_change: 'Water change',
+  water_change: 'Water Change',
   equipment:    'Equipment',
   maintenance:  'Maintenance',
   plant:        'Plant',
@@ -64,13 +64,13 @@ function EntryFormFields({
     <>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
         <div>
-          <FieldLabel>Event type</FieldLabel>
+          <FieldLabel>Event Type</FieldLabel>
           <select value={form.event_type} onChange={e => setForm(f => ({ ...f, event_type: e.target.value }))} style={{ width: '100%' }}>
             {EVENT_TYPES.map(t => <option key={t} value={t}>{EVENT_LABELS[t] ?? t}</option>)}
           </select>
         </div>
         <div>
-          <FieldLabel>Date &amp; time</FieldLabel>
+          <FieldLabel>Date &amp; Time</FieldLabel>
           <input
             type="datetime-local"
             value={form.occurred_at}
@@ -80,7 +80,7 @@ function EntryFormFields({
         </div>
       </div>
       <div style={{ marginBottom: 12 }}>
-        <FieldLabel>Species (optional)</FieldLabel>
+        <FieldLabel>Species (Optional)</FieldLabel>
         <select value={form.tank_fish_id} onChange={e => setForm(f => ({ ...f, tank_fish_id: e.target.value }))} style={{ width: '100%' }}>
           <option value="">— tank-wide entry —</option>
           {fishList.map(f => (
@@ -222,7 +222,7 @@ export default function LivestockJournal() {
   return (
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-        <h1 style={{ margin: 0, fontSize: 22, fontWeight: 500, color: 'var(--text)' }}>Tank journal</h1>
+        <h1 style={{ margin: 0, fontSize: 22, fontWeight: 500, color: 'var(--text)' }}>Tank Journal</h1>
         {selectedTank && (
           <button
             onClick={openModal}
@@ -233,14 +233,14 @@ export default function LivestockJournal() {
               cursor: 'pointer',
             }}
           >
-            <Plus size={13} />Add entry
+            <Plus size={13} />Add Entry
           </button>
         )}
       </div>
 
       {/* Tank selector */}
       <Card style={{ marginBottom: 20 }}>
-        <FieldLabel>Select tank</FieldLabel>
+        <FieldLabel>Select Tank</FieldLabel>
         <select
           value={selectedTank}
           onChange={e => { setSelectedTank(e.target.value); setFilterType('all') }}
@@ -326,7 +326,7 @@ export default function LivestockJournal() {
                       cursor: editForm.notes.trim() && !editSaving ? 'pointer' : 'not-allowed',
                       opacity: editForm.notes.trim() && !editSaving ? 1 : 0.45,
                     }}
-                  >{editSaving ? 'Saving…' : 'Save changes'}</button>
+                  >{editSaving ? 'Saving…' : 'Save Changes'}</button>
                   <button
                     onClick={() => setEditingId(null)}
                     style={{ fontSize: 12, padding: '6px 12px', borderRadius: 8, border: '0.5px solid var(--btn-border)', background: 'transparent', color: 'var(--text-2)', cursor: 'pointer' }}
@@ -373,7 +373,7 @@ export default function LivestockJournal() {
 
       {/* Add entry modal */}
       {showModal && (
-        <Modal title={`New entry — ${tankName}`} onClose={() => setShowModal(false)}>
+        <Modal title={`New Entry — ${tankName}`} onClose={() => setShowModal(false)}>
           <EntryFormFields form={form} setForm={setForm} fishList={fishList} />
           {saveError && <p style={{ fontSize: 13, color: 'var(--red)', margin: '10px 0 0' }}>{saveError}</p>}
           <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
@@ -386,7 +386,7 @@ export default function LivestockJournal() {
                 cursor: form.notes.trim() && !saving ? 'pointer' : 'not-allowed',
                 opacity: form.notes.trim() && !saving ? 1 : 0.45,
               }}
-            >{saving ? 'Saving…' : 'Save entry'}</button>
+            >{saving ? 'Saving…' : 'Save Entry'}</button>
             <button
               onClick={() => setShowModal(false)}
               style={{ fontSize: 13, padding: '7px 14px', borderRadius: 8, border: '0.5px solid var(--btn-border)', background: 'transparent', color: 'var(--text-2)', cursor: 'pointer' }}

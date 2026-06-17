@@ -158,7 +158,7 @@ export default function CompatibilityChecker() {
   return (
     <div>
       <div style={{ marginBottom: 20 }}>
-        <h1 style={{ margin: '0 0 4px', fontSize: 22, fontWeight: 500, color: 'var(--text)' }}>Compatibility checker</h1>
+        <h1 style={{ margin: '0 0 4px', fontSize: 22, fontWeight: 500, color: 'var(--text)' }}>Compatibility Checker</h1>
         <p style={{ margin: 0, fontSize: 13, color: 'var(--text-2)' }}>
           Build a stocklist and instantly see conflicts based on species data.
         </p>
@@ -166,7 +166,7 @@ export default function CompatibilityChecker() {
 
       {/* Search */}
       <Card style={{ marginBottom: 20 }}>
-        <SectionTitle>Add species to stocklist</SectionTitle>
+        <SectionTitle>Add Species To Stocklist</SectionTitle>
         <div ref={dropdownRef} style={{ position: 'relative' }}>
           <input
             ref={inputRef}
@@ -287,7 +287,7 @@ export default function CompatibilityChecker() {
 
           {/* Water parameter summary */}
           <Card>
-            <SectionTitle>Water parameter overlap</SectionTitle>
+            <SectionTitle>Water Parameter Overlap</SectionTitle>
             <div style={{ overflowX: 'auto' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
                 <thead>

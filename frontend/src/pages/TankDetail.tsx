@@ -27,6 +27,7 @@ const TAB_ICONS: Record<string, LucideIcon> = {
 }
 
 const DAY_ABBR = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1)
 const DAILY_COLORS = ['#1e88e5', '#43a047', '#26c6da', '#fb8c00', '#e63946', '#8b5cf6']
 const HEALTH_COLORS: Record<string, { bg: string; color: string }> = {
   healthy:    { bg: 'var(--green-bg)',  color: 'var(--green)'  },
@@ -146,13 +147,13 @@ function EditTankPanel({ tank, onSave }: { tank: any; onSave: () => void }) {
 
   return (
     <Card>
-      <SectionTitle>Edit tank</SectionTitle>
+      <SectionTitle>Edit Tank</SectionTitle>
       {[
-        ['Tank name', name, setName],
-        ['Volume (litres)', volume, setVolume],
+        ['Tank Name', name, setName],
+        ['Volume (Litres)', volume, setVolume],
         ['Substrate', substrate, setSubstrate],
         ['Lighting', lighting, setLighting],
-        ['Filter flow (L/h)', filterFlow, setFilterFlow],
+        ['Filter Flow (L/h)', filterFlow, setFilterFlow],
       ].map(([lbl, val, set]) => (
         <div key={lbl as string} style={{ marginBottom: 12 }}>
           <FieldLabel>{lbl as string}</FieldLabel>
@@ -160,7 +161,7 @@ function EditTankPanel({ tank, onSave }: { tank: any; onSave: () => void }) {
         </div>
       ))}
       <div style={{ marginBottom: 12 }}>
-        <FieldLabel>Water type</FieldLabel>
+        <FieldLabel>Water Type</FieldLabel>
         <select value={waterType} onChange={e => setWaterType(e.target.value)} style={{ width: '100%', boxSizing: 'border-box' }}>
           <option value="freshwater">Freshwater</option>
           <option value="saltwater">Saltwater / Marine</option>
@@ -185,13 +186,13 @@ function EditTankPanel({ tank, onSave }: { tank: any; onSave: () => void }) {
       </div>
 
       <div style={{ marginTop: 28, paddingTop: 20, borderTop: '0.5px solid var(--border)' }}>
-        <p style={{ margin: '0 0 10px', fontSize: 12, fontWeight: 600, color: 'var(--red)', letterSpacing: '0.06em', textTransform: 'uppercase' }}>Danger zone</p>
+        <p style={{ margin: '0 0 10px', fontSize: 12, fontWeight: 600, color: 'var(--red)', letterSpacing: '0.06em', textTransform: 'uppercase' }}>Danger Zone</p>
         {!showDeleteConfirm ? (
           <button
             onClick={() => setShowDeleteConfirm(true)}
             style={{ padding: '7px 16px', borderRadius: 8, border: '0.5px solid var(--red-border)', background: 'transparent', color: 'var(--red)', fontSize: 13, cursor: 'pointer' }}
           >
-            Delete tank…
+            Delete Tank…
           </button>
         ) : (
           <div style={{ background: 'var(--red-bg)', border: '0.5px solid var(--red-border)', borderRadius: 10, padding: '14px 16px' }}>
@@ -770,7 +771,7 @@ export default function TankDetail() {
                   {f.notes && <p style={{ margin: '2px 0 0', fontSize: 11, color: 'var(--text-2)' }}>{f.notes}</p>}
                 </div>
                 <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexShrink: 0 }}>
-                  <Tag bg={hc.bg} color={hc.color}>{f.health_status}</Tag>
+                  <Tag bg={hc.bg} color={hc.color}>{cap(f.health_status)}</Tag>
                   <button onClick={() => startEditFish(f)} style={{ fontSize: 11, color: 'var(--text-2)', background: 'none', border: '0.5px solid var(--btn-border)', borderRadius: 6, padding: '2px 8px', cursor: 'pointer' }}>Edit</button>
                   <button onClick={async () => { await api.fish.remove(id!, f.id); fish.reload() }} style={{ display: 'flex', alignItems: 'center', gap: 3, fontSize: 11, color: 'var(--red)', background: 'none', border: 'none', cursor: 'pointer' }}>
                     <Trash2 size={11} />Remove
@@ -814,7 +815,7 @@ export default function TankDetail() {
                     )}
                   </div>
                   <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexShrink: 0 }}>
-                    <Tag bg={sc.bg} color={sc.color}>{p.plant_status}</Tag>
+                    <Tag bg={sc.bg} color={sc.color}>{cap(p.plant_status)}</Tag>
                     <button
                       onClick={() => {
                         if (isEditing) { setEditingPlantId(null); return }
@@ -879,7 +880,7 @@ export default function TankDetail() {
               onClick={() => setShowAddPlant(true)}
               style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 13, padding: '7px 16px', borderRadius: 8, fontWeight: 500, cursor: 'pointer', border: '0.5px solid var(--green-border)', background: 'var(--green-bg)', color: 'var(--green)' }}
             >
-              <Plus size={13} />Add plant
+              <Plus size={13} />Add Plant
             </button>
           </div>
         </Card>
@@ -889,7 +890,7 @@ export default function TankDetail() {
       {tab === 'parameters' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           <Card>
-            <SectionTitle>Log parameters</SectionTitle>
+            <SectionTitle>Log Parameters</SectionTitle>
             <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(auto-fill, minmax(110px, 1fr))', gap: 10 }}>
               {([
                 ['pH', ph, setPh],
@@ -900,7 +901,7 @@ export default function TankDetail() {
                 ...(tank.water_type === 'freshwater'
                   ? [['GH (dGH)', gh, setGh], ['KH (dKH)', kh, setKh]]
                   : [['GH (dGH)', gh, setGh], ['KH / Alk', kh, setKh],
-                     ['Salinity (ppt)', salinity, setSalinity], ['Specific gravity', sg, setSg]]),
+                     ['Salinity (ppt)', salinity, setSalinity], ['Specific Gravity', sg, setSg]]),
               ] as [string, string, (v: string) => void][]).map(([lbl, val, set]) => (
                 <div key={lbl}>
                   <FieldLabel>{lbl}</FieldLabel>
@@ -933,7 +934,7 @@ export default function TankDetail() {
                 setGh(''); setKh(''); setSalinity(''); setSg('')
                 params.reload(); alerts.reload()
               }}
-            >Save reading</button>
+            >Save Reading</button>
           </Card>
 
           {chartData.length > 0 && (
@@ -974,17 +975,17 @@ export default function TankDetail() {
       {tab === 'schedule' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           <Card>
-            <SectionTitle>Add task</SectionTitle>
+            <SectionTitle>Add Task</SectionTitle>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
               <div>
-                <FieldLabel>Task type</FieldLabel>
+                <FieldLabel>Task Type</FieldLabel>
                 <select value={taskType} onChange={e => setTaskType(e.target.value)} style={{ width: '100%', boxSizing: 'border-box' }}>
                   {TASK_TYPES.map(t => <option key={t}>{t}</option>)}
                 </select>
               </div>
               {!isRecurring && (
                 <div>
-                  <FieldLabel>Due date</FieldLabel>
+                  <FieldLabel>Due Date</FieldLabel>
                   <input type="date" value={taskDue} onChange={e => setTaskDue(e.target.value)} style={{ width: '100%', boxSizing: 'border-box' }} />
                 </div>
               )}
@@ -1015,10 +1016,10 @@ export default function TankDetail() {
             )}
 
             <div style={{ marginBottom: 12 }}>
-              <FieldLabel>Notes (optional)</FieldLabel>
+              <FieldLabel>Notes (Optional)</FieldLabel>
               <input value={taskDesc} onChange={e => setTaskDesc(e.target.value)} placeholder="e.g. 30% water change" style={{ width: '100%', boxSizing: 'border-box' }} />
             </div>
-            <button onClick={addTask}>Add task</button>
+            <button onClick={addTask}>Add Task</button>
           </Card>
 
           {pendingTasks.length > 0 && (
@@ -1145,10 +1146,10 @@ export default function TankDetail() {
 
           {/* Add task form */}
           <Card>
-            <SectionTitle>Add routine task</SectionTitle>
+            <SectionTitle>Add Routine Task</SectionTitle>
             <div style={{ display: 'flex', gap: 10, marginBottom: 12, flexWrap: 'wrap' }}>
               <div style={{ flex: 1, minWidth: 160 }}>
-                <FieldLabel>Task name</FieldLabel>
+                <FieldLabel>Task Name</FieldLabel>
                 <input
                   value={dtName} onChange={e => setDtName(e.target.value)}
                   placeholder="e.g. Morning feed, CO2 on, Lights on"
@@ -1318,7 +1319,7 @@ export default function TankDetail() {
             style={{ background: 'var(--surface)', border: '0.5px solid var(--border)', borderRadius: 14, padding: '1.5rem', width: 400, maxWidth: '100%', boxShadow: '0 12px 40px rgba(0,0,0,0.22)' }}
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-              <p style={{ margin: 0, fontWeight: 600, fontSize: 15, color: 'var(--text)' }}>Edit fish</p>
+              <p style={{ margin: 0, fontWeight: 600, fontSize: 15, color: 'var(--text)' }}>Edit Fish</p>
               <button onClick={() => setEditingFishId(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-2)', lineHeight: 0 }}><X size={18} /></button>
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: '80px 1fr', gap: 10, marginBottom: 12 }}>
@@ -1327,9 +1328,9 @@ export default function TankDetail() {
                 <input type="number" min="1" value={editQty} onChange={e => setEditQty(e.target.value)} style={{ width: '100%', boxSizing: 'border-box' }} />
               </div>
               <div>
-                <FieldLabel>Health status</FieldLabel>
+                <FieldLabel>Health Status</FieldLabel>
                 <select value={editHealth} onChange={e => setEditHealth(e.target.value)} style={{ width: '100%', boxSizing: 'border-box' }}>
-                  {HEALTH_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
+                  {HEALTH_STATUSES.map(s => <option key={s} value={s}>{cap(s)}</option>)}
                 </select>
               </div>
             </div>
@@ -1356,7 +1357,7 @@ export default function TankDetail() {
             style={{ background: 'var(--surface)', border: '0.5px solid var(--border)', borderRadius: 14, padding: '1.5rem', width: 400, maxWidth: '100%', boxShadow: '0 12px 40px rgba(0,0,0,0.22)' }}
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-              <p style={{ margin: 0, fontWeight: 600, fontSize: 15, color: 'var(--text)' }}>Add fish</p>
+              <p style={{ margin: 0, fontWeight: 600, fontSize: 15, color: 'var(--text)' }}>Add Fish</p>
               <button onClick={() => { setShowAddFish(false); setFishSlug(''); setFishName(''); setFishQty('1') }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-2)', lineHeight: 0 }}><X size={18} /></button>
             </div>
             <div style={{ marginBottom: 12 }}>
@@ -1380,7 +1381,7 @@ export default function TankDetail() {
                   fish.reload()
                 }}
                 style={{ padding: '7px 16px', borderRadius: 8, fontSize: 13, fontWeight: 500, cursor: fishSlug ? 'pointer' : 'not-allowed', border: '0.5px solid var(--blue-border)', background: 'var(--blue-bg)', color: 'var(--blue)', opacity: fishSlug ? 1 : 0.45 }}
-              >Add fish</button>
+              >Add Fish</button>
             </div>
           </div>
         </div>
@@ -1397,7 +1398,7 @@ export default function TankDetail() {
             style={{ background: 'var(--surface)', border: '0.5px solid var(--border)', borderRadius: 14, padding: '1.5rem', width: 400, maxWidth: '100%', boxShadow: '0 12px 40px rgba(0,0,0,0.22)' }}
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-              <p style={{ margin: 0, fontWeight: 600, fontSize: 15, color: 'var(--text)' }}>Add plant</p>
+              <p style={{ margin: 0, fontWeight: 600, fontSize: 15, color: 'var(--text)' }}>Add Plant</p>
               <button onClick={() => { setShowAddPlant(false); setPlantSlug(''); setPlantName(''); setPlantQty('1'); setPlantAddStatus('planted') }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-2)', lineHeight: 0 }}><X size={18} /></button>
             </div>
             <div style={{ marginBottom: 12 }}>
@@ -1430,7 +1431,7 @@ export default function TankDetail() {
                   plants.reload()
                 }}
                 style={{ padding: '7px 16px', borderRadius: 8, fontSize: 13, fontWeight: 500, cursor: plantSlug ? 'pointer' : 'not-allowed', border: '0.5px solid var(--green-border)', background: 'var(--green-bg)', color: 'var(--green)', opacity: plantSlug ? 1 : 0.45 }}
-              >Add plant</button>
+              >Add Plant</button>
             </div>
           </div>
         </div>

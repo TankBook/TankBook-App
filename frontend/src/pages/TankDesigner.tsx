@@ -196,7 +196,7 @@ export default function TankDesigner() {
     <div>
       {showClearConfirm && (
         <ConfirmDialog
-          title="Clear design"
+          title="Clear Design"
           message="This will remove all placed items from the canvas. The saved design will remain until you save again."
           confirmLabel="Clear canvas"
           danger
@@ -206,7 +206,7 @@ export default function TankDesigner() {
       )}
       {/* Header bar */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20, flexWrap: 'wrap' }}>
-        <h1 style={{ margin: 0, fontSize: 22, fontWeight: 500, color: 'var(--text)', flex: 1 }}>Tank designer</h1>
+        <h1 style={{ margin: 0, fontSize: 22, fontWeight: 500, color: 'var(--text)', flex: 1 }}>Tank Designer</h1>
         <select
           value={tankId}
           onChange={e => { setTankId(e.target.value); setCells({}); setActiveItem(null) }}
@@ -226,7 +226,7 @@ export default function TankDesigner() {
                 border: '0.5px solid var(--blue-border)', background: 'var(--blue-bg)', color: 'var(--blue)',
               }}
             >
-              <Save size={13} />{saving ? 'Saving…' : 'Save design'}
+              <Save size={13} />{saving ? 'Saving…' : 'Save Design'}
             </button>
             {saved && <span style={{ fontSize: 12, color: 'var(--green)' }}>Saved ✓</span>}
           </>
@@ -279,7 +279,7 @@ export default function TankDesigner() {
                 onClick={() => setShowClearConfirm(true)}
                 style={{ width: '100%', padding: '5px 0', borderRadius: 6, fontSize: 11, color: 'var(--text-3)', border: '0.5px solid var(--btn-border)', cursor: 'pointer' }}
               >
-                Clear all
+                Clear All
               </button>
             </Card>
 

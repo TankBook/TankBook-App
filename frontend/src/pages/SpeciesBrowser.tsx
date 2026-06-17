@@ -260,7 +260,7 @@ function SpeciesModal({ initial, onClose, onSaved }: {
           padding: '16px 20px', borderBottom: '0.5px solid var(--border)', flexShrink: 0,
         }}>
           <p style={{ margin: 0, fontWeight: 600, fontSize: 15, color: 'var(--text)' }}>
-            {isEdit ? `Edit — ${initial!.common_name}` : 'Add species'}
+            {isEdit ? `Edit — ${initial!.common_name}` : 'Add Species'}
           </p>
           <button onClick={onClose} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-3)', padding: 4, lineHeight: 0 }}>
             <X size={18} />
@@ -273,12 +273,12 @@ function SpeciesModal({ initial, onClose, onSaved }: {
           <Sect label="Identity" first />
           <div style={{ ...grid2, marginBottom: 12 }}>
             <div>
-              <FieldLabel>Common name *</FieldLabel>
+              <FieldLabel>Common Name *</FieldLabel>
               <input value={form.common_name} onChange={e => set('common_name', e.target.value)}
                 placeholder="e.g. Neon Tetra" style={{ width: '100%', boxSizing: 'border-box' }} />
             </div>
             <div>
-              <FieldLabel>Latin name *</FieldLabel>
+              <FieldLabel>Latin Name *</FieldLabel>
               <input value={form.latin_name} onChange={e => set('latin_name', e.target.value)}
                 placeholder="e.g. Paracheirodon innesi" style={{ width: '100%', boxSizing: 'border-box' }} />
             </div>
@@ -333,7 +333,7 @@ function SpeciesModal({ initial, onClose, onSaved }: {
               </select>
             </div>
             <div>
-              <FieldLabel>Min tank size (L)</FieldLabel>
+              <FieldLabel>Min Tank Size (L)</FieldLabel>
               <input type="number" min={0} value={form.min_tank_litres}
                 onChange={e => set('min_tank_litres', e.target.value)}
                 placeholder="e.g. 60" style={{ width: '100%', boxSizing: 'border-box' }} />
@@ -355,20 +355,20 @@ function SpeciesModal({ initial, onClose, onSaved }: {
           </div>
           <div style={{ ...grid2, marginBottom: 12 }}>
             <div>
-              <FieldLabel>Min shoal size</FieldLabel>
+              <FieldLabel>Min Shoal Size</FieldLabel>
               <input type="number" min={1} value={form.shoal_min}
                 onChange={e => set('shoal_min', e.target.value)}
                 placeholder="e.g. 6" style={{ width: '100%', boxSizing: 'border-box' }} />
             </div>
             <div>
-              <FieldLabel>Min group size</FieldLabel>
+              <FieldLabel>Min Group Size</FieldLabel>
               <input type="number" min={1} value={form.group_min}
                 onChange={e => set('group_min', e.target.value)}
                 placeholder="e.g. 3" style={{ width: '100%', boxSizing: 'border-box' }} />
             </div>
           </div>
           <div>
-            <FieldLabel>Growth rate <span style={{ color: 'var(--text-3)', fontWeight: 400 }}>(plants)</span></FieldLabel>
+            <FieldLabel>Growth Rate <span style={{ color: 'var(--text-3)', fontWeight: 400 }}>(plants)</span></FieldLabel>
             <select value={form.growth_rate} onChange={e => set('growth_rate', e.target.value)} style={{ width: '100%', boxSizing: 'border-box' }}>
               <option value="">— not set —</option>
               <option value="slow">Slow</option>
@@ -377,7 +377,7 @@ function SpeciesModal({ initial, onClose, onSaved }: {
             </select>
           </div>
 
-          <Sect label="Water parameters" />
+          <Sect label="Water Parameters" />
           <div style={{ ...grid2, marginBottom: 12 }}>
             <RangeField label="Temperature (°C)" minKey="temp_min" maxKey="temp_max" step="0.5" />
             <RangeField label="pH" minKey="ph_min" maxKey="ph_max" step="0.1" />
@@ -401,7 +401,7 @@ function SpeciesModal({ initial, onClose, onSaved }: {
           <Sect label="Light & CO₂" />
           <div style={grid2}>
             <div>
-              <FieldLabel>Light requirement</FieldLabel>
+              <FieldLabel>Light Requirement</FieldLabel>
               <select value={form.light_requirement} onChange={e => set('light_requirement', e.target.value)} style={{ width: '100%', boxSizing: 'border-box' }}>
                 <option value="">— not set —</option>
                 <option value="low">Low</option>
@@ -410,7 +410,7 @@ function SpeciesModal({ initial, onClose, onSaved }: {
               </select>
             </div>
             <div>
-              <FieldLabel>CO₂ required</FieldLabel>
+              <FieldLabel>CO₂ Required</FieldLabel>
               <select value={form.co2_required} onChange={e => set('co2_required', e.target.value)} style={{ width: '100%', boxSizing: 'border-box' }}>
                 <option value="">— not set —</option>
                 <option value="true">Yes</option>
@@ -509,7 +509,7 @@ function SpeciesModal({ initial, onClose, onSaved }: {
               cursor: saving ? 'not-allowed' : 'pointer',
               border: '0.5px solid var(--blue-border)', background: 'var(--blue-bg)', color: 'var(--blue)',
               opacity: saving ? 0.6 : 1,
-            }}>{saving ? 'Saving…' : isEdit ? 'Save changes' : 'Add species'}</button>
+            }}>{saving ? 'Saving…' : isEdit ? 'Save Changes' : 'Add Species'}</button>
           </div>
         </div>
       </div>
@@ -843,7 +843,7 @@ export default function SpeciesBrowser() {
             onClick={() => { setEditTarget(null); setModalMode('add') }}
             style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 14, padding: '8px 16px', borderRadius: 8, border: '0.5px solid var(--blue-border)', background: 'var(--blue-bg)', color: 'var(--blue)', cursor: 'pointer', fontWeight: 500 }}
           >
-            <Plus size={14} />Add species
+            <Plus size={14} />Add Species
           </button>
           {fetchAllProgress && !fetchAllProgress.running && (
             <span style={{ fontSize: 12, color: fetchAllProgress.failed < fetchAllProgress.total ? 'var(--green)' : 'var(--text-3)', alignSelf: 'center' }}>
@@ -858,7 +858,7 @@ export default function SpeciesBrowser() {
           >
             {fetchAllProgress?.running
               ? `Fetching ${fetchAllProgress.current} / ${fetchAllProgress.total}…`
-              : 'Fetch all images'}
+              : 'Fetch All Images'}
           </button>
           <button
             onClick={() => { setShowUpload(true); setUploadResult(null); setUploadError(null) }}
@@ -937,7 +937,7 @@ export default function SpeciesBrowser() {
             >
               {/* Header */}
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 20px', borderBottom: '0.5px solid var(--border)', flexShrink: 0 }}>
-                <p style={{ margin: 0, fontWeight: 600, fontSize: 15, color: 'var(--text)' }}>Import species from YAML</p>
+                <p style={{ margin: 0, fontWeight: 600, fontSize: 15, color: 'var(--text)' }}>Import Species From YAML</p>
                 <button onClick={closeUpload} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-3)', padding: 4, lineHeight: 0 }}>
                   <X size={18} />
                 </button>

@@ -15,8 +15,8 @@ interface CalcDef {
 }
 
 const CALCULATORS: CalcDef[] = [
-  { id: 'volume',  label: 'Tank Volume',       hint: 'From dimensions',      icon: Ruler         },
-  { id: 'dosage',  label: 'Chemical Dosage',   hint: 'API liquid & powder',  icon: FlaskConical  },
+  { id: 'volume',  label: 'Tank Volume',       hint: 'From Dimensions',      icon: Ruler         },
+  { id: 'dosage',  label: 'Chemical Dosage',   hint: 'API Liquid & Powder',  icon: FlaskConical  },
 ]
 
 // ── Volume calculator ─────────────────────────────────────────────────────────
@@ -116,7 +116,7 @@ function VolumeCalculator() {
 
       <Card>
         <div style={{ marginBottom: 20 }}>
-          <FieldLabel>Tank shape</FieldLabel>
+          <FieldLabel>Tank Shape</FieldLabel>
           <div style={{ display: 'flex', gap: 8 }}>
             {shapeBtn('rectangular', 'Rectangular')}
             {shapeBtn('cylinder', 'Cylinder')}
@@ -141,7 +141,7 @@ function VolumeCalculator() {
         <div style={{ background: 'var(--blue-bg)', border: '0.5px solid var(--blue-border)', borderRadius: 12, padding: '20px 24px' }}>
           <div style={{ marginBottom: 16 }}>
             <p style={{ margin: '0 0 4px', fontSize: 11, fontWeight: 600, color: 'var(--text-2)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
-              Total volume
+              Total Volume
             </p>
             <p style={{ margin: 0, lineHeight: 1 }}>
               <span style={{ fontSize: 52, fontWeight: 700, color: 'var(--blue)' }}>{litres.toFixed(1)}</span>
@@ -156,8 +156,8 @@ function VolumeCalculator() {
           }}>
             {statCell('US gallons', `${gallonsUS!.toFixed(1)} gal`)}
             {statCell('UK gallons', `${gallonsUK!.toFixed(1)} gal`)}
-            {statCell('Usable (~80%)', `${usable!.toFixed(1)} L`, 'After substrate & decor')}
-            {surfaceStr && statCell('Surface area', surfaceStr, 'Top water surface')}
+            {statCell('Usable (~80%)', `${usable!.toFixed(1)} L`, 'After Substrate & Decor')}
+            {surfaceStr && statCell('Surface Area', surfaceStr, 'Top Water Surface')}
           </div>
         </div>
       )}
@@ -425,7 +425,7 @@ function DosageCalculator() {
 
       {/* Volume input */}
       <Card>
-        <FieldLabel>Volume of water to treat (litres)</FieldLabel>
+        <FieldLabel>Volume Of Water To Treat (Litres)</FieldLabel>
         <input
           type="number" min="0" step="1"
           value={volume} onChange={e => setVolume(e.target.value)}

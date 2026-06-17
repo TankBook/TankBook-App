@@ -219,7 +219,7 @@ export default function Dashboard() {
         <h1 style={{ margin: 0, fontSize: 22, fontWeight: 500, color: 'var(--text)' }}>Dashboard</h1>
         <button onClick={() => setShowForm(true)} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 14, padding: '8px 16px', borderRadius: 8, border: '0.5px solid var(--blue-border)', background: 'var(--blue-bg)', cursor: 'pointer', color: 'var(--blue)' }}>
           <Plus size={14} />
-          Add tank
+          Add Tank
         </button>
       </div>
 
@@ -227,7 +227,7 @@ export default function Dashboard() {
 
       <div style={{ display: 'flex', gap: 20, alignItems: 'flex-start' }}>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <p style={{ fontWeight: 500, fontSize: 15, margin: '0 0 12px', color: 'var(--text)' }}>Your tanks</p>
+          <p style={{ fontWeight: 500, fontSize: 15, margin: '0 0 12px', color: 'var(--text)' }}>Your Tanks</p>
           {stats.tanks.length === 0 && (
             <p style={{ color: 'var(--text-2)', fontSize: 14 }}>No tanks yet. Add your first one above.</p>
           )}
@@ -244,22 +244,22 @@ export default function Dashboard() {
           onClick={e => { if (e.target === e.currentTarget) { setShowForm(false) } }}>
           <div style={{ background: 'var(--surface)', borderRadius: 12, border: '0.5px solid var(--border)', width: '100%', maxWidth: 520, maxHeight: '90vh', display: 'flex', flexDirection: 'column' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 20px', borderBottom: '0.5px solid var(--border)' }}>
-              <span style={{ fontWeight: 600, fontSize: 15, color: 'var(--text)' }}>New tank</span>
+              <span style={{ fontWeight: 600, fontSize: 15, color: 'var(--text)' }}>New Tank</span>
               <button onClick={() => setShowForm(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-2)', fontSize: 18, lineHeight: 1, padding: 4 }}>✕</button>
             </div>
             <div style={{ padding: '16px 20px', overflowY: 'auto', overflowX: 'hidden', display: 'flex', flexDirection: 'column', gap: 12 }}>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                 <div>
-                  <FieldLabel>Tank name *</FieldLabel>
+                  <FieldLabel>Tank Name *</FieldLabel>
                   <input value={name} onChange={e => setName(e.target.value)} placeholder="e.g. Community tank" style={{ width: '100%', boxSizing: 'border-box' }} />
                 </div>
                 <div>
-                  <FieldLabel>Volume (litres) *</FieldLabel>
+                  <FieldLabel>Volume (Litres) *</FieldLabel>
                   <input type="number" value={volume} onChange={e => setVolume(e.target.value)} placeholder="e.g. 120" style={{ width: '100%', boxSizing: 'border-box' }} />
                 </div>
               </div>
               <div>
-                <FieldLabel>Water type</FieldLabel>
+                <FieldLabel>Water Type</FieldLabel>
                 <select value={waterType} onChange={e => setWaterType(e.target.value)} style={{ width: '100%', boxSizing: 'border-box' }}>
                   <option value="freshwater">Freshwater</option>
                   <option value="saltwater">Saltwater / Marine</option>
@@ -276,7 +276,7 @@ export default function Dashboard() {
                   <input value={lighting} onChange={e => setLighting(e.target.value)} placeholder="e.g. LED full spectrum" style={{ width: '100%', boxSizing: 'border-box' }} />
                 </div>
                 <div>
-                  <FieldLabel>Filter flow (L/h)</FieldLabel>
+                  <FieldLabel>Filter Flow (L/h)</FieldLabel>
                   <input type="number" value={filterFlow} onChange={e => setFilterFlow(e.target.value)} placeholder="e.g. 600" style={{ width: '100%', boxSizing: 'border-box' }} />
                 </div>
               </div>

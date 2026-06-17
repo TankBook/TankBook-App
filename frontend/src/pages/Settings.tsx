@@ -123,7 +123,7 @@ export default function Settings() {
         {/* Left column — display preferences */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
         <Card>
-          <p style={{ fontWeight: 500, fontSize: 14, margin: '0 0 4px', color: 'var(--text)', display: 'flex', alignItems: 'center', gap: 6 }}><CalendarDays size={14} color="var(--text-2)" />Date format</p>
+          <p style={{ fontWeight: 500, fontSize: 14, margin: '0 0 4px', color: 'var(--text)', display: 'flex', alignItems: 'center', gap: 6 }}><CalendarDays size={14} color="var(--text-2)" />Date Format</p>
           <p style={{ fontSize: 12, color: 'var(--text-2)', margin: '0 0 14px' }}>
             Controls how dates are displayed across tanks, parameters, and the maintenance schedule.
           </p>
@@ -156,7 +156,7 @@ export default function Settings() {
         </Card>
 
         <Card>
-          <p style={{ fontWeight: 500, fontSize: 14, margin: '0 0 4px', color: 'var(--text)', display: 'flex', alignItems: 'center', gap: 6 }}><Ruler size={14} color="var(--text-2)" />Dimension units</p>
+          <p style={{ fontWeight: 500, fontSize: 14, margin: '0 0 4px', color: 'var(--text)', display: 'flex', alignItems: 'center', gap: 6 }}><Ruler size={14} color="var(--text-2)" />Dimension Units</p>
           <p style={{ fontSize: 12, color: 'var(--text-2)', margin: '0 0 14px' }}>
             Controls how tank dimensions (width, height, depth) are displayed and entered. Changing this converts existing values automatically.
           </p>
@@ -187,7 +187,7 @@ export default function Settings() {
         </Card>
 
         <Card>
-          <p style={{ fontWeight: 500, fontSize: 14, margin: '0 0 4px', color: 'var(--text)', display: 'flex', alignItems: 'center', gap: 6 }}><Droplets size={14} color="var(--text-2)" />Default tank</p>
+          <p style={{ fontWeight: 500, fontSize: 14, margin: '0 0 4px', color: 'var(--text)', display: 'flex', alignItems: 'center', gap: 6 }}><Droplets size={14} color="var(--text-2)" />Default Tank</p>
           <p style={{ fontSize: 12, color: 'var(--text-2)', margin: '0 0 14px' }}>
             Pre-selects this tank on pages with a tank dropdown, like the Livestock Journal.
           </p>
@@ -208,7 +208,7 @@ export default function Settings() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
         <Card>
           <p style={{ fontWeight: 500, fontSize: 14, margin: '0 0 4px', color: 'var(--text)', display: 'flex', alignItems: 'center', gap: 6 }}>
-            <Download size={14} color="var(--text-2)" />Data backup
+            <Download size={14} color="var(--text-2)" />Data Backup
           </p>
           <p style={{ fontSize: 12, color: 'var(--text-2)', margin: '0 0 16px' }}>
             Export all tank data, parameters, livestock, and journal entries to a JSON file. Import replaces all current data with the backup.
@@ -227,7 +227,7 @@ export default function Settings() {
                 cursor: exporting ? 'not-allowed' : 'pointer', opacity: exporting ? 0.5 : 1,
               }}
             >
-              <Download size={13} />{exporting ? 'Exporting…' : 'Download backup'}
+              <Download size={13} />{exporting ? 'Exporting…' : 'Download Backup'}
             </button>
           </div>
 
@@ -259,7 +259,7 @@ export default function Settings() {
                 }}
               >
                 <span style={{ padding: '7px 12px', background: 'var(--surface-2)', borderRight: '0.5px solid var(--btn-border)', fontSize: 12, color: 'var(--text-2)', whiteSpace: 'nowrap' }}>
-                  Choose file
+                  Choose File
                 </span>
                 <span style={{ padding: '7px 10px', fontSize: 12, color: importFile ? 'var(--text)' : 'var(--text-3)' }}>
                   {importFile ? importFile.name : 'No file chosen'}
@@ -276,7 +276,7 @@ export default function Settings() {
                   }}
                 >
                   <Upload size={13} style={{ display: 'inline', marginRight: 5, verticalAlign: 'middle' }} />
-                  Restore backup
+                  Restore Backup
                 </button>
               )}
             </div>
@@ -335,7 +335,7 @@ export default function Settings() {
 
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
             <div>
-              <p style={{ margin: '0 0 2px', fontSize: 12, color: 'var(--text-2)' }}>Current version</p>
+              <p style={{ margin: '0 0 2px', fontSize: 12, color: 'var(--text-2)' }}>Current Version</p>
               <p style={{ margin: 0, fontSize: 18, fontWeight: 600, color: 'var(--text)', letterSpacing: '0.02em' }}>
                 v{APP_VERSION}
               </p>
@@ -351,7 +351,7 @@ export default function Settings() {
               }}
             >
               <RefreshCw size={12} style={{ animation: checking ? 'spin 1s linear infinite' : 'none' }} />
-              {checking ? 'Checking…' : 'Check for updates'}
+              {checking ? 'Checking…' : 'Check For Updates'}
             </button>
           </div>
 
