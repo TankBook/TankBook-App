@@ -1,5 +1,6 @@
+import { useState, useEffect } from 'react'
 import { BrowserRouter, Routes, Route, Link, useLocation } from 'react-router-dom'
-import { LayoutDashboard, BookOpen, Cog, PencilRuler, NotebookPen, ShieldCheck, type LucideIcon } from 'lucide-react'
+import { LayoutDashboard, BookOpen, Cog, PencilRuler, NotebookPen, ShieldCheck, Menu, X, type LucideIcon } from 'lucide-react'
 
 function GitHubIcon({ size = 14 }: { size?: number }) {
   return (
@@ -31,12 +32,32 @@ import LivestockJournal from './pages/LivestockJournal'
 import CompatibilityChecker from './pages/CompatibilityChecker'
 import { SettingsProvider, useSettings } from './context/SettingsContext'
 
+const NAV_LINKS: [string, string, LucideIcon][] = [
+  ['/', 'Dashboard', LayoutDashboard],
+  ['/designer', 'Designer', PencilRuler],
+  ['/species', 'Species', BookOpen],
+  ['/compatibility', 'Compatibility', ShieldCheck],
+  ['/journal', 'Journal', NotebookPen],
+  ['/settings', 'Settings', Cog],
+]
+
 function Nav() {
   const { pathname } = useLocation()
   const { theme, toggleTheme } = useSettings()
+  const [menuOpen, setMenuOpen] = useState(false)
+  const [isMobile, setIsMobile] = useState(() => window.matchMedia('(max-width: 768px)').matches)
 
-  const link = (to: string, label: string, Icon: LucideIcon) => (
-    <Link to={to} style={{
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 768px)')
+    const handler = (e: MediaQueryListEvent) => { setIsMobile(e.matches); setMenuOpen(false) }
+    mq.addEventListener('change', handler)
+    return () => mq.removeEventListener('change', handler)
+  }, [])
+
+  useEffect(() => { setMenuOpen(false) }, [pathname])
+
+  const link = (to: string, label: string, Icon: LucideIcon, onClick?: () => void) => (
+    <Link to={to} onClick={onClick} style={{
       display: 'flex', alignItems: 'center', gap: 6,
       padding: '6px 14px', borderRadius: 8, textDecoration: 'none', fontSize: 14,
       background: pathname === to ? 'var(--blue-bg)' : 'transparent',
@@ -50,6 +71,7 @@ function Nav() {
 
   return (
     <nav style={{
+      position: 'relative',
       display: 'flex', alignItems: 'center', gap: 4,
       padding: '12px 24px', borderBottom: '0.5px solid var(--border)',
       background: 'var(--surface)',
@@ -57,34 +79,53 @@ function Nav() {
       <span style={{ display: 'flex', alignItems: 'center', gap: 8, marginRight: 24, textDecoration: 'none' }}>
         <AquaDropIcon size={26} />
         <span style={{ display: 'flex', flexDirection: 'column', lineHeight: 1 }}>
-          <span style={{ fontWeight: 700, fontSize: 15, color: 'var(--text)', letterSpacing: '0.04em' }}>AQUA LOG</span>
+          <span style={{ fontWeight: 700, fontSize: 15, color: 'var(--text)', letterSpacing: '0.04em' }}>TANKBOOK</span>
           <span style={{ fontSize: 9, color: 'var(--cyan)', letterSpacing: '0.06em', fontWeight: 500 }}>LOG. CARE. THRIVE.</span>
         </span>
       </span>
-      {link('/', 'Dashboard', LayoutDashboard)}
-      {link('/designer', 'Designer', PencilRuler)}
-      {link('/species', 'Species', BookOpen)}
-      {link('/compatibility', 'Compatibility', ShieldCheck)}
-      {link('/journal', 'Journal', NotebookPen)}
+
+      {!isMobile && NAV_LINKS.map(([to, label, Icon]) => link(to, label, Icon))}
+
       <span style={{ flex: 1 }} />
+
       <button
         onClick={toggleTheme}
         title={theme === 'light' ? 'Switch to dark mode' : 'Switch to light mode'}
         style={{
-          fontSize: 15,
-          padding: '4px 8px',
-          border: '0.5px solid var(--border)',
-          borderRadius: 8,
-          background: 'transparent',
-          color: 'var(--text-2)',
-          cursor: 'pointer',
-          lineHeight: 1,
-          marginRight: 4,
+          fontSize: 15, padding: '4px 8px',
+          border: '0.5px solid var(--border)', borderRadius: 8,
+          background: 'transparent', color: 'var(--text-2)',
+          cursor: 'pointer', lineHeight: 1, marginRight: 4,
         }}
       >
         {theme === 'light' ? '☾' : '☀'}
       </button>
-      {link('/settings', 'Settings', Cog)}
+
+      {isMobile ? (
+        <button
+          onClick={() => setMenuOpen(o => !o)}
+          style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            padding: '6px', border: '0.5px solid var(--border)', borderRadius: 8,
+            background: 'transparent', color: 'var(--text-2)', cursor: 'pointer', lineHeight: 0,
+          }}
+        >
+          {menuOpen ? <X size={18} /> : <Menu size={18} />}
+        </button>
+      ) : (
+        link('/settings', 'Settings', Cog)
+      )}
+
+      {isMobile && menuOpen && (
+        <div style={{
+          position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 200,
+          background: 'var(--surface)', borderBottom: '0.5px solid var(--border)',
+          display: 'flex', flexDirection: 'column', gap: 2, padding: '8px 16px 12px',
+          boxShadow: '0 8px 24px rgba(0,0,0,0.12)',
+        }}>
+          {NAV_LINKS.map(([to, label, Icon]) => link(to, label, Icon, () => setMenuOpen(false)))}
+        </div>
+      )}
     </nav>
   )
 }
@@ -102,7 +143,7 @@ function Footer() {
     }}>
       <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
         <AquaDropIcon size={18} />
-        <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)', letterSpacing: '0.04em' }}>AQUA LOG</span>
+        <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)', letterSpacing: '0.04em' }}>TANKBOOK</span>
         <span style={{ fontSize: 12, color: 'var(--text-2)' }}>© {new Date().getFullYear()}</span>
       </span>
       <a
