@@ -15,6 +15,7 @@ def _enrich(row: TankFish) -> dict:
         "tank_id": row.tank_id,
         "species_slug": row.species_slug,
         "quantity": row.quantity,
+        "fish_status": row.fish_status,
         "health_status": row.health_status,
         "notes": row.notes,
         "added_at": row.added_at,

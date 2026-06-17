@@ -43,6 +43,7 @@ class TankFish(Base):
     tank_id: Mapped[str] = mapped_column(String, ForeignKey("tanks.id"), nullable=False)
     species_slug: Mapped[str] = mapped_column(String, nullable=False)
     quantity: Mapped[int] = mapped_column(Integer, nullable=False)
+    fish_status: Mapped[str] = mapped_column(String, default="added")
     health_status: Mapped[str] = mapped_column(String, default="healthy")
     added_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     notes: Mapped[str | None] = mapped_column(Text)

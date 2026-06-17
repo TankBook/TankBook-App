@@ -42,6 +42,13 @@ const PLANT_STATUS_COLORS: Record<string, { bg: string; color: string }> = {
   removed: { bg: 'var(--tag-bg)',   color: 'var(--text-2)' },
 }
 
+const FISH_STATUSES = ['planned', 'added', 'removed']
+const FISH_STATUS_COLORS: Record<string, { bg: string; color: string }> = {
+  planned: { bg: 'var(--blue-bg)',   color: 'var(--blue)'   },
+  added:   { bg: 'var(--green-bg)',  color: 'var(--green)'  },
+  removed: { bg: 'var(--tag-bg)',    color: 'var(--text-2)' },
+}
+
 // --- Species autocomplete ---
 function SpeciesAutocomplete({ type, value, onChange }: {
   type: 'fish' | 'plant'
@@ -470,9 +477,11 @@ export default function TankDetail() {
   const [fishSlug, setFishSlug] = useState('')
   const [fishName, setFishName] = useState('')
   const [fishQty, setFishQty] = useState('1')
+  const [fishAddStatus, setFishAddStatus] = useState('added')
 
   const [editingFishId, setEditingFishId] = useState<string | null>(null)
   const [editQty, setEditQty] = useState('')
+  const [editFishStatus, setEditFishStatus] = useState('added')
   const [editHealth, setEditHealth] = useState('')
   const [editNotes, setEditNotes] = useState('')
 
@@ -617,9 +626,10 @@ export default function TankDetail() {
     loadTasks()
   }
 
-  function startEditFish(f: { id: string; quantity: number; health_status: string; notes: string | null }) {
+  function startEditFish(f: { id: string; quantity: number; fish_status: string; health_status: string; notes: string | null }) {
     setEditingFishId(f.id)
     setEditQty(String(f.quantity))
+    setEditFishStatus(f.fish_status)
     setEditHealth(f.health_status)
     setEditNotes(f.notes ?? '')
   }
@@ -628,6 +638,7 @@ export default function TankDetail() {
     if (!editingFishId) return
     await api.fish.update(id!, editingFishId, {
       quantity: Number(editQty),
+      fish_status: editFishStatus,
       health_status: editHealth,
       notes: editNotes || null,
     })
@@ -760,32 +771,54 @@ export default function TankDetail() {
         <Card>
           <SectionTitle>Fish</SectionTitle>
           {fish.data?.length === 0 && <p style={{ fontSize: 13, color: 'var(--text-2)' }}>No fish added yet.</p>}
-          {fish.data?.map(f => {
-            const hc = HEALTH_COLORS[f.health_status] ?? HEALTH_COLORS.healthy
-            return (
-              <div key={f.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 0', borderBottom: '0.5px solid var(--border-sub)' }}>
-                <div>
-                  <span style={{ fontSize: 13, color: 'var(--text)', fontWeight: 500 }}>{f.common_name ?? f.species_slug}</span>
-                  <span style={{ fontSize: 12, color: 'var(--text-2)', marginLeft: 8 }}>×{f.quantity}</span>
-                  {f.latin_name && <p style={{ margin: '1px 0 0', fontSize: 11, color: 'var(--text-3)', fontStyle: 'italic' }}>{f.latin_name}</p>}
-                  {f.notes && <p style={{ margin: '2px 0 0', fontSize: 11, color: 'var(--text-2)' }}>{f.notes}</p>}
+          {(() => {
+            type FishEntry = NonNullable<typeof fish.data>[0]
+            const grouped = new Map<string, FishEntry[]>()
+            for (const f of fish.data ?? []) {
+              const key = f.species_slug
+              if (!grouped.has(key)) grouped.set(key, [])
+              grouped.get(key)!.push(f)
+            }
+            return [...grouped.entries()].map(([slug, entries]) => {
+              const first = entries[0]
+              return (
+                <div key={slug} style={{ borderBottom: '0.5px solid var(--border-sub)', padding: '10px 0' }}>
+                  <div style={{ marginBottom: entries.length > 1 ? 8 : 0 }}>
+                    <span style={{ fontSize: 13, color: 'var(--text)', fontWeight: 500 }}>{first.common_name ?? slug}</span>
+                    {first.latin_name && <span style={{ fontSize: 11, color: 'var(--text-3)', fontStyle: 'italic', marginLeft: 8 }}>{first.latin_name}</span>}
+                  </div>
+                  {entries.map(f => {
+                    const sc = FISH_STATUS_COLORS[f.fish_status] ?? FISH_STATUS_COLORS.added
+                    const hc = HEALTH_COLORS[f.health_status] ?? HEALTH_COLORS.healthy
+                    return (
+                      <div key={f.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingLeft: entries.length > 1 ? 12 : 0, marginTop: entries.length > 1 ? 4 : 0 }}>
+                        <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                          <span style={{ fontSize: 12, color: 'var(--text-2)', minWidth: 28 }}>×{f.quantity}</span>
+                          <Tag bg={sc.bg} color={sc.color}>{cap(f.fish_status)}</Tag>
+                          {f.fish_status === 'added' && (
+                            <Tag bg={hc.bg} color={hc.color}>{cap(f.health_status)}</Tag>
+                          )}
+                          {f.notes && <span style={{ fontSize: 11, color: 'var(--text-2)' }}>{f.notes}</span>}
+                        </div>
+                        <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexShrink: 0 }}>
+                          <button onClick={() => startEditFish(f)} style={{ fontSize: 11, color: 'var(--text-2)', background: 'none', border: '0.5px solid var(--btn-border)', borderRadius: 6, padding: '2px 8px', cursor: 'pointer' }}>Edit</button>
+                          <button onClick={async () => { await api.fish.remove(id!, f.id); fish.reload() }} style={{ display: 'flex', alignItems: 'center', gap: 3, fontSize: 11, color: 'var(--red)', background: 'none', border: 'none', cursor: 'pointer' }}>
+                            <Trash2 size={11} />Remove
+                          </button>
+                        </div>
+                      </div>
+                    )
+                  })}
                 </div>
-                <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexShrink: 0 }}>
-                  <Tag bg={hc.bg} color={hc.color}>{cap(f.health_status)}</Tag>
-                  <button onClick={() => startEditFish(f)} style={{ fontSize: 11, color: 'var(--text-2)', background: 'none', border: '0.5px solid var(--btn-border)', borderRadius: 6, padding: '2px 8px', cursor: 'pointer' }}>Edit</button>
-                  <button onClick={async () => { await api.fish.remove(id!, f.id); fish.reload() }} style={{ display: 'flex', alignItems: 'center', gap: 3, fontSize: 11, color: 'var(--red)', background: 'none', border: 'none', cursor: 'pointer' }}>
-                    <Trash2 size={11} />Remove
-                  </button>
-                </div>
-              </div>
-            )
-          })}
+              )
+            })
+          })()}
           <div style={{ marginTop: 14 }}>
             <button
               onClick={() => setShowAddFish(true)}
               style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 13, padding: '7px 16px', borderRadius: 8, fontWeight: 500, cursor: 'pointer', border: '0.5px solid var(--blue-border)', background: 'var(--blue-bg)', color: 'var(--blue)' }}
             >
-              <Plus size={13} />Add fish
+              <Plus size={13} />Add Fish
             </button>
           </div>
         </Card>
@@ -1322,14 +1355,20 @@ export default function TankDetail() {
               <p style={{ margin: 0, fontWeight: 600, fontSize: 15, color: 'var(--text)' }}>Edit Fish</p>
               <button onClick={() => setEditingFishId(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-2)', lineHeight: 0 }}><X size={18} /></button>
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '80px 1fr', gap: 10, marginBottom: 12 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '80px 1fr 1fr', gap: 10, marginBottom: 12 }}>
               <div>
                 <FieldLabel>Quantity</FieldLabel>
                 <input type="number" min="1" value={editQty} onChange={e => setEditQty(e.target.value)} style={{ width: '100%', boxSizing: 'border-box' }} />
               </div>
               <div>
+                <FieldLabel>Status</FieldLabel>
+                <select value={editFishStatus} onChange={e => setEditFishStatus(e.target.value)} style={{ width: '100%', boxSizing: 'border-box' }}>
+                  {FISH_STATUSES.map(s => <option key={s} value={s}>{cap(s)}</option>)}
+                </select>
+              </div>
+              <div>
                 <FieldLabel>Health Status</FieldLabel>
-                <select value={editHealth} onChange={e => setEditHealth(e.target.value)} style={{ width: '100%', boxSizing: 'border-box' }}>
+                <select value={editHealth} onChange={e => setEditHealth(e.target.value)} style={{ width: '100%', boxSizing: 'border-box' }} disabled={editFishStatus !== 'added'}>
                   {HEALTH_STATUSES.map(s => <option key={s} value={s}>{cap(s)}</option>)}
                 </select>
               </div>
@@ -1364,19 +1403,27 @@ export default function TankDetail() {
               <FieldLabel>Species</FieldLabel>
               <SpeciesAutocomplete type="fish" value={fishName} onChange={(slug, name) => { setFishSlug(slug); setFishName(name) }} />
             </div>
-            <div style={{ marginBottom: 16 }}>
-              <FieldLabel>Quantity</FieldLabel>
-              <input type="number" value={fishQty} onChange={e => setFishQty(e.target.value)} min="1" style={{ width: 80 }} />
+            <div style={{ display: 'grid', gridTemplateColumns: '80px 1fr', gap: 10, marginBottom: 12 }}>
+              <div>
+                <FieldLabel>Quantity</FieldLabel>
+                <input type="number" value={fishQty} onChange={e => setFishQty(e.target.value)} min="1" style={{ width: '100%', boxSizing: 'border-box' }} />
+              </div>
+              <div>
+                <FieldLabel>Status</FieldLabel>
+                <select value={fishAddStatus} onChange={e => setFishAddStatus(e.target.value)} style={{ width: '100%', boxSizing: 'border-box' }}>
+                  {FISH_STATUSES.map(s => <option key={s} value={s}>{cap(s)}</option>)}
+                </select>
+              </div>
             </div>
             <CompatibilityCheck tankId={id!} slug={fishSlug} />
             <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 16 }}>
-              <button onClick={() => { setShowAddFish(false); setFishSlug(''); setFishName(''); setFishQty('1') }} style={{ padding: '7px 16px', borderRadius: 8, fontSize: 13, cursor: 'pointer', border: '0.5px solid var(--btn-border)', background: 'transparent', color: 'var(--text)' }}>Cancel</button>
+              <button onClick={() => { setShowAddFish(false); setFishSlug(''); setFishName(''); setFishQty('1'); setFishAddStatus('added') }} style={{ padding: '7px 16px', borderRadius: 8, fontSize: 13, cursor: 'pointer', border: '0.5px solid var(--btn-border)', background: 'transparent', color: 'var(--text)' }}>Cancel</button>
               <button
                 disabled={!fishSlug}
                 onClick={async () => {
                   if (!fishSlug) return
-                  await api.fish.add(id!, { species_slug: fishSlug, quantity: Number(fishQty), notes: null })
-                  setFishSlug(''); setFishName(''); setFishQty('1')
+                  await api.fish.add(id!, { species_slug: fishSlug, quantity: Number(fishQty), fish_status: fishAddStatus, notes: null })
+                  setFishSlug(''); setFishName(''); setFishQty('1'); setFishAddStatus('added')
                   setShowAddFish(false)
                   fish.reload()
                 }}

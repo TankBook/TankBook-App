@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models.models import (
     Tank, TankFish, TankPlant, WaterParameter, MaintenanceTask,
-    Alert, DailyTask, TankDesign, JournalEntry, AppSettings,
+    Alert, DailyTask, JournalEntry, AppSettings,
 )
 
 router = APIRouter()
@@ -37,7 +37,6 @@ def export_backup(db: Session = Depends(get_db)):
         tasks = db.query(MaintenanceTask).filter_by(tank_id=tank.id).all()
         alerts = db.query(Alert).filter_by(tank_id=tank.id).all()
         daily_tasks = db.query(DailyTask).filter_by(tank_id=tank.id).all()
-        design = db.query(TankDesign).filter_by(tank_id=tank.id).first()
         journal = db.query(JournalEntry).filter_by(tank_id=tank.id).all()
 
         tanks_out.append({
@@ -48,7 +47,8 @@ def export_backup(db: Session = Depends(get_db)):
             "co2_injection": tank.co2_injection,
             "setup_date": _dt(tank.setup_date), "created_at": _dt(tank.created_at),
             "fish": [{"id": r.id, "species_slug": r.species_slug, "quantity": r.quantity,
-                      "health_status": r.health_status, "notes": r.notes, "added_at": _dt(r.added_at)}
+                      "fish_status": r.fish_status, "health_status": r.health_status,
+                      "notes": r.notes, "added_at": _dt(r.added_at)}
                      for r in fish],
             "plants": [{"id": r.id, "species_slug": r.species_slug, "quantity": r.quantity,
                         "notes": r.notes, "added_at": _dt(r.added_at)}
@@ -72,8 +72,6 @@ def export_backup(db: Session = Depends(get_db)):
             "daily_tasks": [{"id": r.id, "name": r.name, "hour": r.hour, "minute": r.minute,
                               "days": r.days, "color": r.color}
                              for r in daily_tasks],
-            "design": {"id": design.id, "cells": design.cells, "updated_at": _dt(design.updated_at)}
-                       if design else None,
             "journal_entries": [{"id": r.id, "tank_fish_id": r.tank_fish_id, "event_type": r.event_type,
                                   "notes": r.notes, "occurred_at": _dt(r.occurred_at),
                                   "created_at": _dt(r.created_at)}
@@ -129,7 +127,8 @@ def import_backup(payload: dict, db: Session = Depends(get_db)):
         for f in t.get("fish", []):
             db.add(TankFish(
                 id=f["id"], tank_id=tank.id, species_slug=f["species_slug"],
-                quantity=f["quantity"], health_status=f.get("health_status", "healthy"),
+                quantity=f["quantity"], fish_status=f.get("fish_status", "added"),
+                health_status=f.get("health_status", "healthy"),
                 notes=f.get("notes"), added_at=_parse_dt(f.get("added_at")) or datetime.utcnow(),
             ))
         db.flush()
@@ -179,13 +178,6 @@ def import_backup(payload: dict, db: Session = Depends(get_db)):
             db.add(DailyTask(
                 id=d["id"], tank_id=tank.id, name=d["name"],
                 hour=d["hour"], minute=d.get("minute", 0), days=d["days"], color=d.get("color"),
-            ))
-
-        if t.get("design"):
-            d = t["design"]
-            db.add(TankDesign(
-                id=d["id"], tank_id=tank.id, cells=d.get("cells", "[]"),
-                updated_at=_parse_dt(d.get("updated_at")) or datetime.utcnow(),
             ))
 
         for j in t.get("journal_entries", []):
