@@ -137,6 +137,11 @@
         border-bottom: 0.5px solid var(--border-sub);
       }
       .species-option:hover { background: var(--surface-2); }
+
+      @keyframes spin {
+        from { transform: rotate(0deg); }
+        to   { transform: rotate(360deg); }
+      }
     </style>
     <script>
       const t = localStorage.getItem('theme')

@@ -1,8 +1,22 @@
 import { useState, useRef, useEffect } from 'react'
-import { CalendarDays, Ruler, Info, Download, Upload, Droplets } from 'lucide-react'
+import { CalendarDays, Ruler, Info, Download, Upload, Droplets, RefreshCw } from 'lucide-react'
 import { useSettings, formatDate, DateFormat, UnitSystem } from '../context/SettingsContext'
 import { Card } from '../components/ui'
 import { api, Tank } from '../api/client'
+
+const APP_VERSION = '0.5.0'
+const GITHUB_REPO = 'ThatTom/Aqua-Log'
+
+function semverNewer(current: string, latest: string): boolean {
+  const c = current.split('.').map(Number)
+  const l = latest.split('.').map(Number)
+  for (let i = 0; i < Math.max(c.length, l.length); i++) {
+    const cv = c[i] ?? 0, lv = l[i] ?? 0
+    if (lv > cv) return true
+    if (lv < cv) return false
+  }
+  return false
+}
 
 const FORMAT_OPTIONS: { value: DateFormat; label: string }[] = [
   { value: 'DD/MM/YYYY', label: 'DD/MM/YYYY (UK / Europe)' },
@@ -23,6 +37,30 @@ export default function Settings() {
   useEffect(() => {
     api.tanks.list().then(setTanks)
   }, [])
+
+  const [checking, setChecking] = useState(false)
+  const [updateStatus, setUpdateStatus] = useState<'idle' | 'up-to-date' | 'available' | 'no-releases' | 'error'>('idle')
+  const [latestVersion, setLatestVersion] = useState<string | null>(null)
+  const [releaseUrl, setReleaseUrl] = useState<string | null>(null)
+
+  async function checkForUpdates() {
+    setChecking(true)
+    setUpdateStatus('idle')
+    try {
+      const res = await fetch(`https://api.github.com/repos/${GITHUB_REPO}/releases/latest`)
+      if (res.status === 404) { setUpdateStatus('no-releases'); return }
+      if (!res.ok) throw new Error('GitHub API error')
+      const data = await res.json()
+      const tag: string = (data.tag_name ?? '').replace(/^v/, '')
+      setLatestVersion(tag)
+      setReleaseUrl(data.html_url ?? null)
+      setUpdateStatus(semverNewer(APP_VERSION, tag) ? 'available' : 'up-to-date')
+    } catch {
+      setUpdateStatus('error')
+    } finally {
+      setChecking(false)
+    }
+  }
 
   const [exporting, setExporting] = useState(false)
   const [importing, setImporting] = useState(false)
@@ -291,11 +329,74 @@ export default function Settings() {
         </Card>
 
         <Card>
-          <p style={{ fontWeight: 500, fontSize: 14, margin: '0 0 4px', color: 'var(--text)', display: 'flex', alignItems: 'center', gap: 6 }}><Info size={14} color="var(--text-2)" />About</p>
+          <p style={{ fontWeight: 500, fontSize: 14, margin: '0 0 12px', color: 'var(--text)', display: 'flex', alignItems: 'center', gap: 6 }}>
+            <Info size={14} color="var(--text-2)" />About
+          </p>
+
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+            <div>
+              <p style={{ margin: '0 0 2px', fontSize: 12, color: 'var(--text-2)' }}>Current version</p>
+              <p style={{ margin: 0, fontSize: 18, fontWeight: 600, color: 'var(--text)', letterSpacing: '0.02em' }}>
+                v{APP_VERSION}
+              </p>
+            </div>
+            <button
+              onClick={checkForUpdates}
+              disabled={checking}
+              style={{
+                display: 'inline-flex', alignItems: 'center', gap: 6,
+                fontSize: 12, padding: '6px 14px', borderRadius: 8, fontWeight: 500,
+                border: '0.5px solid var(--btn-border)', background: 'transparent', color: 'var(--text-2)',
+                cursor: checking ? 'not-allowed' : 'pointer', opacity: checking ? 0.6 : 1,
+              }}
+            >
+              <RefreshCw size={12} style={{ animation: checking ? 'spin 1s linear infinite' : 'none' }} />
+              {checking ? 'Checking…' : 'Check for updates'}
+            </button>
+          </div>
+
+          {updateStatus === 'up-to-date' && (
+            <div style={{ marginBottom: 12, padding: '8px 12px', borderRadius: 8, background: 'var(--green-bg)', border: '0.5px solid var(--green-border)' }}>
+              <p style={{ margin: 0, fontSize: 12, color: 'var(--green)', fontWeight: 500 }}>
+                ✓ You're up to date — v{APP_VERSION} is the latest release.
+              </p>
+            </div>
+          )}
+
+          {updateStatus === 'available' && latestVersion && (
+            <div style={{ marginBottom: 12, padding: '8px 12px', borderRadius: 8, background: 'var(--blue-bg)', border: '0.5px solid var(--blue-border)' }}>
+              <p style={{ margin: '0 0 6px', fontSize: 12, color: 'var(--blue)', fontWeight: 500 }}>
+                Update available — v{latestVersion}
+              </p>
+              {releaseUrl && (
+                <a
+                  href={releaseUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{ fontSize: 12, color: 'var(--blue)', textDecoration: 'underline' }}
+                >
+                  View release notes ↗
+                </a>
+              )}
+            </div>
+          )}
+
+          {updateStatus === 'no-releases' && (
+            <div style={{ marginBottom: 12, padding: '8px 12px', borderRadius: 8, background: 'var(--surface-2)', border: '0.5px solid var(--border)' }}>
+              <p style={{ margin: 0, fontSize: 12, color: 'var(--text-2)' }}>No releases published on GitHub yet.</p>
+            </div>
+          )}
+
+          {updateStatus === 'error' && (
+            <div style={{ marginBottom: 12, padding: '8px 12px', borderRadius: 8, background: 'var(--red-bg)', border: '0.5px solid var(--red-border)' }}>
+              <p style={{ margin: 0, fontSize: 12, color: 'var(--red)' }}>Could not reach GitHub. Check your connection and try again.</p>
+            </div>
+          )}
+
           <p style={{ fontSize: 12, color: 'var(--text-2)', margin: 0 }}>
             TankBook is self-hosted aquarium management software. Species data lives in YAML
             files under <code style={{ fontSize: 11, background: 'var(--tag-bg)', padding: '1px 5px', borderRadius: 4, color: 'var(--text)' }}>species-data/</code>,
-            while tank and parameter data is stored in PostgreSQL.
+            while tank and parameter data is stored in SQLite.
           </p>
         </Card>
         </div>{/* end right column */}
