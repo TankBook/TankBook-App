@@ -52,10 +52,60 @@ function EventBadge({ type }: { type: string }) {
   return <Tag bg={s.bg} color={s.color}>{EVENT_LABELS[type] ?? type}</Tag>
 }
 
-const DATE_LANG: Record<string, string> = {
-  'DD/MM/YYYY': 'en-GB',
-  'MM/DD/YYYY': 'en-US',
-  'YYYY-MM-DD': 'sv',
+function DateTimeInput({ value, onChange, dateFormat }: {
+  value: string
+  onChange: (v: string) => void
+  dateFormat: string
+}) {
+  const datePart = value.slice(0, 10)
+  const timePart = value.slice(11, 16) || '00:00'
+  const [py = '', pm = '', pd = ''] = datePart.split('-')
+  const [ph = '00', pmi = '00'] = timePart.split(':')
+
+  function emit(y: string, mo: string, d: string, h: string, mi: string) {
+    onChange(`${y.padStart(4, '0')}-${mo.padStart(2, '0')}-${d.padStart(2, '0')}T${h.padStart(2, '0')}:${mi.padStart(2, '0')}`)
+  }
+
+  const cell: React.CSSProperties = {
+    border: 'none', background: 'transparent', color: 'var(--text)',
+    fontSize: 13, outline: 'none', textAlign: 'center', padding: 0, fontFamily: 'inherit',
+  }
+  const box: React.CSSProperties = {
+    display: 'inline-flex', alignItems: 'center',
+    border: '0.5px solid var(--btn-border)', borderRadius: 8,
+    padding: '5px 10px', background: 'var(--surface)', gap: 1,
+  }
+  const sep = (c: string) => <span style={{ color: 'var(--text-3)', userSelect: 'none', padding: '0 1px' }}>{c}</span>
+
+  function seg(val: string, placeholder: string, w: number, maxLen: number, onCh: (s: string) => void) {
+    return (
+      <input
+        type="text" inputMode="numeric" maxLength={maxLen}
+        value={val}
+        placeholder={placeholder}
+        onChange={e => onCh(e.target.value.replace(/\D/g, '').slice(0, maxLen))}
+        style={{ ...cell, width: w }}
+      />
+    )
+  }
+
+  const dS = seg(pd,  'DD',   24, 2, v => emit(py, pm, v,  ph,  pmi))
+  const mS = seg(pm,  'MM',   24, 2, v => emit(py, v,  pd, ph,  pmi))
+  const yS = seg(py,  'YYYY', 40, 4, v => emit(v,  pm, pd, ph,  pmi))
+  const hS = seg(ph,  'hh',   22, 2, v => emit(py, pm, pd, v,   pmi))
+  const iS = seg(pmi, 'mm',   22, 2, v => emit(py, pm, pd, ph,  v))
+
+  let dateEl: React.ReactElement
+  if (dateFormat === 'MM/DD/YYYY')      dateEl = <>{mS}{sep('/')}{dS}{sep('/')}{yS}</>
+  else if (dateFormat === 'YYYY-MM-DD') dateEl = <>{yS}{sep('-')}{mS}{sep('-')}{dS}</>
+  else                                  dateEl = <>{dS}{sep('/')}{mS}{sep('/')}{yS}</>
+
+  return (
+    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+      <div style={box}>{dateEl}</div>
+      <div style={box}>{hS}{sep(':')}{iS}</div>
+    </div>
+  )
 }
 
 // Shared form fields used by both Add modal and inline Edit
@@ -69,9 +119,6 @@ function EntryFormFields({
   fishList: TankFish[]
 }) {
   const { dateFormat } = useSettings()
-  const dateLang = DATE_LANG[dateFormat] ?? 'en-GB'
-  const datePart = form.occurred_at.slice(0, 10)
-  const timePart = form.occurred_at.slice(11, 16) || '00:00'
 
   return (
     <>
@@ -84,21 +131,11 @@ function EntryFormFields({
         </div>
         <div>
           <FieldLabel>Date &amp; Time</FieldLabel>
-          <div style={{ display: 'flex', gap: 6 }}>
-            <input
-              type="date"
-              lang={dateLang}
-              value={datePart}
-              onChange={e => setForm(f => ({ ...f, occurred_at: `${e.target.value}T${f.occurred_at.slice(11, 16) || '00:00'}` }))}
-              style={{ flex: 1, minWidth: 0, boxSizing: 'border-box' }}
-            />
-            <input
-              type="time"
-              value={timePart}
-              onChange={e => setForm(f => ({ ...f, occurred_at: `${f.occurred_at.slice(0, 10)}T${e.target.value}` }))}
-              style={{ width: 95 }}
-            />
-          </div>
+          <DateTimeInput
+            value={form.occurred_at}
+            onChange={v => setForm(f => ({ ...f, occurred_at: v }))}
+            dateFormat={dateFormat}
+          />
         </div>
       </div>
       <div style={{ marginBottom: 12 }}>
