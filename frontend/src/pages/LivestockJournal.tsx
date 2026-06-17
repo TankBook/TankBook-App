@@ -4,17 +4,45 @@ import { Tag, Card, FieldLabel, SectionTitle } from '../components/ui'
 import { api, JournalEntry, Tank, TankFish } from '../api/client'
 import { useSettings, formatDate } from '../context/SettingsContext'
 
-const EVENT_TYPES = ['observation', 'illness', 'treatment', 'recovery', 'birth', 'death', 'behaviour', 'other']
+const EVENT_TYPES = [
+  // Tank events
+  'water_change', 'equipment', 'maintenance', 'plant', 'feeding',
+  // Livestock events
+  'observation', 'illness', 'treatment', 'recovery', 'birth', 'death', 'behaviour',
+  // General
+  'other',
+]
+
+const EVENT_LABELS: Record<string, string> = {
+  water_change: 'Water change',
+  equipment:    'Equipment',
+  maintenance:  'Maintenance',
+  plant:        'Plant',
+  feeding:      'Feeding',
+  observation:  'Observation',
+  illness:      'Illness',
+  treatment:    'Treatment',
+  recovery:     'Recovery',
+  birth:        'Birth',
+  death:        'Death',
+  behaviour:    'Behaviour',
+  other:        'Other',
+}
 
 const EVENT_STYLE: Record<string, { bg: string; color: string }> = {
-  observation: { bg: 'var(--blue-bg)',   color: 'var(--blue)'   },
-  illness:     { bg: 'var(--red-bg)',    color: 'var(--red)'    },
-  treatment:   { bg: 'var(--amber-bg)', color: 'var(--amber)'  },
-  recovery:    { bg: 'var(--green-bg)',  color: 'var(--green)'  },
-  birth:       { bg: 'var(--green-bg)',  color: 'var(--green)'  },
-  death:       { bg: 'var(--tag-bg)',    color: 'var(--text-2)' },
-  behaviour:   { bg: 'var(--blue-bg)',   color: 'var(--blue)'   },
-  other:       { bg: 'var(--tag-bg)',    color: 'var(--text-2)' },
+  water_change: { bg: 'var(--cyan-bg)',   color: 'var(--cyan)'   },
+  equipment:    { bg: 'var(--amber-bg)',  color: 'var(--amber)'  },
+  maintenance:  { bg: 'var(--blue-bg)',   color: 'var(--blue)'   },
+  plant:        { bg: 'var(--green-bg)',  color: 'var(--green)'  },
+  feeding:      { bg: 'var(--orange-bg, #fff4e6)', color: 'var(--orange, #c27216)' },
+  observation:  { bg: 'var(--blue-bg)',   color: 'var(--blue)'   },
+  illness:      { bg: 'var(--red-bg)',    color: 'var(--red)'    },
+  treatment:    { bg: 'var(--amber-bg)',  color: 'var(--amber)'  },
+  recovery:     { bg: 'var(--green-bg)',  color: 'var(--green)'  },
+  birth:        { bg: 'var(--green-bg)',  color: 'var(--green)'  },
+  death:        { bg: 'var(--tag-bg)',    color: 'var(--text-2)' },
+  behaviour:    { bg: 'var(--blue-bg)',   color: 'var(--blue)'   },
+  other:        { bg: 'var(--tag-bg)',    color: 'var(--text-2)' },
 }
 
 function EventBadge({ type }: { type: string }) {
@@ -132,7 +160,7 @@ export default function LivestockJournal() {
   return (
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-        <h1 style={{ margin: 0, fontSize: 22, fontWeight: 500, color: 'var(--text)' }}>Livestock journal</h1>
+        <h1 style={{ margin: 0, fontSize: 22, fontWeight: 500, color: 'var(--text)' }}>Tank journal</h1>
         {selectedTank && (
           <button
             onClick={() => { setShowForm(v => !v); setSaveError(null) }}
@@ -164,7 +192,7 @@ export default function LivestockJournal() {
             <div>
               <FieldLabel>Event type</FieldLabel>
               <select value={form.event_type} onChange={e => setForm(f => ({ ...f, event_type: e.target.value }))} style={{ width: '100%' }}>
-                {EVENT_TYPES.map(t => <option key={t} value={t}>{t.charAt(0).toUpperCase() + t.slice(1)}</option>)}
+                {EVENT_TYPES.map(t => <option key={t} value={t}>{EVENT_LABELS[t] ?? t}</option>)}
               </select>
             </div>
             <div>
@@ -233,7 +261,7 @@ export default function LivestockJournal() {
                   fontWeight: active ? 500 : 400,
                 }}
               >
-                {type === 'all' ? 'All' : type.charAt(0).toUpperCase() + type.slice(1)}
+                {type === 'all' ? 'All' : (EVENT_LABELS[type] ?? type)}
               </button>
             )
           })}
@@ -244,7 +272,7 @@ export default function LivestockJournal() {
       {!selectedTank && (
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '60px 0', color: 'var(--text-3)' }}>
           <NotebookPen size={36} style={{ marginBottom: 12, opacity: 0.4 }} />
-          <p style={{ fontSize: 14, margin: 0 }}>Select a tank to view its livestock journal.</p>
+          <p style={{ fontSize: 14, margin: 0 }}>Select a tank to view its journal.</p>
         </div>
       )}
 
@@ -271,7 +299,7 @@ export default function LivestockJournal() {
                   <div>
                     <FieldLabel>Event type</FieldLabel>
                     <select value={editForm.event_type} onChange={e => setEditForm(f => ({ ...f, event_type: e.target.value }))} style={{ width: '100%' }}>
-                      {EVENT_TYPES.map(t => <option key={t} value={t}>{t.charAt(0).toUpperCase() + t.slice(1)}</option>)}
+                      {EVENT_TYPES.map(t => <option key={t} value={t}>{EVENT_LABELS[t] ?? t}</option>)}
                     </select>
                   </div>
                   <div>

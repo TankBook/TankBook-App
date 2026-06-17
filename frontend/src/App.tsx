@@ -38,7 +38,7 @@ const NAV_LINKS: [string, string, LucideIcon][] = [
   ['/designer', 'Designer', PencilRuler],
   ['/species', 'Species', BookOpen],
   ['/compatibility', 'Compatibility', ShieldCheck],
-  ['/journal', 'Journal', NotebookPen],
+  ['/journal', 'Tank Journal', NotebookPen],
   ['/calculators', 'Calculators', Calculator],
 ]
 
