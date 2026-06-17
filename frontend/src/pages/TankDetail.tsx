@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
-import { useParams, Link } from 'react-router-dom'
+import { useParams, Link, useNavigate } from 'react-router-dom'
 import { Fish, Leaf, Droplets, CalendarClock, Bell, Pencil, Trash2, Plus, ChevronLeft, Sun, Camera, X, ChevronLeft as Prev, ChevronRight as Next, type LucideIcon } from 'lucide-react'
 import {
   LineChart, Line, XAxis, YAxis, Tooltip,
@@ -108,6 +108,7 @@ function SpeciesAutocomplete({ type, value, onChange }: {
 function EditTankPanel({ tank, onSave }: { tank: any; onSave: () => void }) {
   const { unitSystem } = useSettings()
   const dp = dimInputProps(unitSystem)
+  const navigate = useNavigate()
 
   const [name, setName] = useState(tank.name)
   const [volume, setVolume] = useState(String(tank.volume_litres))
@@ -119,6 +120,8 @@ function EditTankPanel({ tank, onSave }: { tank: any; onSave: () => void }) {
   const [depth, setDepth] = useState(tank.depth_mm != null ? String(fromMM(tank.depth_mm, unitSystem)) : '')
   const [co2, setCo2] = useState(tank.co2_injection)
   const [saved, setSaved] = useState(false)
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const [deleting, setDeleting] = useState(false)
 
   async function save() {
     await fetch(`/api/tanks/${tank.id}`, {
@@ -169,6 +172,44 @@ function EditTankPanel({ tank, onSave }: { tank: any; onSave: () => void }) {
       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
         <button onClick={save} style={{ padding: '7px 16px', borderRadius: 8, border: '0.5px solid var(--blue-border)', background: 'var(--blue-bg)', color: 'var(--blue)', fontSize: 13, fontWeight: 500, cursor: 'pointer' }}>Save changes</button>
         {saved && <span style={{ fontSize: 12, color: 'var(--green)' }}>Saved ✓</span>}
+      </div>
+
+      <div style={{ marginTop: 28, paddingTop: 20, borderTop: '0.5px solid var(--border)' }}>
+        <p style={{ margin: '0 0 10px', fontSize: 12, fontWeight: 600, color: 'var(--red)', letterSpacing: '0.06em', textTransform: 'uppercase' }}>Danger zone</p>
+        {!showDeleteConfirm ? (
+          <button
+            onClick={() => setShowDeleteConfirm(true)}
+            style={{ padding: '7px 16px', borderRadius: 8, border: '0.5px solid var(--red-border)', background: 'transparent', color: 'var(--red)', fontSize: 13, cursor: 'pointer' }}
+          >
+            Delete tank…
+          </button>
+        ) : (
+          <div style={{ background: 'var(--red-bg)', border: '0.5px solid var(--red-border)', borderRadius: 10, padding: '14px 16px' }}>
+            <p style={{ margin: '0 0 4px', fontSize: 13, fontWeight: 500, color: 'var(--red)' }}>Delete "{tank.name}"?</p>
+            <p style={{ margin: '0 0 14px', fontSize: 12, color: 'var(--red)', opacity: 0.8 }}>
+              This will permanently remove the tank and all its fish, plants, water parameters, maintenance tasks, and journal entries. This cannot be undone.
+            </p>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button
+                onClick={() => setShowDeleteConfirm(false)}
+                style={{ padding: '6px 14px', borderRadius: 8, border: '0.5px solid var(--btn-border)', background: 'transparent', color: 'var(--text-2)', fontSize: 13, cursor: 'pointer' }}
+              >
+                Cancel
+              </button>
+              <button
+                disabled={deleting}
+                onClick={async () => {
+                  setDeleting(true)
+                  await fetch(`/api/tanks/${tank.id}`, { method: 'DELETE' })
+                  navigate('/')
+                }}
+                style={{ padding: '6px 16px', borderRadius: 8, border: '0.5px solid var(--red-border)', background: 'var(--red-bg)', color: 'var(--red)', fontSize: 13, fontWeight: 600, cursor: deleting ? 'not-allowed' : 'pointer', opacity: deleting ? 0.6 : 1 }}
+              >
+                {deleting ? 'Deleting…' : 'Yes, delete permanently'}
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </Card>
   )
