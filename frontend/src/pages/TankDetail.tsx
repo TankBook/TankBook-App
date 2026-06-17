@@ -112,6 +112,7 @@ function EditTankPanel({ tank, onSave }: { tank: any; onSave: () => void }) {
 
   const [name, setName] = useState(tank.name)
   const [volume, setVolume] = useState(String(tank.volume_litres))
+  const [waterType, setWaterType] = useState(tank.water_type ?? 'freshwater')
   const [substrate, setSubstrate] = useState(tank.substrate ?? '')
   const [lighting, setLighting] = useState(tank.lighting ?? '')
   const [filterFlow, setFilterFlow] = useState(tank.filter_flow_lph != null ? String(tank.filter_flow_lph) : '')
@@ -129,6 +130,7 @@ function EditTankPanel({ tank, onSave }: { tank: any; onSave: () => void }) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         name, volume_litres: Number(volume),
+        water_type: waterType,
         substrate: substrate || null, lighting: lighting || null,
         filter_flow_lph: filterFlow ? Number(filterFlow) : null,
         width_mm: width ? toMM(Number(width), unitSystem) : null,
@@ -157,6 +159,14 @@ function EditTankPanel({ tank, onSave }: { tank: any; onSave: () => void }) {
           <input value={val as string} onChange={e => (set as any)(e.target.value)} style={{ width: '100%', boxSizing: 'border-box' }} />
         </div>
       ))}
+      <div style={{ marginBottom: 12 }}>
+        <FieldLabel>Water type</FieldLabel>
+        <select value={waterType} onChange={e => setWaterType(e.target.value)} style={{ width: '100%', boxSizing: 'border-box' }}>
+          <option value="freshwater">Freshwater</option>
+          <option value="saltwater">Saltwater / Marine</option>
+          <option value="brackish">Brackish</option>
+        </select>
+      </div>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10, marginBottom: 12 }}>
         {([['Width', width, setWidth], ['Height', height, setHeight], ['Depth', depth, setDepth]] as [string, string, (v: string) => void][]).map(([lbl, val, set]) => (
           <div key={lbl}>
@@ -482,6 +492,8 @@ export default function TankDetail() {
   const [nitrate, setNitrate] = useState('')
   const [gh, setGh] = useState('')
   const [kh, setKh] = useState('')
+  const [salinity, setSalinity] = useState('')
+  const [sg, setSg] = useState('')
 
   const [dailyTasks, setDailyTasks] = useState<any[]>([])
   const [dtName, setDtName] = useState('')
@@ -652,7 +664,17 @@ export default function TankDetail() {
           <ChevronLeft size={13} />All tanks
         </Link>
         <div style={{ marginTop: 8 }}>
-          <h1 style={{ margin: '0 0 4px', fontSize: 22, fontWeight: 500, color: 'var(--text)' }}>{tank.name}</h1>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
+            <h1 style={{ margin: 0, fontSize: 22, fontWeight: 500, color: 'var(--text)' }}>{tank.name}</h1>
+            {tank.water_type && tank.water_type !== 'freshwater' && (() => {
+              const styles: Record<string, { bg: string; color: string; label: string }> = {
+                saltwater: { bg: 'var(--blue-bg)',  color: 'var(--blue)',  label: 'Saltwater' },
+                brackish:  { bg: 'var(--green-bg)', color: 'var(--green)', label: 'Brackish'  },
+              }
+              const s = styles[tank.water_type]
+              return s ? <Tag bg={s.bg} color={s.color}>{s.label}</Tag> : null
+            })()}
+          </div>
           <p style={{ margin: 0, fontSize: 13, color: 'var(--text-2)' }}>
             {tank.volume_litres}L
             {(tank.width_mm || tank.height_mm || tank.depth_mm) ? ` · ${fmtDim(tank.width_mm, unitSystem)} × ${fmtDim(tank.height_mm, unitSystem)} × ${fmtDim(tank.depth_mm, unitSystem)}` : ''}
@@ -868,8 +890,18 @@ export default function TankDetail() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           <Card>
             <SectionTitle>Log parameters</SectionTitle>
-            <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(7, 1fr)', gap: 10 }}>
-              {([['pH', ph, setPh], ['Temp (°C)', temp, setTemp], ['Ammonia', ammonia, setAmmonia], ['Nitrite', nitrite, setNitrite], ['Nitrate', nitrate, setNitrate], ['GH (dGH)', gh, setGh], ['KH (dKH)', kh, setKh]] as [string, string, (v: string) => void][]).map(([lbl, val, set]) => (
+            <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(auto-fill, minmax(110px, 1fr))', gap: 10 }}>
+              {([
+                ['pH', ph, setPh],
+                ['Temp (°C)', temp, setTemp],
+                ['Ammonia', ammonia, setAmmonia],
+                ['Nitrite', nitrite, setNitrite],
+                ['Nitrate', nitrate, setNitrate],
+                ...(tank.water_type === 'freshwater'
+                  ? [['GH (dGH)', gh, setGh], ['KH (dKH)', kh, setKh]]
+                  : [['GH (dGH)', gh, setGh], ['KH / Alk', kh, setKh],
+                     ['Salinity (ppt)', salinity, setSalinity], ['Specific gravity', sg, setSg]]),
+              ] as [string, string, (v: string) => void][]).map(([lbl, val, set]) => (
                 <div key={lbl}>
                   <FieldLabel>{lbl}</FieldLabel>
                   <input type="number" step="0.01" value={val} onChange={e => set(e.target.value)} style={{ width: '100%', boxSizing: 'border-box' }} />
@@ -893,9 +925,12 @@ export default function TankDetail() {
                   nitrate_ppm: nitrate ? Number(nitrate) : null,
                   gh_dgh: gh ? Number(gh) : null,
                   kh_dkh: kh ? Number(kh) : null,
+                  salinity_ppt: salinity ? Number(salinity) : null,
+                  specific_gravity: sg ? Number(sg) : null,
                   notes: null,
                 })
-                setPh(''); setTemp(''); setAmmonia(''); setNitrite(''); setNitrate(''); setGh(''); setKh('')
+                setPh(''); setTemp(''); setAmmonia(''); setNitrite(''); setNitrate('')
+                setGh(''); setKh(''); setSalinity(''); setSg('')
                 params.reload(); alerts.reload()
               }}
             >Save reading</button>
@@ -909,6 +944,10 @@ export default function TankDetail() {
                 { key: 'ammonia_ppm', label: 'Ammonia (ppm)', color: '#c0392b', domain: [0, 2] },
                 { key: 'nitrite_ppm', label: 'Nitrite (ppm)', color: '#8e44ad', domain: [0, 2] },
                 { key: 'nitrate_ppm', label: 'Nitrate (ppm)', color: '#d4ac0d', domain: [0, 80] },
+                ...(tank.water_type !== 'freshwater' ? [
+                  { key: 'salinity_ppt', label: 'Salinity (ppt)', color: '#1abc9c', domain: [0, 45] },
+                  { key: 'specific_gravity', label: 'Specific Gravity', color: '#16a085', domain: [1.000, 1.035] },
+                ] : []),
               ].filter(({ key }) => chartData.some((d: any) => d[key] != null)).map(({ key, label: lbl, color, domain }) => (
                 <Card key={key}>
                   <SectionTitle>{lbl}</SectionTitle>

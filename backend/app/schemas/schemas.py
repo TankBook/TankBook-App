@@ -7,6 +7,7 @@ from pydantic import BaseModel
 class TankCreate(BaseModel):
     name: str
     volume_litres: int
+    water_type: str = "freshwater"
     substrate: str | None = None
     lighting: str | None = None
     filter_flow_lph: int | None = None
@@ -85,6 +86,8 @@ class WaterParameterCreate(BaseModel):
     temperature_c: float | None = None
     gh_dgh: float | None = None
     kh_dkh: float | None = None
+    salinity_ppt: float | None = None
+    specific_gravity: float | None = None
     notes: str | None = None
 
 

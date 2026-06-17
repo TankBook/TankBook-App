@@ -22,6 +22,7 @@ class Tank(Base):
     width_mm: Mapped[int | None] = mapped_column(Integer)
     height_mm: Mapped[int | None] = mapped_column(Integer)
     depth_mm: Mapped[int | None] = mapped_column(Integer)
+    water_type: Mapped[str] = mapped_column(String, default="freshwater")
     co2_injection: Mapped[bool] = mapped_column(Boolean, default=False)
     setup_date: Mapped[datetime | None] = mapped_column(DateTime)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
@@ -76,6 +77,8 @@ class WaterParameter(Base):
     temperature_c: Mapped[float | None] = mapped_column(Float)
     gh_dgh: Mapped[float | None] = mapped_column(Float)
     kh_dkh: Mapped[float | None] = mapped_column(Float)
+    salinity_ppt: Mapped[float | None] = mapped_column(Float)
+    specific_gravity: Mapped[float | None] = mapped_column(Float)
     recorded_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     notes: Mapped[str | None] = mapped_column(Text)
 

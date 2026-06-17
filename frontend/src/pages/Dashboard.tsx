@@ -18,11 +18,22 @@ interface DashboardStats {
     description: string | null; due_at: string; is_recurring: boolean
   }>
   tanks: Array<{
-    id: string; name: string; volume_litres: number; co2_injection: boolean
+    id: string; name: string; volume_litres: number; water_type: string; co2_injection: boolean
     substrate: string | null; fish_count: number; fish_species: number
     plant_species: number; unack_alerts: number; overdue_tasks: number
     latest_ph: number | null; latest_temp: number | null; latest_recorded: string | null
   }>
+}
+
+const WATER_TYPE_STYLES: Record<string, { bg: string; color: string; label: string }> = {
+  freshwater: { bg: 'var(--cyan-bg)',   color: 'var(--cyan)',   label: 'Freshwater' },
+  saltwater:  { bg: 'var(--blue-bg)',   color: 'var(--blue)',   label: 'Saltwater'  },
+  brackish:   { bg: 'var(--green-bg)',  color: 'var(--green)',  label: 'Brackish'   },
+}
+
+function WaterTypeBadge({ type }: { type: string }) {
+  const s = WATER_TYPE_STYLES[type] ?? WATER_TYPE_STYLES.freshwater
+  return <Tag bg={s.bg} color={s.color}>{s.label}</Tag>
 }
 
 function StatCard({ label, value, accent, icon: Icon }: {
@@ -48,7 +59,10 @@ function TankOverviewCard({ tank }: { tank: DashboardStats['tanks'][0] }) {
       style={{ background: 'var(--surface)', border: '0.5px solid var(--border)', borderRadius: 12, padding: '1rem 1.25rem', cursor: 'pointer' }}
     >
       <div style={{ marginBottom: 10 }}>
-        <p style={{ fontWeight: 500, fontSize: 15, margin: '0 0 4px', color: 'var(--text)' }}>{tank.name}</p>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+          <p style={{ fontWeight: 500, fontSize: 15, margin: 0, color: 'var(--text)' }}>{tank.name}</p>
+          <WaterTypeBadge type={tank.water_type} />
+        </div>
         <p style={{ fontSize: 13, color: 'var(--text-2)', margin: 0 }}>
           {tank.volume_litres}L{tank.co2_injection ? ' · CO₂' : ''}{tank.substrate ? ` · ${tank.substrate}` : ''}
         </p>
@@ -101,6 +115,7 @@ export default function Dashboard() {
 
   const [name, setName] = useState('')
   const [volume, setVolume] = useState('')
+  const [waterType, setWaterType] = useState('freshwater')
   const [co2, setCo2] = useState(false)
   const [substrate, setSubstrate] = useState('')
   const [lighting, setLighting] = useState('')
@@ -121,6 +136,7 @@ export default function Dashboard() {
     await api.tanks.create({
       name,
       volume_litres: Number(volume),
+      water_type: waterType,
       co2_injection: co2,
       substrate: substrate || null,
       lighting: lighting || null,
@@ -130,7 +146,8 @@ export default function Dashboard() {
       depth_mm: depth ? toMM(Number(depth), unitSystem) : null,
       setup_date: null,
     })
-    setName(''); setVolume(''); setCo2(false); setSubstrate(''); setLighting(''); setFilterFlow('')
+    setName(''); setVolume(''); setWaterType('freshwater'); setCo2(false)
+    setSubstrate(''); setLighting(''); setFilterFlow('')
     setWidth(''); setHeight(''); setDepth('')
     setShowForm(false)
     reload(); loadStats()
@@ -240,6 +257,14 @@ export default function Dashboard() {
                   <FieldLabel>Volume (litres) *</FieldLabel>
                   <input type="number" value={volume} onChange={e => setVolume(e.target.value)} placeholder="e.g. 120" style={{ width: '100%', boxSizing: 'border-box' }} />
                 </div>
+              </div>
+              <div>
+                <FieldLabel>Water type</FieldLabel>
+                <select value={waterType} onChange={e => setWaterType(e.target.value)} style={{ width: '100%', boxSizing: 'border-box' }}>
+                  <option value="freshwater">Freshwater</option>
+                  <option value="saltwater">Saltwater / Marine</option>
+                  <option value="brackish">Brackish</option>
+                </select>
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
                 <div>

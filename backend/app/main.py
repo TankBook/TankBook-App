@@ -110,6 +110,7 @@ def dashboard_stats(db=Depends(get_db)):
             "id": tank.id,
             "name": tank.name,
             "volume_litres": tank.volume_litres,
+            "water_type": tank.water_type,
             "co2_injection": tank.co2_injection,
             "substrate": tank.substrate,
             "fish_count": sum(f.quantity for f in fish),

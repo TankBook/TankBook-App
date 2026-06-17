@@ -4,6 +4,7 @@ export interface Tank {
   id: string
   name: string
   volume_litres: number
+  water_type: string
   substrate: string | null
   lighting: string | null
   filter_flow_lph: number | null
@@ -49,6 +50,8 @@ export interface WaterParameter {
   temperature_c: number | null
   gh_dgh: number | null
   kh_dkh: number | null
+  salinity_ppt: number | null
+  specific_gravity: number | null
   recorded_at: string
   notes: string | null
 }
