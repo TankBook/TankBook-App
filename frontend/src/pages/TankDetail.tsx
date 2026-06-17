@@ -698,79 +698,21 @@ export default function TankDetail() {
           {fish.data?.length === 0 && <p style={{ fontSize: 13, color: 'var(--text-2)' }}>No fish added yet.</p>}
           {fish.data?.map(f => {
             const hc = HEALTH_COLORS[f.health_status] ?? HEALTH_COLORS.healthy
-            const isEditing = editingFishId === f.id
             return (
-              <div key={f.id} style={{ borderBottom: '0.5px solid var(--border-sub)' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 0' }}>
-                  <div>
-                    <span style={{ fontSize: 13, color: 'var(--text)', fontWeight: 500 }}>
-                      {f.common_name ?? f.species_slug}
-                    </span>
-                    <span style={{ fontSize: 12, color: 'var(--text-2)', marginLeft: 8 }}>×{f.quantity}</span>
-                    {f.latin_name && (
-                      <p style={{ margin: '1px 0 0', fontSize: 11, color: 'var(--text-3)', fontStyle: 'italic' }}>{f.latin_name}</p>
-                    )}
-                    {f.notes && (
-                      <p style={{ margin: '2px 0 0', fontSize: 11, color: 'var(--text-2)' }}>{f.notes}</p>
-                    )}
-                  </div>
-                  <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexShrink: 0 }}>
-                    <Tag bg={hc.bg} color={hc.color}>{f.health_status}</Tag>
-                    <button
-                      onClick={() => isEditing ? setEditingFishId(null) : startEditFish(f)}
-                      style={{ fontSize: 11, color: 'var(--text-2)', background: 'none', border: '0.5px solid var(--btn-border)', borderRadius: 6, padding: '2px 8px', cursor: 'pointer' }}
-                    >
-                      {isEditing ? 'Cancel' : 'Edit'}
-                    </button>
-                    <button
-                      onClick={async () => { await api.fish.remove(id!, f.id); fish.reload() }}
-                      style={{ display: 'flex', alignItems: 'center', gap: 3, fontSize: 11, color: 'var(--red)', background: 'none', border: 'none', cursor: 'pointer' }}
-                    >
-                      <Trash2 size={11} />Remove
-                    </button>
-                  </div>
+              <div key={f.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 0', borderBottom: '0.5px solid var(--border-sub)' }}>
+                <div>
+                  <span style={{ fontSize: 13, color: 'var(--text)', fontWeight: 500 }}>{f.common_name ?? f.species_slug}</span>
+                  <span style={{ fontSize: 12, color: 'var(--text-2)', marginLeft: 8 }}>×{f.quantity}</span>
+                  {f.latin_name && <p style={{ margin: '1px 0 0', fontSize: 11, color: 'var(--text-3)', fontStyle: 'italic' }}>{f.latin_name}</p>}
+                  {f.notes && <p style={{ margin: '2px 0 0', fontSize: 11, color: 'var(--text-2)' }}>{f.notes}</p>}
                 </div>
-
-                {isEditing && (
-                  <div style={{ background: 'var(--surface-2)', borderRadius: 8, padding: '12px 14px', marginBottom: 10 }}>
-                    <div style={{ display: 'grid', gridTemplateColumns: '80px 1fr', gap: 10, marginBottom: 10 }}>
-                      <div>
-                        <FieldLabel>Quantity</FieldLabel>
-                        <input
-                          type="number" min="1" value={editQty}
-                          onChange={e => setEditQty(e.target.value)}
-                          style={{ width: '100%', boxSizing: 'border-box' }}
-                        />
-                      </div>
-                      <div>
-                        <FieldLabel>Health status</FieldLabel>
-                        <select
-                          value={editHealth}
-                          onChange={e => setEditHealth(e.target.value)}
-                          style={{ width: '100%', boxSizing: 'border-box' }}
-                        >
-                          {HEALTH_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
-                        </select>
-                      </div>
-                    </div>
-                    <div style={{ marginBottom: 10 }}>
-                      <FieldLabel>Notes</FieldLabel>
-                      <textarea
-                        value={editNotes}
-                        onChange={e => setEditNotes(e.target.value)}
-                        placeholder="e.g. Hikari micro pellets, twice daily"
-                        rows={2}
-                        style={{ width: '100%', boxSizing: 'border-box', resize: 'vertical' }}
-                      />
-                    </div>
-                    <button
-                      onClick={saveEditFish}
-                      style={{ fontSize: 12, padding: '5px 14px', borderRadius: 6, border: '0.5px solid var(--blue-border)', background: 'var(--blue-bg)', color: 'var(--blue)', cursor: 'pointer', fontWeight: 500 }}
-                    >
-                      Save
-                    </button>
-                  </div>
-                )}
+                <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexShrink: 0 }}>
+                  <Tag bg={hc.bg} color={hc.color}>{f.health_status}</Tag>
+                  <button onClick={() => startEditFish(f)} style={{ fontSize: 11, color: 'var(--text-2)', background: 'none', border: '0.5px solid var(--btn-border)', borderRadius: 6, padding: '2px 8px', cursor: 'pointer' }}>Edit</button>
+                  <button onClick={async () => { await api.fish.remove(id!, f.id); fish.reload() }} style={{ display: 'flex', alignItems: 'center', gap: 3, fontSize: 11, color: 'var(--red)', background: 'none', border: 'none', cursor: 'pointer' }}>
+                    <Trash2 size={11} />Remove
+                  </button>
+                </div>
               </div>
             )
           })}
@@ -1284,6 +1226,44 @@ export default function TankDetail() {
 
       {/* EDIT TAB */}
       {tab === 'edit' && <EditTankPanel tank={tank} onSave={reloadTank} />}
+
+      {/* EDIT FISH MODAL */}
+      {editingFishId && (
+        <div
+          onMouseDown={() => setEditingFishId(null)}
+          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', zIndex: 300, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}
+        >
+          <div
+            onMouseDown={e => e.stopPropagation()}
+            style={{ background: 'var(--surface)', border: '0.5px solid var(--border)', borderRadius: 14, padding: '1.5rem', width: 400, maxWidth: '100%', boxShadow: '0 12px 40px rgba(0,0,0,0.22)' }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+              <p style={{ margin: 0, fontWeight: 600, fontSize: 15, color: 'var(--text)' }}>Edit fish</p>
+              <button onClick={() => setEditingFishId(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-2)', lineHeight: 0 }}><X size={18} /></button>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '80px 1fr', gap: 10, marginBottom: 12 }}>
+              <div>
+                <FieldLabel>Quantity</FieldLabel>
+                <input type="number" min="1" value={editQty} onChange={e => setEditQty(e.target.value)} style={{ width: '100%', boxSizing: 'border-box' }} />
+              </div>
+              <div>
+                <FieldLabel>Health status</FieldLabel>
+                <select value={editHealth} onChange={e => setEditHealth(e.target.value)} style={{ width: '100%', boxSizing: 'border-box' }}>
+                  {HEALTH_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
+                </select>
+              </div>
+            </div>
+            <div style={{ marginBottom: 16 }}>
+              <FieldLabel>Notes</FieldLabel>
+              <textarea value={editNotes} onChange={e => setEditNotes(e.target.value)} placeholder="e.g. Hikari micro pellets, twice daily" rows={2} style={{ width: '100%', boxSizing: 'border-box', resize: 'vertical' }} />
+            </div>
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+              <button onClick={() => setEditingFishId(null)} style={{ padding: '7px 16px', borderRadius: 8, fontSize: 13, cursor: 'pointer', border: '0.5px solid var(--btn-border)', background: 'transparent', color: 'var(--text)' }}>Cancel</button>
+              <button onClick={saveEditFish} style={{ padding: '7px 16px', borderRadius: 8, fontSize: 13, fontWeight: 500, cursor: 'pointer', border: '0.5px solid var(--blue-border)', background: 'var(--blue-bg)', color: 'var(--blue)' }}>Save</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ADD FISH MODAL */}
       {showAddFish && (
