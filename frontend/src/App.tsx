@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { BrowserRouter, Routes, Route, Link, useLocation } from 'react-router-dom'
-import { LayoutDashboard, BookOpen, Cog, PencilRuler, NotebookPen, ShieldCheck, Menu, X, type LucideIcon } from 'lucide-react'
+import { LayoutDashboard, BookOpen, Cog, PencilRuler, NotebookPen, ShieldCheck, Calculator, Menu, X, type LucideIcon } from 'lucide-react'
 
 function GitHubIcon({ size = 14 }: { size?: number }) {
   return (
@@ -30,6 +30,7 @@ import TankDesigner from './pages/TankDesigner'
 import Settings from './pages/Settings'
 import LivestockJournal from './pages/LivestockJournal'
 import CompatibilityChecker from './pages/CompatibilityChecker'
+import Calculators from './pages/Calculators'
 import { SettingsProvider, useSettings } from './context/SettingsContext'
 
 const NAV_LINKS: [string, string, LucideIcon][] = [
@@ -38,6 +39,7 @@ const NAV_LINKS: [string, string, LucideIcon][] = [
   ['/species', 'Species', BookOpen],
   ['/compatibility', 'Compatibility', ShieldCheck],
   ['/journal', 'Journal', NotebookPen],
+  ['/calculators', 'Calculators', Calculator],
   ['/settings', 'Settings', Cog],
 ]
 
@@ -183,6 +185,7 @@ export default function App() {
               <Route path="/species" element={<SpeciesBrowser />} />
               <Route path="/compatibility" element={<CompatibilityChecker />} />
               <Route path="/journal" element={<LivestockJournal />} />
+              <Route path="/calculators" element={<Calculators />} />
               <Route path="/settings" element={<Settings />} />
             </Routes>
           </div>
