@@ -6,7 +6,7 @@ from fastapi import FastAPI, Depends
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 
-from app.routers import tanks, fish, plants, parameters, alerts, species, maintenance, settings, daily_tasks, tank_designer, journal, backup, images
+from app.routers import tanks, fish, plants, parameters, alerts, species, maintenance, settings, daily_tasks, journal, backup, images
 from app.services.species import species_service
 from app.database import get_db
 
@@ -34,7 +34,6 @@ app.include_router(alerts.router, prefix="/api/alerts", tags=["alerts"])
 app.include_router(species.router, prefix="/api/species", tags=["species"])
 app.include_router(maintenance.router, prefix="/api/tanks", tags=["maintenance"])
 app.include_router(daily_tasks.router, prefix="/api/tanks", tags=["daily_tasks"])
-app.include_router(tank_designer.router, prefix="/api/tanks", tags=["designer"])
 app.include_router(settings.router, prefix="/api/settings", tags=["settings"])
 app.include_router(journal.router, prefix="/api/tanks", tags=["journal"])
 app.include_router(backup.router, prefix="/api/backup", tags=["backup"])

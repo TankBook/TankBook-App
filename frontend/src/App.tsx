@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { BrowserRouter, Routes, Route, Link, useLocation } from 'react-router-dom'
-import { LayoutDashboard, BookOpen, Cog, PencilRuler, NotebookPen, ShieldCheck, Calculator, Menu, X, type LucideIcon } from 'lucide-react'
+import { LayoutDashboard, BookOpen, Cog, NotebookPen, ShieldCheck, Calculator, Menu, X, type LucideIcon } from 'lucide-react'
 
 function GitHubIcon({ size = 14 }: { size?: number }) {
   return (
@@ -26,7 +26,6 @@ function AquaDropIcon({ size = 26 }: { size?: number }) {
 import Dashboard from './pages/Dashboard'
 import TankDetail from './pages/TankDetail'
 import SpeciesBrowser from './pages/SpeciesBrowser'
-import TankDesigner from './pages/TankDesigner'
 import Settings from './pages/Settings'
 import LivestockJournal from './pages/LivestockJournal'
 import CompatibilityChecker from './pages/CompatibilityChecker'
@@ -35,7 +34,6 @@ import { SettingsProvider, useSettings } from './context/SettingsContext'
 
 const NAV_LINKS: [string, string, LucideIcon][] = [
   ['/', 'Dashboard', LayoutDashboard],
-  ['/designer', 'Designer', PencilRuler],
   ['/species', 'Species', BookOpen],
   ['/compatibility', 'Compatibility', ShieldCheck],
   ['/journal', 'Tank Journal', NotebookPen],
@@ -181,7 +179,6 @@ export default function App() {
             <Routes>
               <Route path="/" element={<Dashboard />} />
               <Route path="/tanks/:id" element={<TankDetail />} />
-              <Route path="/designer" element={<TankDesigner />} />
               <Route path="/species" element={<SpeciesBrowser />} />
               <Route path="/compatibility" element={<CompatibilityChecker />} />
               <Route path="/journal" element={<LivestockJournal />} />

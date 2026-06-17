@@ -33,7 +33,6 @@ class Tank(Base):
     tasks: Mapped[list["MaintenanceTask"]] = relationship(back_populates="tank", cascade="all, delete-orphan")
     alerts: Mapped[list["Alert"]] = relationship(back_populates="tank", cascade="all, delete-orphan")
     daily_tasks: Mapped[list["DailyTask"]] = relationship(back_populates="tank", cascade="all, delete-orphan")
-    design: Mapped["TankDesign | None"] = relationship(back_populates="tank", uselist=False, cascade="all, delete-orphan")
     journal_entries: Mapped[list["JournalEntry"]] = relationship(back_populates="tank", cascade="all, delete-orphan")
 
 
@@ -131,17 +130,6 @@ class SpeciesIndex(Base):
     ph_min: Mapped[float | None] = mapped_column(Float)
     ph_max: Mapped[float | None] = mapped_column(Float)
     synced_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
-
-
-class TankDesign(Base):
-    __tablename__ = "tank_designs"
-
-    id: Mapped[str] = mapped_column(String, primary_key=True, default=new_uuid)
-    tank_id: Mapped[str] = mapped_column(String, ForeignKey("tanks.id", ondelete="CASCADE"), unique=True)
-    cells: Mapped[str] = mapped_column(Text, default="[]")  # JSON array of {x,y,label,color}
-    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-
-    tank: Mapped["Tank"] = relationship(back_populates="design")
 
 
 class DailyTask(Base):
