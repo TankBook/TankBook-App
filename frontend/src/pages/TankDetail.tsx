@@ -917,7 +917,7 @@ export default function TankDetail() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           <Card>
             <SectionTitle>Log parameters</SectionTitle>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 10 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(7, 1fr)', gap: 10 }}>
               {([['pH', ph, setPh], ['Temp (°C)', temp, setTemp], ['Ammonia', ammonia, setAmmonia], ['Nitrite', nitrite, setNitrite], ['Nitrate', nitrate, setNitrate], ['GH (dGH)', gh, setGh], ['KH (dKH)', kh, setKh]] as [string, string, (v: string) => void][]).map(([lbl, val, set]) => (
                 <div key={lbl}>
                   <FieldLabel>{lbl}</FieldLabel>
