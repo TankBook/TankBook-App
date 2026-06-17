@@ -200,6 +200,15 @@ const CATEGORY_COLORS: Record<string, { bg: string; color: string }> = {
 const API_PRODUCTS: APIProduct[] = [
   // Conditioners
   {
+    id: 'aqua-essential',
+    name: 'Aqua Essential',
+    category: 'conditioner',
+    use: 'Removes chlorine & chloramines, detoxifies ammonia, nitrite and nitrate',
+    doseAmount: 5,
+    doseUnit: 'ml',
+    schedule: 'Add when performing water changes or setting up a new tank. Dose proportionally to the volume of water being replaced.',
+  },
+  {
     id: 'stress-coat',
     name: 'Stress Coat+',
     category: 'conditioner',
