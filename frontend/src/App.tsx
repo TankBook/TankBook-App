@@ -40,7 +40,6 @@ const NAV_LINKS: [string, string, LucideIcon][] = [
   ['/compatibility', 'Compatibility', ShieldCheck],
   ['/journal', 'Journal', NotebookPen],
   ['/calculators', 'Calculators', Calculator],
-  ['/settings', 'Settings', Cog],
 ]
 
 function Nav() {
@@ -126,6 +125,7 @@ function Nav() {
           boxShadow: '0 8px 24px rgba(0,0,0,0.12)',
         }}>
           {NAV_LINKS.map(([to, label, Icon]) => link(to, label, Icon, () => setMenuOpen(false)))}
+          {link('/settings', 'Settings', Cog, () => setMenuOpen(false))}
         </div>
       )}
     </nav>
