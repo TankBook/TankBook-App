@@ -142,7 +142,7 @@ def dashboard_stats(db=Depends(get_db)):
 
 
 # Serve the bundled frontend — must come after all API routes
-_static = Path(os.environ.get("STATIC_DIR", "/app/static"))
+_static = Path("/app/static")
 if _static.is_dir():
     app.mount("/assets", StaticFiles(directory=_static / "assets"), name="assets")
 
