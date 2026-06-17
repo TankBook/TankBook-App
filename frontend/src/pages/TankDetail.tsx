@@ -652,7 +652,7 @@ export default function TankDetail() {
         </div>
       )}
 
-      <div style={{ display: 'flex', gap: 4, marginBottom: 20, justifyContent: 'center' }}>
+      <div style={{ display: 'flex', gap: 4, width: 'fit-content', margin: '0 auto 20px' }}>
         {(['fish', 'plants', 'parameters', 'schedule', 'daily', 'alerts', 'gallery', 'edit'] as Tab[]).map(t => {
           const Icon = TAB_ICONS[t]
           const label = t.charAt(0).toUpperCase() + t.slice(1)
