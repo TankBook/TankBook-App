@@ -817,6 +817,14 @@ export default function SpeciesBrowser() {
     }
   }
 
+  const counts = {
+    all: all.length,
+    fish: all.filter(s => s.type === 'fish').length,
+    invertebrate: all.filter(s => s.type === 'invertebrate').length,
+    amphibian: all.filter(s => s.type === 'amphibian').length,
+    plant: all.filter(s => s.type === 'plant').length,
+  }
+
   const visible = all.filter(s => {
     if (filter !== 'all' && s.type !== filter) return false
     if (search) {
@@ -865,11 +873,11 @@ export default function SpeciesBrowser() {
       <div style={{ display: 'flex', gap: 10, marginBottom: 20, flexWrap: 'wrap' }}>
         <input value={search} onChange={e => setSearch(e.target.value)}
           placeholder="Search by name or slug…" style={{ flex: 1, minWidth: 200 }} />
-        <button style={typeFilterStyle('all', filter === 'all')} onClick={() => setFilter('all')}>All</button>
-        <button style={{ ...typeFilterStyle('fish', filter === 'fish'), display: 'inline-flex', alignItems: 'center', gap: 5 }} onClick={() => setFilter('fish')}><Fish size={13} />Fish</button>
-        <button style={{ ...typeFilterStyle('invertebrate', filter === 'invertebrate'), display: 'inline-flex', alignItems: 'center', gap: 5 }} onClick={() => setFilter('invertebrate')}><Shrimp size={13} />Invertebrates</button>
-        <button style={{ ...typeFilterStyle('amphibian', filter === 'amphibian'), display: 'inline-flex', alignItems: 'center', gap: 5 }} onClick={() => setFilter('amphibian')}><Bug size={13} />Amphibians</button>
-        <button style={{ ...typeFilterStyle('plant', filter === 'plant'), display: 'inline-flex', alignItems: 'center', gap: 5 }} onClick={() => setFilter('plant')}><Leaf size={13} />Plants</button>
+        <button style={{ ...typeFilterStyle('all', filter === 'all'), display: 'inline-flex', alignItems: 'center', gap: 5 }} onClick={() => setFilter('all')}>All<span style={{ fontSize: 10, opacity: 0.65 }}>{counts.all}</span></button>
+        <button style={{ ...typeFilterStyle('fish', filter === 'fish'), display: 'inline-flex', alignItems: 'center', gap: 5 }} onClick={() => setFilter('fish')}><Fish size={13} />Fish<span style={{ fontSize: 10, opacity: 0.65 }}>{counts.fish}</span></button>
+        <button style={{ ...typeFilterStyle('invertebrate', filter === 'invertebrate'), display: 'inline-flex', alignItems: 'center', gap: 5 }} onClick={() => setFilter('invertebrate')}><Shrimp size={13} />Invertebrates<span style={{ fontSize: 10, opacity: 0.65 }}>{counts.invertebrate}</span></button>
+        <button style={{ ...typeFilterStyle('amphibian', filter === 'amphibian'), display: 'inline-flex', alignItems: 'center', gap: 5 }} onClick={() => setFilter('amphibian')}><Bug size={13} />Amphibians<span style={{ fontSize: 10, opacity: 0.65 }}>{counts.amphibian}</span></button>
+        <button style={{ ...typeFilterStyle('plant', filter === 'plant'), display: 'inline-flex', alignItems: 'center', gap: 5 }} onClick={() => setFilter('plant')}><Leaf size={13} />Plants<span style={{ fontSize: 10, opacity: 0.65 }}>{counts.plant}</span></button>
       </div>
 
       {loading && <p style={{ color: 'var(--text-2)', fontSize: 14 }}>Loading species…</p>}
