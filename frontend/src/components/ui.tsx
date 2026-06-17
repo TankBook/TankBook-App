@@ -108,6 +108,58 @@ export function ConfirmDialog({
   )
 }
 
+export function Modal({ title, onClose, children, width = 500 }: {
+  title: string
+  onClose: () => void
+  children: ReactNode
+  width?: number
+}) {
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [onClose])
+
+  return (
+    <div
+      onMouseDown={onClose}
+      style={{
+        position: 'fixed', inset: 0, zIndex: 400,
+        background: 'var(--overlay)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        padding: '16px',
+      }}
+    >
+      <div
+        onMouseDown={e => e.stopPropagation()}
+        style={{
+          background: 'var(--surface)', border: '0.5px solid var(--border)',
+          borderRadius: 14, width, maxWidth: '100%', maxHeight: '90vh',
+          display: 'flex', flexDirection: 'column',
+          boxShadow: '0 12px 40px rgba(0,0,0,0.22)',
+        }}
+      >
+        <div style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          padding: '14px 20px', borderBottom: '0.5px solid var(--border)', flexShrink: 0,
+        }}>
+          <p style={{ margin: 0, fontWeight: 600, fontSize: 15, color: 'var(--text)' }}>{title}</p>
+          <button
+            onClick={onClose}
+            style={{
+              padding: '3px 7px', borderRadius: 6, border: '0.5px solid var(--border)',
+              background: 'transparent', color: 'var(--text-3)', cursor: 'pointer', fontSize: 14, lineHeight: 1,
+            }}
+          >✕</button>
+        </div>
+        <div style={{ padding: '20px', overflowY: 'auto' }}>
+          {children}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export function tabStyle(active: boolean, bordered = false): CSSProperties {
   return {
     padding: '6px 14px', borderRadius: 8, cursor: 'pointer', fontSize: 13,

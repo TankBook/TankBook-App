@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { NotebookPen, Trash2, Plus, Pencil } from 'lucide-react'
-import { Tag, Card, FieldLabel, SectionTitle } from '../components/ui'
+import { Tag, Card, FieldLabel, Modal } from '../components/ui'
 import { api, JournalEntry, Tank, TankFish } from '../api/client'
 import { useSettings, formatDate } from '../context/SettingsContext'
 
@@ -30,24 +30,76 @@ const EVENT_LABELS: Record<string, string> = {
 }
 
 const EVENT_STYLE: Record<string, { bg: string; color: string }> = {
-  water_change: { bg: 'var(--cyan-bg)',   color: 'var(--cyan)'   },
-  equipment:    { bg: 'var(--amber-bg)',  color: 'var(--amber)'  },
-  maintenance:  { bg: 'var(--blue-bg)',   color: 'var(--blue)'   },
-  plant:        { bg: 'var(--green-bg)',  color: 'var(--green)'  },
-  feeding:      { bg: 'var(--orange-bg, #fff4e6)', color: 'var(--orange, #c27216)' },
-  observation:  { bg: 'var(--blue-bg)',   color: 'var(--blue)'   },
-  illness:      { bg: 'var(--red-bg)',    color: 'var(--red)'    },
-  treatment:    { bg: 'var(--amber-bg)',  color: 'var(--amber)'  },
-  recovery:     { bg: 'var(--green-bg)',  color: 'var(--green)'  },
-  birth:        { bg: 'var(--green-bg)',  color: 'var(--green)'  },
-  death:        { bg: 'var(--tag-bg)',    color: 'var(--text-2)' },
-  behaviour:    { bg: 'var(--blue-bg)',   color: 'var(--blue)'   },
-  other:        { bg: 'var(--tag-bg)',    color: 'var(--text-2)' },
+  water_change: { bg: 'var(--cyan-bg)',            color: 'var(--cyan)'              },
+  equipment:    { bg: 'var(--amber-bg)',            color: 'var(--amber)'             },
+  maintenance:  { bg: 'var(--blue-bg)',             color: 'var(--blue)'              },
+  plant:        { bg: 'var(--green-bg)',            color: 'var(--green)'             },
+  feeding:      { bg: 'var(--orange-bg, #fff4e6)', color: 'var(--orange, #c27216)'   },
+  observation:  { bg: 'var(--blue-bg)',             color: 'var(--blue)'              },
+  illness:      { bg: 'var(--red-bg)',              color: 'var(--red)'               },
+  treatment:    { bg: 'var(--amber-bg)',            color: 'var(--amber)'             },
+  recovery:     { bg: 'var(--green-bg)',            color: 'var(--green)'             },
+  birth:        { bg: 'var(--green-bg)',            color: 'var(--green)'             },
+  death:        { bg: 'var(--tag-bg)',              color: 'var(--text-2)'            },
+  behaviour:    { bg: 'var(--blue-bg)',             color: 'var(--blue)'              },
+  other:        { bg: 'var(--tag-bg)',              color: 'var(--text-2)'            },
 }
 
 function EventBadge({ type }: { type: string }) {
   const s = EVENT_STYLE[type] ?? EVENT_STYLE.other
-  return <Tag bg={s.bg} color={s.color}>{type}</Tag>
+  return <Tag bg={s.bg} color={s.color}>{EVENT_LABELS[type] ?? type}</Tag>
+}
+
+// Shared form fields used by both Add modal and inline Edit
+function EntryFormFields({
+  form,
+  setForm,
+  fishList,
+}: {
+  form: { tank_fish_id: string; event_type: string; notes: string; occurred_at: string }
+  setForm: (updater: (f: typeof form) => typeof form) => void
+  fishList: TankFish[]
+}) {
+  return (
+    <>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
+        <div>
+          <FieldLabel>Event type</FieldLabel>
+          <select value={form.event_type} onChange={e => setForm(f => ({ ...f, event_type: e.target.value }))} style={{ width: '100%' }}>
+            {EVENT_TYPES.map(t => <option key={t} value={t}>{EVENT_LABELS[t] ?? t}</option>)}
+          </select>
+        </div>
+        <div>
+          <FieldLabel>Date &amp; time</FieldLabel>
+          <input
+            type="datetime-local"
+            value={form.occurred_at}
+            onChange={e => setForm(f => ({ ...f, occurred_at: e.target.value }))}
+            style={{ width: '100%', boxSizing: 'border-box' }}
+          />
+        </div>
+      </div>
+      <div style={{ marginBottom: 12 }}>
+        <FieldLabel>Species (optional)</FieldLabel>
+        <select value={form.tank_fish_id} onChange={e => setForm(f => ({ ...f, tank_fish_id: e.target.value }))} style={{ width: '100%' }}>
+          <option value="">— tank-wide entry —</option>
+          {fishList.map(f => (
+            <option key={f.id} value={f.id}>{f.common_name ?? f.species_slug} ×{f.quantity}</option>
+          ))}
+        </select>
+      </div>
+      <div>
+        <FieldLabel>Notes</FieldLabel>
+        <textarea
+          value={form.notes}
+          onChange={e => setForm(f => ({ ...f, notes: e.target.value }))}
+          rows={4}
+          placeholder="Describe what happened…"
+          style={{ width: '100%', boxSizing: 'border-box', resize: 'vertical' }}
+        />
+      </div>
+    </>
+  )
 }
 
 export default function LivestockJournal() {
@@ -58,8 +110,9 @@ export default function LivestockJournal() {
   const [fishList, setFishList] = useState<TankFish[]>([])
   const [filterType, setFilterType] = useState<string>('all')
   const [loading, setLoading] = useState(false)
-  const [showForm, setShowForm] = useState(false)
 
+  // Add modal
+  const [showModal, setShowModal] = useState(false)
   const [form, setForm] = useState({
     tank_fish_id: '',
     event_type: 'observation',
@@ -69,10 +122,59 @@ export default function LivestockJournal() {
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
 
+  // Inline edit
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editForm, setEditForm] = useState({ tank_fish_id: '', event_type: 'observation', notes: '', occurred_at: '' })
   const [editSaving, setEditSaving] = useState(false)
   const [editError, setEditError] = useState<string | null>(null)
+
+  useEffect(() => {
+    api.tanks.list().then(list => {
+      setTanks(list)
+      if (list.length > 0) {
+        const preferred = defaultTank && list.find(t => t.id === defaultTank)
+        setSelectedTank(preferred ? preferred.id : list[0].id)
+      }
+    })
+  }, [defaultTank])
+
+  useEffect(() => {
+    if (!selectedTank) { setEntries([]); setFishList([]); return }
+    setLoading(true)
+    Promise.all([
+      api.journal.list(selectedTank),
+      api.fish.list(selectedTank),
+    ]).then(([j, f]) => {
+      setEntries(j)
+      setFishList(f)
+    }).finally(() => setLoading(false))
+  }, [selectedTank])
+
+  function openModal() {
+    setForm({ tank_fish_id: '', event_type: 'observation', notes: '', occurred_at: new Date().toISOString().slice(0, 16) })
+    setSaveError(null)
+    setShowModal(true)
+  }
+
+  async function handleAdd() {
+    if (!selectedTank || !form.notes.trim()) return
+    setSaving(true)
+    setSaveError(null)
+    try {
+      const entry = await api.journal.add(selectedTank, {
+        tank_fish_id: form.tank_fish_id || null,
+        event_type: form.event_type,
+        notes: form.notes.trim(),
+        occurred_at: new Date(form.occurred_at).toISOString(),
+      })
+      setEntries(prev => [entry, ...prev])
+      setShowModal(false)
+    } catch (e: any) {
+      setSaveError(e.message ?? 'Save failed')
+    } finally {
+      setSaving(false)
+    }
+  }
 
   function startEdit(entry: JournalEntry) {
     setEditingId(entry.id)
@@ -105,57 +207,17 @@ export default function LivestockJournal() {
     }
   }
 
-  useEffect(() => {
-    api.tanks.list().then(list => {
-      setTanks(list)
-      if (list.length > 0) {
-        const preferred = defaultTank && list.find(t => t.id === defaultTank)
-        setSelectedTank(preferred ? preferred.id : list[0].id)
-      }
-    })
-  }, [defaultTank])
-
-  useEffect(() => {
-    if (!selectedTank) { setEntries([]); setFishList([]); return }
-    setLoading(true)
-    Promise.all([
-      api.journal.list(selectedTank),
-      api.fish.list(selectedTank),
-    ]).then(([j, f]) => {
-      setEntries(j)
-      setFishList(f)
-    }).finally(() => setLoading(false))
-  }, [selectedTank])
-
-  async function handleAdd() {
-    if (!selectedTank || !form.notes.trim()) return
-    setSaving(true)
-    setSaveError(null)
-    try {
-      const entry = await api.journal.add(selectedTank, {
-        tank_fish_id: form.tank_fish_id || null,
-        event_type: form.event_type,
-        notes: form.notes.trim(),
-        occurred_at: new Date(form.occurred_at).toISOString(),
-      })
-      setEntries(prev => [entry, ...prev])
-      setForm({ tank_fish_id: '', event_type: 'observation', notes: '', occurred_at: new Date().toISOString().slice(0, 16) })
-      setShowForm(false)
-    } catch (e: any) {
-      setSaveError(e.message ?? 'Save failed')
-    } finally {
-      setSaving(false)
-    }
-  }
-
   async function handleDelete(entry: JournalEntry) {
     await api.journal.delete(selectedTank, entry.id)
     setEntries(prev => prev.filter(e => e.id !== entry.id))
   }
 
   const visible = filterType === 'all' ? entries : entries.filter(e => e.event_type === filterType)
-
   const tankName = tanks.find(t => t.id === selectedTank)?.name ?? ''
+
+  // Filter buttons: all + each type, laid out in a full-width grid (2 rows)
+  const allFilters = ['all', ...EVENT_TYPES]
+  const cols = Math.ceil(allFilters.length / 2)
 
   return (
     <div>
@@ -163,10 +225,15 @@ export default function LivestockJournal() {
         <h1 style={{ margin: 0, fontSize: 22, fontWeight: 500, color: 'var(--text)' }}>Tank journal</h1>
         {selectedTank && (
           <button
-            onClick={() => { setShowForm(v => !v); setSaveError(null) }}
-            style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 14, padding: '8px 16px', borderRadius: 8, border: '0.5px solid var(--btn-border)', background: 'transparent', cursor: 'pointer', color: 'var(--text)' }}
+            onClick={openModal}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 6,
+              fontSize: 13, padding: '7px 16px', borderRadius: 8, fontWeight: 500,
+              border: '0.5px solid var(--blue-border)', background: 'var(--blue-bg)', color: 'var(--blue)',
+              cursor: 'pointer',
+            }}
           >
-            {showForm ? 'Cancel' : <><Plus size={14} />Add entry</>}
+            <Plus size={13} />Add entry
           </button>
         )}
       </div>
@@ -176,7 +243,7 @@ export default function LivestockJournal() {
         <FieldLabel>Select tank</FieldLabel>
         <select
           value={selectedTank}
-          onChange={e => { setSelectedTank(e.target.value); setShowForm(false); setFilterType('all') }}
+          onChange={e => { setSelectedTank(e.target.value); setFilterType('all') }}
           style={{ width: '100%' }}
         >
           <option value="">— choose a tank —</option>
@@ -184,81 +251,32 @@ export default function LivestockJournal() {
         </select>
       </Card>
 
-      {/* Add entry form */}
-      {showForm && selectedTank && (
-        <Card style={{ marginBottom: 20 }}>
-          <SectionTitle>New journal entry — {tankName}</SectionTitle>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
-            <div>
-              <FieldLabel>Event type</FieldLabel>
-              <select value={form.event_type} onChange={e => setForm(f => ({ ...f, event_type: e.target.value }))} style={{ width: '100%' }}>
-                {EVENT_TYPES.map(t => <option key={t} value={t}>{EVENT_LABELS[t] ?? t}</option>)}
-              </select>
-            </div>
-            <div>
-              <FieldLabel>Date &amp; time</FieldLabel>
-              <input
-                type="datetime-local"
-                value={form.occurred_at}
-                onChange={e => setForm(f => ({ ...f, occurred_at: e.target.value }))}
-                style={{ width: '100%', boxSizing: 'border-box' }}
-              />
-            </div>
-          </div>
-          <div style={{ marginBottom: 12 }}>
-            <FieldLabel>Species (optional)</FieldLabel>
-            <select value={form.tank_fish_id} onChange={e => setForm(f => ({ ...f, tank_fish_id: e.target.value }))} style={{ width: '100%' }}>
-              <option value="">— tank-wide entry —</option>
-              {fishList.map(f => (
-                <option key={f.id} value={f.id}>
-                  {f.common_name ?? f.species_slug} ×{f.quantity}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div style={{ marginBottom: 12 }}>
-            <FieldLabel>Notes</FieldLabel>
-            <textarea
-              value={form.notes}
-              onChange={e => setForm(f => ({ ...f, notes: e.target.value }))}
-              rows={3}
-              placeholder="Describe what you observed…"
-              style={{ width: '100%', boxSizing: 'border-box', resize: 'vertical' }}
-            />
-          </div>
-          {saveError && (
-            <p style={{ fontSize: 13, color: 'var(--red)', margin: '0 0 10px' }}>{saveError}</p>
-          )}
-          <button
-            onClick={handleAdd}
-            disabled={!form.notes.trim() || saving}
-            style={{
-              fontSize: 13, padding: '7px 20px', borderRadius: 8, fontWeight: 500,
-              border: '0.5px solid var(--blue-border)', background: 'var(--blue-bg)', color: 'var(--blue)',
-              cursor: form.notes.trim() && !saving ? 'pointer' : 'not-allowed',
-              opacity: form.notes.trim() && !saving ? 1 : 0.45,
-            }}
-          >
-            {saving ? 'Saving…' : 'Save entry'}
-          </button>
-        </Card>
-      )}
-
-      {/* Filter bar */}
+      {/* Filter bar — equal-width grid, two rows, category colours */}
       {selectedTank && entries.length > 0 && (
-        <div style={{ display: 'flex', gap: 6, marginBottom: 16, flexWrap: 'wrap' }}>
-          {['all', ...EVENT_TYPES].map(type => {
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: `repeat(${cols}, 1fr)`,
+          gap: 4,
+          marginBottom: 16,
+        }}>
+          {allFilters.map(type => {
             const active = filterType === type
+            const s = type === 'all' ? null : (EVENT_STYLE[type] ?? null)
             return (
               <button
                 key={type}
                 onClick={() => setFilterType(type)}
                 style={{
-                  fontSize: 12, padding: '4px 12px', borderRadius: 6, cursor: 'pointer',
-                  border: active ? '0.5px solid var(--blue-border)' : '0.5px solid var(--btn-border)',
-                  background: active ? 'var(--blue-bg)' : 'transparent',
-                  color: active ? 'var(--blue)' : 'var(--text-2)',
-                  fontWeight: active ? 500 : 400,
+                  fontSize: 11, padding: '5px 4px', borderRadius: 6, cursor: 'pointer',
+                  fontWeight: active ? 600 : 400,
+                  textAlign: 'center',
+                  border: active
+                    ? `1px solid ${s ? s.color : 'var(--blue)'}`
+                    : '0.5px solid var(--border)',
+                  background: active
+                    ? (s ? s.bg : 'var(--blue-bg)')
+                    : 'transparent',
+                  color: s ? s.color : (active ? 'var(--blue)' : 'var(--text-2)'),
                 }}
               >
                 {type === 'all' ? 'All' : (EVENT_LABELS[type] ?? type)}
@@ -280,7 +298,7 @@ export default function LivestockJournal() {
 
       {selectedTank && !loading && visible.length === 0 && (
         <p style={{ color: 'var(--text-2)', fontSize: 14 }}>
-          {entries.length === 0 ? 'No journal entries yet. Add the first one above.' : 'No entries match this filter.'}
+          {entries.length === 0 ? 'No journal entries yet. Use Add entry to get started.' : 'No entries match this filter.'}
         </p>
       )}
 
@@ -289,37 +307,16 @@ export default function LivestockJournal() {
           <div
             key={entry.id}
             style={{
-              background: 'var(--surface)', border: `0.5px solid ${editingId === entry.id ? 'var(--blue-border)' : 'var(--border)'}`,
+              background: 'var(--surface)',
+              border: `0.5px solid ${editingId === entry.id ? 'var(--blue-border)' : 'var(--border)'}`,
               borderRadius: 12, padding: '12px 16px',
             }}
           >
             {editingId === entry.id ? (
               <div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
-                  <div>
-                    <FieldLabel>Event type</FieldLabel>
-                    <select value={editForm.event_type} onChange={e => setEditForm(f => ({ ...f, event_type: e.target.value }))} style={{ width: '100%' }}>
-                      {EVENT_TYPES.map(t => <option key={t} value={t}>{EVENT_LABELS[t] ?? t}</option>)}
-                    </select>
-                  </div>
-                  <div>
-                    <FieldLabel>Date &amp; time</FieldLabel>
-                    <input type="datetime-local" value={editForm.occurred_at} onChange={e => setEditForm(f => ({ ...f, occurred_at: e.target.value }))} style={{ width: '100%', boxSizing: 'border-box' }} />
-                  </div>
-                </div>
-                <div style={{ marginBottom: 10 }}>
-                  <FieldLabel>Species (optional)</FieldLabel>
-                  <select value={editForm.tank_fish_id} onChange={e => setEditForm(f => ({ ...f, tank_fish_id: e.target.value }))} style={{ width: '100%' }}>
-                    <option value="">— tank-wide entry —</option>
-                    {fishList.map(f => <option key={f.id} value={f.id}>{f.common_name ?? f.species_slug} ×{f.quantity}</option>)}
-                  </select>
-                </div>
-                <div style={{ marginBottom: 10 }}>
-                  <FieldLabel>Notes</FieldLabel>
-                  <textarea value={editForm.notes} onChange={e => setEditForm(f => ({ ...f, notes: e.target.value }))} rows={3} style={{ width: '100%', boxSizing: 'border-box', resize: 'vertical' }} />
-                </div>
-                {editError && <p style={{ fontSize: 12, color: 'var(--red)', margin: '0 0 8px' }}>{editError}</p>}
-                <div style={{ display: 'flex', gap: 8 }}>
+                <EntryFormFields form={editForm} setForm={setEditForm} fishList={fishList} />
+                {editError && <p style={{ fontSize: 12, color: 'var(--red)', margin: '10px 0 0' }}>{editError}</p>}
+                <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
                   <button
                     onClick={() => handleEdit(entry)}
                     disabled={!editForm.notes.trim() || editSaving}
@@ -373,6 +370,30 @@ export default function LivestockJournal() {
           </div>
         ))}
       </div>
+
+      {/* Add entry modal */}
+      {showModal && (
+        <Modal title={`New entry — ${tankName}`} onClose={() => setShowModal(false)}>
+          <EntryFormFields form={form} setForm={setForm} fishList={fishList} />
+          {saveError && <p style={{ fontSize: 13, color: 'var(--red)', margin: '10px 0 0' }}>{saveError}</p>}
+          <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
+            <button
+              onClick={handleAdd}
+              disabled={!form.notes.trim() || saving}
+              style={{
+                fontSize: 13, padding: '7px 20px', borderRadius: 8, fontWeight: 500,
+                border: '0.5px solid var(--blue-border)', background: 'var(--blue-bg)', color: 'var(--blue)',
+                cursor: form.notes.trim() && !saving ? 'pointer' : 'not-allowed',
+                opacity: form.notes.trim() && !saving ? 1 : 0.45,
+              }}
+            >{saving ? 'Saving…' : 'Save entry'}</button>
+            <button
+              onClick={() => setShowModal(false)}
+              style={{ fontSize: 13, padding: '7px 14px', borderRadius: 8, border: '0.5px solid var(--btn-border)', background: 'transparent', color: 'var(--text-2)', cursor: 'pointer' }}
+            >Cancel</button>
+          </div>
+        </Modal>
+      )}
     </div>
   )
 }
