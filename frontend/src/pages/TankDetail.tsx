@@ -412,6 +412,9 @@ export default function TankDetail() {
   const alerts = useAlerts(id!)
   const { dateFormat, unitSystem } = useSettings()
 
+  const [showAddFish, setShowAddFish] = useState(false)
+  const [showAddPlant, setShowAddPlant] = useState(false)
+
   const [fishSlug, setFishSlug] = useState('')
   const [fishName, setFishName] = useState('')
   const [fishQty, setFishQty] = useState('1')
@@ -772,26 +775,12 @@ export default function TankDetail() {
             )
           })}
           <div style={{ marginTop: 16, borderTop: '0.5px solid var(--border-sub)', paddingTop: 14 }}>
-            <p style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, fontWeight: 500, color: 'var(--text-label)', margin: '0 0 8px' }}>
-              <Plus size={12} />Add fish
-            </p>
-            <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end' }}>
-              <div style={{ flex: 1 }}>
-                <FieldLabel>Species</FieldLabel>
-                <SpeciesAutocomplete type="fish" value={fishName} onChange={(slug, name) => { setFishSlug(slug); setFishName(name) }} />
-              </div>
-              <div>
-                <FieldLabel>Qty</FieldLabel>
-                <input type="number" value={fishQty} onChange={e => setFishQty(e.target.value)} style={{ width: 60 }} min="1" />
-              </div>
-              <button onClick={async () => {
-                if (!fishSlug) return
-                await api.fish.add(id!, { species_slug: fishSlug, quantity: Number(fishQty), notes: null })
-                setFishSlug(''); setFishName(''); setFishQty('1')
-                fish.reload()
-              }}>Add</button>
-            </div>
-            <CompatibilityCheck tankId={id!} slug={fishSlug} />
+            <button
+              onClick={() => setShowAddFish(true)}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 13, padding: '7px 16px', borderRadius: 8, fontWeight: 500, cursor: 'pointer', border: '0.5px solid var(--blue-border)', background: 'var(--blue-bg)', color: 'var(--blue)' }}
+            >
+              <Plus size={13} />Add fish
+            </button>
           </div>
         </Card>
       )}
@@ -881,33 +870,12 @@ export default function TankDetail() {
             )
           })}
           <div style={{ marginTop: 16, borderTop: '0.5px solid var(--border-sub)', paddingTop: 14 }}>
-            <p style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, fontWeight: 500, color: 'var(--text-label)', margin: '0 0 8px' }}>
-              <Plus size={12} />Add plant
-            </p>
-            <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end' }}>
-              <div style={{ flex: 1 }}>
-                <FieldLabel>Species</FieldLabel>
-                <SpeciesAutocomplete type="plant" value={plantName} onChange={(slug, name) => { setPlantSlug(slug); setPlantName(name) }} />
-              </div>
-              <div>
-                <FieldLabel>Status</FieldLabel>
-                <select value={plantAddStatus} onChange={e => setPlantAddStatus(e.target.value)}>
-                  <option value="planned">Planned</option>
-                  <option value="planted">Planted</option>
-                  <option value="removed">Removed</option>
-                </select>
-              </div>
-              <div>
-                <FieldLabel>Qty</FieldLabel>
-                <input type="number" value={plantQty} onChange={e => setPlantQty(e.target.value)} style={{ width: 60 }} min="1" />
-              </div>
-              <button onClick={async () => {
-                if (!plantSlug) return
-                await api.plants.add(id!, { species_slug: plantSlug, quantity: Number(plantQty), notes: null, plant_status: plantAddStatus })
-                setPlantSlug(''); setPlantName(''); setPlantQty('1'); setPlantAddStatus('planted')
-                plants.reload()
-              }}>Add</button>
-            </div>
+            <button
+              onClick={() => setShowAddPlant(true)}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 13, padding: '7px 16px', borderRadius: 8, fontWeight: 500, cursor: 'pointer', border: '0.5px solid var(--green-border)', background: 'var(--green-bg)', color: 'var(--green)' }}
+            >
+              <Plus size={13} />Add plant
+            </button>
           </div>
         </Card>
       )}
@@ -1316,6 +1284,97 @@ export default function TankDetail() {
 
       {/* EDIT TAB */}
       {tab === 'edit' && <EditTankPanel tank={tank} onSave={reloadTank} />}
+
+      {/* ADD FISH MODAL */}
+      {showAddFish && (
+        <div
+          onMouseDown={() => { setShowAddFish(false); setFishSlug(''); setFishName(''); setFishQty('1') }}
+          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', zIndex: 300, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}
+        >
+          <div
+            onMouseDown={e => e.stopPropagation()}
+            style={{ background: 'var(--surface)', border: '0.5px solid var(--border)', borderRadius: 14, padding: '1.5rem', width: 400, maxWidth: '100%', boxShadow: '0 12px 40px rgba(0,0,0,0.22)' }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+              <p style={{ margin: 0, fontWeight: 600, fontSize: 15, color: 'var(--text)' }}>Add fish</p>
+              <button onClick={() => { setShowAddFish(false); setFishSlug(''); setFishName(''); setFishQty('1') }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-2)', lineHeight: 0 }}><X size={18} /></button>
+            </div>
+            <div style={{ marginBottom: 12 }}>
+              <FieldLabel>Species</FieldLabel>
+              <SpeciesAutocomplete type="fish" value={fishName} onChange={(slug, name) => { setFishSlug(slug); setFishName(name) }} />
+            </div>
+            <div style={{ marginBottom: 16 }}>
+              <FieldLabel>Quantity</FieldLabel>
+              <input type="number" value={fishQty} onChange={e => setFishQty(e.target.value)} min="1" style={{ width: 80 }} />
+            </div>
+            <CompatibilityCheck tankId={id!} slug={fishSlug} />
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 16 }}>
+              <button onClick={() => { setShowAddFish(false); setFishSlug(''); setFishName(''); setFishQty('1') }} style={{ padding: '7px 16px', borderRadius: 8, fontSize: 13, cursor: 'pointer', border: '0.5px solid var(--btn-border)', background: 'transparent', color: 'var(--text)' }}>Cancel</button>
+              <button
+                disabled={!fishSlug}
+                onClick={async () => {
+                  if (!fishSlug) return
+                  await api.fish.add(id!, { species_slug: fishSlug, quantity: Number(fishQty), notes: null })
+                  setFishSlug(''); setFishName(''); setFishQty('1')
+                  setShowAddFish(false)
+                  fish.reload()
+                }}
+                style={{ padding: '7px 16px', borderRadius: 8, fontSize: 13, fontWeight: 500, cursor: fishSlug ? 'pointer' : 'not-allowed', border: '0.5px solid var(--blue-border)', background: 'var(--blue-bg)', color: 'var(--blue)', opacity: fishSlug ? 1 : 0.45 }}
+              >Add fish</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ADD PLANT MODAL */}
+      {showAddPlant && (
+        <div
+          onMouseDown={() => { setShowAddPlant(false); setPlantSlug(''); setPlantName(''); setPlantQty('1'); setPlantAddStatus('planted') }}
+          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', zIndex: 300, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}
+        >
+          <div
+            onMouseDown={e => e.stopPropagation()}
+            style={{ background: 'var(--surface)', border: '0.5px solid var(--border)', borderRadius: 14, padding: '1.5rem', width: 400, maxWidth: '100%', boxShadow: '0 12px 40px rgba(0,0,0,0.22)' }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+              <p style={{ margin: 0, fontWeight: 600, fontSize: 15, color: 'var(--text)' }}>Add plant</p>
+              <button onClick={() => { setShowAddPlant(false); setPlantSlug(''); setPlantName(''); setPlantQty('1'); setPlantAddStatus('planted') }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-2)', lineHeight: 0 }}><X size={18} /></button>
+            </div>
+            <div style={{ marginBottom: 12 }}>
+              <FieldLabel>Species</FieldLabel>
+              <SpeciesAutocomplete type="plant" value={plantName} onChange={(slug, name) => { setPlantSlug(slug); setPlantName(name) }} />
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 80px', gap: 10, marginBottom: 16 }}>
+              <div>
+                <FieldLabel>Status</FieldLabel>
+                <select value={plantAddStatus} onChange={e => setPlantAddStatus(e.target.value)} style={{ width: '100%' }}>
+                  <option value="planned">Planned</option>
+                  <option value="planted">Planted</option>
+                  <option value="removed">Removed</option>
+                </select>
+              </div>
+              <div>
+                <FieldLabel>Quantity</FieldLabel>
+                <input type="number" value={plantQty} onChange={e => setPlantQty(e.target.value)} min="1" style={{ width: '100%', boxSizing: 'border-box' }} />
+              </div>
+            </div>
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+              <button onClick={() => { setShowAddPlant(false); setPlantSlug(''); setPlantName(''); setPlantQty('1'); setPlantAddStatus('planted') }} style={{ padding: '7px 16px', borderRadius: 8, fontSize: 13, cursor: 'pointer', border: '0.5px solid var(--btn-border)', background: 'transparent', color: 'var(--text)' }}>Cancel</button>
+              <button
+                disabled={!plantSlug}
+                onClick={async () => {
+                  if (!plantSlug) return
+                  await api.plants.add(id!, { species_slug: plantSlug, quantity: Number(plantQty), notes: null, plant_status: plantAddStatus })
+                  setPlantSlug(''); setPlantName(''); setPlantQty('1'); setPlantAddStatus('planted')
+                  setShowAddPlant(false)
+                  plants.reload()
+                }}
+                style={{ padding: '7px 16px', borderRadius: 8, fontSize: 13, fontWeight: 500, cursor: plantSlug ? 'pointer' : 'not-allowed', border: '0.5px solid var(--green-border)', background: 'var(--green-bg)', color: 'var(--green)', opacity: plantSlug ? 1 : 0.45 }}
+              >Add plant</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* LIGHTBOX */}
       {lightboxIdx !== null && (
