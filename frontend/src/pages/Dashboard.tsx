@@ -4,7 +4,7 @@ import { Layers, Fish, Leaf, Bell, Clock, Plus, type LucideIcon } from 'lucide-r
 import { useTanks } from '../hooks'
 import { api } from '../api/client'
 import { useSettings, formatDate, toMM, dimInputProps } from '../context/SettingsContext'
-import { Card, FieldLabel, Tag, SectionTitle, ConfirmDialog } from '../components/ui'
+import { Card, FieldLabel, Tag, SectionTitle } from '../components/ui'
 
 interface DashboardStats {
   total_tanks: number
@@ -40,24 +40,18 @@ function StatCard({ label, value, accent, icon: Icon }: {
   )
 }
 
-function TankOverviewCard({ tank, onDelete }: { tank: DashboardStats['tanks'][0]; onDelete: () => void }) {
+function TankOverviewCard({ tank }: { tank: DashboardStats['tanks'][0] }) {
   const navigate = useNavigate()
   return (
     <div
       onClick={() => navigate(`/tanks/${tank.id}`)}
       style={{ background: 'var(--surface)', border: '0.5px solid var(--border)', borderRadius: 12, padding: '1rem 1.25rem', cursor: 'pointer' }}
     >
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 }}>
-        <div>
-          <p style={{ fontWeight: 500, fontSize: 15, margin: '0 0 4px', color: 'var(--text)' }}>{tank.name}</p>
-          <p style={{ fontSize: 13, color: 'var(--text-2)', margin: 0 }}>
-            {tank.volume_litres}L{tank.co2_injection ? ' · CO₂' : ''}{tank.substrate ? ` · ${tank.substrate}` : ''}
-          </p>
-        </div>
-        <button
-          onClick={e => { e.stopPropagation(); onDelete() }}
-          style={{ fontSize: 12, padding: '2px 8px', borderRadius: 6, border: '0.5px solid var(--border)', background: 'transparent', cursor: 'pointer', color: 'var(--text-2)', flexShrink: 0 }}
-        >Remove</button>
+      <div style={{ marginBottom: 10 }}>
+        <p style={{ fontWeight: 500, fontSize: 15, margin: '0 0 4px', color: 'var(--text)' }}>{tank.name}</p>
+        <p style={{ fontSize: 13, color: 'var(--text-2)', margin: 0 }}>
+          {tank.volume_litres}L{tank.co2_injection ? ' · CO₂' : ''}{tank.substrate ? ` · ${tank.substrate}` : ''}
+        </p>
       </div>
 
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: tank.unack_alerts || tank.overdue_tasks ? 10 : 0 }}>
@@ -96,7 +90,14 @@ export default function Dashboard() {
   const [stats, setStats] = useState<DashboardStats | null>(null)
   const [showForm, setShowForm] = useState(false)
   const [completingId, setCompletingId] = useState<string | null>(null)
-  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null)
+  const [isMobile, setIsMobile] = useState(() => window.matchMedia('(max-width: 768px)').matches)
+
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 768px)')
+    const handler = (e: MediaQueryListEvent) => setIsMobile(e.matches)
+    mq.addEventListener('change', handler)
+    return () => mq.removeEventListener('change', handler)
+  }, [])
 
   const [name, setName] = useState('')
   const [volume, setVolume] = useState('')
@@ -135,17 +136,6 @@ export default function Dashboard() {
     reload(); loadStats()
   }
 
-  async function deleteTank(id: string) {
-    setPendingDeleteId(id)
-  }
-
-  async function confirmDeleteTank() {
-    if (!pendingDeleteId) return
-    await api.tanks.delete(pendingDeleteId)
-    setPendingDeleteId(null)
-    reload(); loadStats()
-  }
-
   async function completeTask(tankId: string, taskId: string) {
     setCompletingId(taskId)
     try {
@@ -158,19 +148,56 @@ export default function Dashboard() {
 
   if (loading || !stats) return <p style={{ color: 'var(--text-2)' }}>Loading dashboard…</p>
 
+  const statsSidebar = (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+      <StatCard label="Tanks" value={stats.total_tanks} icon={Layers} />
+      <StatCard label="Fish" value={stats.total_fish} icon={Fish} />
+      <StatCard label="Fish species" value={stats.total_species} icon={Fish} />
+      <StatCard label="Plant species" value={stats.total_plants} icon={Leaf} />
+      <StatCard label="Alerts" value={stats.unack_alerts} icon={Bell} accent={stats.unack_alerts > 0 ? 'var(--amber)' : undefined} />
+      <StatCard label="Overdue tasks" value={stats.overdue_tasks} icon={Clock} accent={stats.overdue_tasks > 0 ? 'var(--red)' : undefined} />
+
+      {stats.upcoming_tasks.length > 0 && (
+        <div style={{ marginTop: 8 }}>
+          <Card>
+            <SectionTitle>Upcoming</SectionTitle>
+            {stats.upcoming_tasks.map(t => {
+              const tank = stats.tanks.find(tk => tk.id === t.tank_id)
+              return (
+                <div key={t.id} style={{ padding: '8px 0', borderBottom: '0.5px solid var(--border-sub)' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 6 }}>
+                    <div style={{ minWidth: 0 }}>
+                      <p style={{ fontSize: 12, fontWeight: 500, color: 'var(--text)', margin: '0 0 2px' }}>{t.task_type}</p>
+                      <p style={{ fontSize: 11, color: 'var(--text-2)', margin: 0 }}>
+                        {tank?.name}{t.is_recurring ? ' ↻' : ''}{t.description ? ` · ${t.description}` : ''}
+                      </p>
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4, flexShrink: 0 }}>
+                      <span style={{ fontSize: 11, color: 'var(--text-3)' }}>{formatDate(t.due_at, dateFormat)}</span>
+                      <button
+                        onClick={() => completeTask(t.tank_id, t.id)}
+                        disabled={completingId === t.id}
+                        style={{
+                          fontSize: 11, padding: '2px 8px', borderRadius: 6,
+                          border: '0.5px solid var(--green-border)', background: 'var(--green-bg)', color: 'var(--green)',
+                          cursor: 'pointer', opacity: completingId === t.id ? 0.5 : 1,
+                        }}
+                      >
+                        {completingId === t.id ? '…' : 'Done'}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )
+            })}
+          </Card>
+        </div>
+      )}
+    </div>
+  )
+
   return (
     <div>
-      {pendingDeleteId && (
-        <ConfirmDialog
-          title="Remove tank"
-          message="This will permanently delete the tank and all its fish, plants, parameters, and history."
-          confirmLabel="Remove tank"
-          danger
-          onConfirm={confirmDeleteTank}
-          onCancel={() => setPendingDeleteId(null)}
-        />
-      )}
-
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
         <h1 style={{ margin: 0, fontSize: 22, fontWeight: 500, color: 'var(--text)' }}>Dashboard</h1>
         <button onClick={() => setShowForm(true)} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 14, padding: '8px 16px', borderRadius: 8, border: '0.5px solid var(--blue-border)', background: 'var(--blue-bg)', cursor: 'pointer', color: 'var(--blue)' }}>
@@ -179,49 +206,21 @@ export default function Dashboard() {
         </button>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: 12, marginBottom: 20 }}>
-        <StatCard label="Tanks" value={stats.total_tanks} icon={Layers} />
-        <StatCard label="Fish" value={stats.total_fish} icon={Fish} />
-        <StatCard label="Fish species" value={stats.total_species} icon={Fish} />
-        <StatCard label="Plant species" value={stats.total_plants} icon={Leaf} />
-        <StatCard label="Unacknowledged alerts" value={stats.unack_alerts} icon={Bell} accent={stats.unack_alerts > 0 ? 'var(--amber)' : undefined} />
-        <StatCard label="Overdue tasks" value={stats.overdue_tasks} icon={Clock} accent={stats.overdue_tasks > 0 ? 'var(--red)' : undefined} />
-      </div>
+      {isMobile && <div style={{ marginBottom: 20 }}>{statsSidebar}</div>}
 
-      {stats.upcoming_tasks.length > 0 && (
-        <div style={{ marginBottom: 20 }}>
-          <Card>
-            <SectionTitle>Upcoming maintenance</SectionTitle>
-            {stats.upcoming_tasks.map(t => {
-              const tank = stats.tanks.find(tk => tk.id === t.tank_id)
-              return (
-                <div key={t.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: '0.5px solid var(--border-sub)' }}>
-                  <div>
-                    <span style={{ fontSize: 13, color: 'var(--text)', fontWeight: 500 }}>{t.task_type}</span>
-                    <span style={{ fontSize: 12, color: 'var(--text-2)', marginLeft: 8 }}>{tank?.name}</span>
-                    {t.is_recurring && <span style={{ fontSize: 11, color: 'var(--blue)', marginLeft: 8 }}>↻</span>}
-                    {t.description && <span style={{ fontSize: 12, color: 'var(--text-3)', marginLeft: 8 }}>{t.description}</span>}
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                    <span style={{ fontSize: 12, color: 'var(--text-3)' }}>{formatDate(t.due_at, dateFormat)}</span>
-                    <button
-                      onClick={() => completeTask(t.tank_id, t.id)}
-                      disabled={completingId === t.id}
-                      style={{
-                        fontSize: 11, padding: '3px 10px', borderRadius: 6,
-                        border: '0.5px solid var(--green-border)', background: 'var(--green-bg)', color: 'var(--green)',
-                        cursor: 'pointer', opacity: completingId === t.id ? 0.5 : 1,
-                      }}
-                    >
-                      {completingId === t.id ? '…' : 'Done'}
-                    </button>
-                  </div>
-                </div>
-              )
-            })}
-          </Card>
+      <div style={{ display: 'flex', gap: 20, alignItems: 'flex-start' }}>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <p style={{ fontWeight: 500, fontSize: 15, margin: '0 0 12px', color: 'var(--text)' }}>Your tanks</p>
+          {stats.tanks.length === 0 && (
+            <p style={{ color: 'var(--text-2)', fontSize: 14 }}>No tanks yet. Add your first one above.</p>
+          )}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 16 }}>
+            {stats.tanks.map(t => <TankOverviewCard key={t.id} tank={t} />)}
+          </div>
         </div>
-      )}
+
+        {!isMobile && <div style={{ width: 220, flexShrink: 0 }}>{statsSidebar}</div>}
+      </div>
 
       {showForm && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}
@@ -291,15 +290,6 @@ export default function Dashboard() {
         </div>
       )}
 
-      <p style={{ fontWeight: 500, fontSize: 15, margin: '0 0 12px', color: 'var(--text)' }}>Your tanks</p>
-
-      {stats.tanks.length === 0 && (
-        <p style={{ color: 'var(--text-2)', fontSize: 14 }}>No tanks yet. Add your first one above.</p>
-      )}
-
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 16 }}>
-        {stats.tanks.map(t => <TankOverviewCard key={t.id} tank={t} onDelete={() => deleteTank(t.id)} />)}
-      </div>
     </div>
   )
 }
