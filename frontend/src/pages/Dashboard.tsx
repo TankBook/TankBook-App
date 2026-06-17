@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Layers, Fish, Leaf, Bell, Clock, Plus, type LucideIcon } from 'lucide-react'
+import { Layers, Fish, Leaf, Bell, Clock, Plus, AlertTriangle, Timer, type LucideIcon } from 'lucide-react'
 import { useTanks } from '../hooks'
 import { api } from '../api/client'
 import { useSettings, formatDate, toMM, dimInputProps } from '../context/SettingsContext'
@@ -21,7 +21,9 @@ interface DashboardStats {
     id: string; name: string; volume_litres: number; water_type: string; co2_injection: boolean
     substrate: string | null; fish_count: number; fish_species: number
     plant_species: number; unack_alerts: number; overdue_tasks: number
-    latest_ph: number | null; latest_temp: number | null; latest_recorded: string | null
+    latest_ph: number | null; latest_temp: number | null
+    latest_ammonia: number | null; latest_nitrite: number | null; latest_nitrate: number | null
+    latest_recorded: string | null
   }>
 }
 
@@ -51,47 +53,99 @@ function StatCard({ label, value, accent, icon: Icon }: {
   )
 }
 
+const PARAMS = [
+  { key: 'latest_ph',      label: 'pH',   color: 'var(--blue)',              fmt: (v: number) => v.toFixed(1) },
+  { key: 'latest_temp',    label: 'Temp', color: 'var(--orange, #ef6c00)',   fmt: (v: number) => `${v.toFixed(0)}°` },
+  { key: 'latest_ammonia', label: 'NH₃',  color: 'var(--red)',               fmt: (v: number) => v.toFixed(2) },
+  { key: 'latest_nitrite', label: 'NO₂',  color: 'var(--amber)',             fmt: (v: number) => v.toFixed(2) },
+  { key: 'latest_nitrate', label: 'NO₃',  color: 'var(--green)',             fmt: (v: number) => v.toFixed(0) },
+] as const
+
 function TankOverviewCard({ tank }: { tank: DashboardStats['tanks'][0] }) {
   const navigate = useNavigate()
+  const hasAlerts = tank.unack_alerts > 0 || tank.overdue_tasks > 0
+
   return (
     <div
       onClick={() => navigate(`/tanks/${tank.id}`)}
-      style={{ background: 'var(--surface)', border: '0.5px solid var(--border)', borderRadius: 12, padding: '1rem 1.25rem', cursor: 'pointer' }}
+      style={{
+        background: 'var(--surface)', border: '0.5px solid var(--border)',
+        borderRadius: 14, padding: '1rem 1.1rem', cursor: 'pointer',
+        display: 'flex', flexDirection: 'column', gap: 12,
+        transition: 'border-color 0.15s',
+      }}
+      onMouseEnter={e => (e.currentTarget.style.borderColor = 'var(--blue-border)')}
+      onMouseLeave={e => (e.currentTarget.style.borderColor = 'var(--border)')}
     >
-      <div style={{ marginBottom: 10 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-          <p style={{ fontWeight: 500, fontSize: 15, margin: 0, color: 'var(--text)' }}>{tank.name}</p>
-          <WaterTypeBadge type={tank.water_type} />
+      {/* Header */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
+        <div style={{ minWidth: 0 }}>
+          <p style={{ fontWeight: 600, fontSize: 15, margin: '0 0 4px', color: 'var(--text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+            {tank.name}
+          </p>
+          <span style={{ fontSize: 11, color: 'var(--text-3)', background: 'var(--surface-2)', padding: '1px 7px', borderRadius: 5, border: '0.5px solid var(--border)' }}>
+            {tank.volume_litres} L
+          </span>
         </div>
-        <p style={{ fontSize: 13, color: 'var(--text-2)', margin: 0 }}>
-          {tank.volume_litres}L{tank.co2_injection ? ' · CO₂' : ''}{tank.substrate ? ` · ${tank.substrate}` : ''}
-        </p>
+        <WaterTypeBadge type={tank.water_type} />
       </div>
 
-      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: tank.unack_alerts || tank.overdue_tasks ? 10 : 0 }}>
-        <Tag bg="var(--tag-bg)" color="var(--text-2)">{tank.fish_count} fish ({tank.fish_species} species)</Tag>
-        <Tag bg="var(--tag-bg)" color="var(--text-2)">{tank.plant_species} plant species</Tag>
-        {tank.latest_ph != null && (
-          <Tag bg="var(--blue-bg)" color="var(--blue)">pH {tank.latest_ph.toFixed(1)}</Tag>
-        )}
-        {tank.latest_temp != null && (
-          <Tag bg="var(--orange-bg)" color="var(--orange)">{tank.latest_temp.toFixed(1)}°C</Tag>
+      {/* Parameter grid */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 5 }}>
+        {PARAMS.map(({ key, label, color, fmt }) => {
+          const val = tank[key] as number | null
+          return (
+            <div key={key} style={{
+              textAlign: 'center', background: 'var(--surface-2)',
+              borderRadius: 8, padding: '7px 2px',
+              border: '0.5px solid var(--border-sub)',
+            }}>
+              <p style={{ fontSize: 9, fontWeight: 600, color: 'var(--text-3)', margin: '0 0 5px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                {label}
+              </p>
+              <p style={{ fontSize: 14, fontWeight: 500, margin: 0, color: val != null ? color : 'var(--text-4)' }}>
+                {val != null ? fmt(val) : '—'}
+              </p>
+            </div>
+          )
+        })}
+      </div>
+
+      {/* Footer */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 6 }}>
+        <div style={{ display: 'flex', gap: 12, fontSize: 12, color: 'var(--text-2)' }}>
+          <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+            <Fish size={12} />
+            {tank.fish_count} fish · {tank.fish_species} sp
+          </span>
+          <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+            <Leaf size={12} />
+            {tank.plant_species} plant sp
+          </span>
+        </div>
+        {tank.latest_recorded && (
+          <span style={{ fontSize: 10, color: 'var(--text-4)' }}>
+            {new Date(tank.latest_recorded).toLocaleDateString()}
+          </span>
         )}
       </div>
 
-      {(tank.unack_alerts > 0 || tank.overdue_tasks > 0) && (
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+      {/* Alerts strip */}
+      {hasAlerts && (
+        <div style={{ display: 'flex', gap: 6, paddingTop: 8, borderTop: '0.5px solid var(--border-sub)' }}>
           {tank.unack_alerts > 0 && (
-            <Tag bg="var(--amber-bg)" color="var(--amber)">{tank.unack_alerts} alert{tank.unack_alerts > 1 ? 's' : ''}</Tag>
+            <span style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, fontWeight: 500, color: 'var(--amber)', background: 'var(--amber-bg)', padding: '3px 8px', borderRadius: 6 }}>
+              <AlertTriangle size={11} />
+              {tank.unack_alerts} alert{tank.unack_alerts > 1 ? 's' : ''}
+            </span>
           )}
           {tank.overdue_tasks > 0 && (
-            <Tag bg="var(--red-bg)" color="var(--red)">{tank.overdue_tasks} overdue task{tank.overdue_tasks > 1 ? 's' : ''}</Tag>
+            <span style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, fontWeight: 500, color: 'var(--red)', background: 'var(--red-bg)', padding: '3px 8px', borderRadius: 6 }}>
+              <Timer size={11} />
+              {tank.overdue_tasks} overdue
+            </span>
           )}
         </div>
-      )}
-
-      {!tank.latest_recorded && (
-        <p style={{ fontSize: 11, color: 'var(--text-4)', margin: '8px 0 0' }}>No parameter readings logged yet</p>
       )}
     </div>
   )

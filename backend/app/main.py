@@ -120,6 +120,9 @@ def dashboard_stats(db=Depends(get_db)):
             "overdue_tasks": tank_overdue,
             "latest_ph": latest.ph if latest else None,
             "latest_temp": latest.temperature_c if latest else None,
+            "latest_ammonia": latest.ammonia_ppm if latest else None,
+            "latest_nitrite": latest.nitrite_ppm if latest else None,
+            "latest_nitrate": latest.nitrate_ppm if latest else None,
             "latest_recorded": latest.recorded_at.isoformat() if latest else None,
         })
 
