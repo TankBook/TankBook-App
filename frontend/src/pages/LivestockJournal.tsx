@@ -103,6 +103,12 @@ function EntryFormFields({
   )
 }
 
+function localNow(): string {
+  const d = new Date()
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
+}
+
 export default function LivestockJournal() {
   const { dateFormat, defaultTank } = useSettings()
   const [tanks, setTanks] = useState<Tank[]>([])
@@ -118,7 +124,7 @@ export default function LivestockJournal() {
     tank_fish_id: '',
     event_type: 'observation',
     notes: '',
-    occurred_at: new Date().toISOString().slice(0, 16),
+    occurred_at: localNow(),
   })
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
@@ -152,7 +158,7 @@ export default function LivestockJournal() {
   }, [selectedTank])
 
   function openModal() {
-    setForm({ tank_fish_id: '', event_type: 'observation', notes: '', occurred_at: new Date().toISOString().slice(0, 16) })
+    setForm({ tank_fish_id: '', event_type: 'observation', notes: '', occurred_at: localNow() })
     setSaveError(null)
     setShowModal(true)
   }
@@ -166,7 +172,7 @@ export default function LivestockJournal() {
         tank_fish_id: form.tank_fish_id || null,
         event_type: form.event_type,
         notes: form.notes.trim(),
-        occurred_at: new Date(form.occurred_at).toISOString(),
+        occurred_at: form.occurred_at,
       })
       setEntries(prev => [entry, ...prev])
       setShowModal(false)
@@ -183,7 +189,7 @@ export default function LivestockJournal() {
       tank_fish_id: entry.tank_fish_id ?? '',
       event_type: entry.event_type,
       notes: entry.notes,
-      occurred_at: new Date(entry.occurred_at).toISOString().slice(0, 16),
+      occurred_at: entry.occurred_at.slice(0, 16),
     })
     setEditError(null)
   }
@@ -197,7 +203,7 @@ export default function LivestockJournal() {
         tank_fish_id: editForm.tank_fish_id || null,
         event_type: editForm.event_type,
         notes: editForm.notes.trim(),
-        occurred_at: new Date(editForm.occurred_at).toISOString(),
+        occurred_at: editForm.occurred_at,
       })
       setEntries(prev => prev.map(e => e.id === entry.id ? updated : e))
       setEditingId(null)
