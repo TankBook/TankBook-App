@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { NotebookPen, Trash2, Plus, Pencil } from 'lucide-react'
-import { Tag, Card, FieldLabel, Modal } from '../components/ui'
+import { Tag, Card, FieldLabel, Modal, RichTextarea, renderNotes } from '../components/ui'
 import { api, JournalEntry, Tank, TankFish } from '../api/client'
 import { useSettings, formatDate } from '../context/SettingsContext'
 
@@ -90,12 +90,11 @@ function EntryFormFields({
       </div>
       <div>
         <FieldLabel>Notes</FieldLabel>
-        <textarea
+        <RichTextarea
           value={form.notes}
-          onChange={e => setForm(f => ({ ...f, notes: e.target.value }))}
+          onChange={v => setForm(f => ({ ...f, notes: v }))}
           rows={4}
           placeholder="Describe what happened…"
-          style={{ width: '100%', boxSizing: 'border-box', resize: 'vertical' }}
         />
       </div>
     </>
@@ -347,7 +346,7 @@ export default function LivestockJournal() {
                       {new Date(entry.occurred_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                     </span>
                   </div>
-                  <p style={{ fontSize: 13, color: 'var(--text)', margin: 0, lineHeight: 1.5 }}>{entry.notes}</p>
+                  <div style={{ fontSize: 13, color: 'var(--text)', margin: 0, lineHeight: 1.5 }} dangerouslySetInnerHTML={{ __html: renderNotes(entry.notes) }} />
                 </div>
                 <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
                   <button

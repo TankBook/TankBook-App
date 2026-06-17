@@ -1,5 +1,83 @@
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import type { CSSProperties, ReactNode } from 'react'
+
+function formatInline(text: string): string {
+  const escaped = text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+  return escaped
+    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+    .replace(/__(.*?)__/g, '<u>$1</u>')
+}
+
+export function renderNotes(text: string): string {
+  if (!text) return ''
+  const lines = text.split('\n')
+  const parts: string[] = []
+  let inList = false
+  for (const line of lines) {
+    if (line.startsWith('- ')) {
+      if (!inList) { parts.push('<ul style="margin:4px 0 4px;padding-left:18px;">'); inList = true }
+      parts.push(`<li style="margin:2px 0">${formatInline(line.slice(2))}</li>`)
+    } else {
+      if (inList) { parts.push('</ul>'); inList = false }
+      if (line.trim() === '') parts.push('<br>')
+      else parts.push(`<span style="display:block">${formatInline(line)}</span>`)
+    }
+  }
+  if (inList) parts.push('</ul>')
+  return parts.join('')
+}
+
+export function RichTextarea({ value, onChange, rows = 4, placeholder }: {
+  value: string
+  onChange: (v: string) => void
+  rows?: number
+  placeholder?: string
+}) {
+  const ref = useRef<HTMLTextAreaElement>(null)
+
+  function wrap(before: string, after: string) {
+    const el = ref.current; if (!el) return
+    const s = el.selectionStart, e = el.selectionEnd
+    const sel = value.slice(s, e) || 'text'
+    onChange(value.slice(0, s) + before + sel + after + value.slice(e))
+    requestAnimationFrame(() => {
+      el.setSelectionRange(s + before.length, s + before.length + sel.length)
+      el.focus()
+    })
+  }
+
+  function insertBullet() {
+    const el = ref.current; if (!el) return
+    const s = el.selectionStart
+    const lineStart = value.lastIndexOf('\n', s - 1) + 1
+    const insert = s === lineStart ? '- ' : '\n- '
+    onChange(value.slice(0, s) + insert + value.slice(s))
+    requestAnimationFrame(() => { el.setSelectionRange(s + insert.length, s + insert.length); el.focus() })
+  }
+
+  const btn: CSSProperties = {
+    padding: '2px 8px', borderRadius: 4, border: '0.5px solid var(--btn-border)',
+    background: 'transparent', color: 'var(--text-2)', cursor: 'pointer', fontSize: 12, lineHeight: 1.5,
+  }
+
+  return (
+    <div>
+      <div style={{ display: 'flex', gap: 4, marginBottom: 4 }}>
+        <button type="button" onMouseDown={e => { e.preventDefault(); wrap('**', '**') }} style={{ ...btn, fontWeight: 700 }} title="Bold">B</button>
+        <button type="button" onMouseDown={e => { e.preventDefault(); wrap('__', '__') }} style={{ ...btn, textDecoration: 'underline' }} title="Underline">U</button>
+        <button type="button" onMouseDown={e => { e.preventDefault(); insertBullet() }} style={btn} title="Bullet point">•  List</button>
+      </div>
+      <textarea
+        ref={ref}
+        value={value}
+        onChange={e => onChange(e.target.value)}
+        rows={rows}
+        placeholder={placeholder}
+        style={{ width: '100%', boxSizing: 'border-box', resize: 'vertical' }}
+      />
+    </div>
+  )
+}
 
 export function Card({ children, style }: { children: ReactNode; style?: CSSProperties }) {
   return (
