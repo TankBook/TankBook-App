@@ -52,6 +52,12 @@ function EventBadge({ type }: { type: string }) {
   return <Tag bg={s.bg} color={s.color}>{EVENT_LABELS[type] ?? type}</Tag>
 }
 
+const DATE_LANG: Record<string, string> = {
+  'DD/MM/YYYY': 'en-GB',
+  'MM/DD/YYYY': 'en-US',
+  'YYYY-MM-DD': 'sv',
+}
+
 // Shared form fields used by both Add modal and inline Edit
 function EntryFormFields({
   form,
@@ -62,6 +68,11 @@ function EntryFormFields({
   setForm: (updater: (f: typeof form) => typeof form) => void
   fishList: TankFish[]
 }) {
+  const { dateFormat } = useSettings()
+  const dateLang = DATE_LANG[dateFormat] ?? 'en-GB'
+  const datePart = form.occurred_at.slice(0, 10)
+  const timePart = form.occurred_at.slice(11, 16) || '00:00'
+
   return (
     <>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
@@ -73,12 +84,21 @@ function EntryFormFields({
         </div>
         <div>
           <FieldLabel>Date &amp; Time</FieldLabel>
-          <input
-            type="datetime-local"
-            value={form.occurred_at}
-            onChange={e => setForm(f => ({ ...f, occurred_at: e.target.value }))}
-            style={{ width: '100%', boxSizing: 'border-box' }}
-          />
+          <div style={{ display: 'flex', gap: 6 }}>
+            <input
+              type="date"
+              lang={dateLang}
+              value={datePart}
+              onChange={e => setForm(f => ({ ...f, occurred_at: `${e.target.value}T${f.occurred_at.slice(11, 16) || '00:00'}` }))}
+              style={{ flex: 1, minWidth: 0, boxSizing: 'border-box' }}
+            />
+            <input
+              type="time"
+              value={timePart}
+              onChange={e => setForm(f => ({ ...f, occurred_at: `${f.occurred_at.slice(0, 10)}T${e.target.value}` }))}
+              style={{ width: 95 }}
+            />
+          </div>
         </div>
       </div>
       <div style={{ marginBottom: 12 }}>
