@@ -716,7 +716,7 @@ export default function TankDetail() {
               </div>
             )
           })}
-          <div style={{ marginTop: 16, borderTop: '0.5px solid var(--border-sub)', paddingTop: 14 }}>
+          <div style={{ marginTop: 14 }}>
             <button
               onClick={() => setShowAddFish(true)}
               style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 13, padding: '7px 16px', borderRadius: 8, fontWeight: 500, cursor: 'pointer', border: '0.5px solid var(--blue-border)', background: 'var(--blue-bg)', color: 'var(--blue)' }}
