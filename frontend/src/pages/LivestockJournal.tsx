@@ -6,7 +6,7 @@ import { useSettings, formatDate } from '../context/SettingsContext'
 
 const EVENT_TYPES = [
   // Tank events
-  'water_change', 'equipment', 'maintenance', 'plant', 'feeding',
+  'water_change', 'water_treatment', 'equipment', 'maintenance', 'plant', 'feeding',
   // Livestock events
   'observation', 'illness', 'treatment', 'recovery', 'birth', 'death', 'behaviour',
   // General
@@ -14,35 +14,37 @@ const EVENT_TYPES = [
 ]
 
 const EVENT_LABELS: Record<string, string> = {
-  water_change: 'Water Change',
-  equipment:    'Equipment',
-  maintenance:  'Maintenance',
-  plant:        'Plant',
-  feeding:      'Feeding',
-  observation:  'Observation',
-  illness:      'Illness',
-  treatment:    'Treatment',
-  recovery:     'Recovery',
-  birth:        'Birth',
-  death:        'Death',
-  behaviour:    'Behaviour',
-  other:        'Other',
+  water_change:     'Water Change',
+  water_treatment:  'Water Treatment',
+  equipment:        'Equipment',
+  maintenance:      'Maintenance',
+  plant:            'Plant',
+  feeding:          'Feeding',
+  observation:      'Observation',
+  illness:          'Illness',
+  treatment:        'Treatment',
+  recovery:         'Recovery',
+  birth:            'Birth',
+  death:            'Death',
+  behaviour:        'Behaviour',
+  other:            'Other',
 }
 
 const EVENT_STYLE: Record<string, { bg: string; color: string }> = {
-  water_change: { bg: 'var(--cyan-bg)',            color: 'var(--cyan)'              },
-  equipment:    { bg: 'var(--amber-bg)',            color: 'var(--amber)'             },
-  maintenance:  { bg: 'var(--blue-bg)',             color: 'var(--blue)'              },
-  plant:        { bg: 'var(--green-bg)',            color: 'var(--green)'             },
-  feeding:      { bg: 'var(--orange-bg, #fff4e6)', color: 'var(--orange, #c27216)'   },
-  observation:  { bg: 'var(--blue-bg)',             color: 'var(--blue)'              },
-  illness:      { bg: 'var(--red-bg)',              color: 'var(--red)'               },
-  treatment:    { bg: 'var(--amber-bg)',            color: 'var(--amber)'             },
-  recovery:     { bg: 'var(--green-bg)',            color: 'var(--green)'             },
-  birth:        { bg: 'var(--green-bg)',            color: 'var(--green)'             },
-  death:        { bg: 'var(--tag-bg)',              color: 'var(--text-2)'            },
-  behaviour:    { bg: 'var(--blue-bg)',             color: 'var(--blue)'              },
-  other:        { bg: 'var(--tag-bg)',              color: 'var(--text-2)'            },
+  water_change:     { bg: 'var(--cyan-bg)',              color: 'var(--cyan)'              },
+  water_treatment:  { bg: 'var(--violet-bg, #ede9fe)',   color: 'var(--violet, #7c3aed)'   },
+  equipment:        { bg: 'var(--amber-bg)',              color: 'var(--amber)'             },
+  maintenance:      { bg: 'var(--blue-bg)',               color: 'var(--blue)'              },
+  plant:            { bg: 'var(--green-bg)',              color: 'var(--green)'             },
+  feeding:          { bg: 'var(--orange-bg, #fff4e6)',   color: 'var(--orange, #c27216)'   },
+  observation:      { bg: 'var(--blue-bg)',               color: 'var(--blue)'              },
+  illness:          { bg: 'var(--red-bg)',                color: 'var(--red)'               },
+  treatment:        { bg: 'var(--amber-bg)',              color: 'var(--amber)'             },
+  recovery:         { bg: 'var(--green-bg)',              color: 'var(--green)'             },
+  birth:            { bg: 'var(--green-bg)',              color: 'var(--green)'             },
+  death:            { bg: 'var(--tag-bg)',                color: 'var(--text-2)'            },
+  behaviour:        { bg: 'var(--blue-bg)',               color: 'var(--blue)'              },
+  other:            { bg: 'var(--tag-bg)',                color: 'var(--text-2)'            },
 }
 
 function EventBadge({ type }: { type: string }) {
