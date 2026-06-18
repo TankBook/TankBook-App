@@ -34,4 +34,3 @@ volumes:
   postgres_data:
   species_data:
   tankbook-images:
-    external: true

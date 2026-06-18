@@ -21,6 +21,53 @@
 
 ---
 
+## Screenshots
+
+<table>
+  <tr>
+    <td align="center">
+      <img src="docs/screenshots/dashboard.png" alt="Dashboard" /><br/>
+      <strong>Dashboard</strong> — overview of all tanks with live water parameter readings, upcoming maintenance tasks, and alert counts
+    </td>
+    <td align="center">
+      <img src="docs/screenshots/tank-detail.png" alt="Tank detail" /><br/>
+      <strong>Tank detail</strong> — per-tank view showing inhabitants, plants, water parameters, maintenance schedule, and an animated tank visualisation
+    </td>
+  </tr>
+  <tr>
+    <td align="center">
+      <img src="docs/screenshots/species.png" alt="Species catalogue" /><br/>
+      <strong>Species catalogue</strong> — searchable library of fish, invertebrates, amphibians, and plants with care data, difficulty ratings, and origin
+    </td>
+    <td align="center">
+      <img src="docs/screenshots/journal.png" alt="Tank Journal" /><br/>
+      <strong>Tank journal</strong> — per-tank event log for recording observations, water changes, treatments, plant additions, and more
+    </td>
+  </tr>
+  <tr>
+    <td align="center">
+      <img src="docs/screenshots/compatibility.png" alt="Compatibility checker" /><br/>
+      <strong>Compatibility checker</strong> — build a stocklist and instantly see temperament conflicts and water parameter overlaps between species
+    </td>
+    <td align="center">
+      <img src="docs/screenshots/spending.png" alt="Spending tracker" /><br/>
+      <strong>Spending tracker</strong> — log aquarium expenses by tank and category, with all-time, monthly, and yearly totals and a per-category breakdown
+    </td>
+  </tr>
+  <tr>
+    <td align="center">
+      <img src="docs/screenshots/calculators.png" alt="Calculators" /><br/>
+      <strong>Calculators</strong> — tank volume calculator (rectangular and cylinder) and chemical dosage calculator for API liquid and powder treatments
+    </td>
+    <td align="center">
+      <img src="docs/screenshots/settings.png" alt="Settings" /><br/>
+      <strong>Settings</strong> — configure date format, dimension units, and default tank; export or import a full data backup
+    </td>
+  </tr>
+</table>
+
+---
+
 ## Features
 
 | Page | Description |
@@ -29,8 +76,9 @@
 | **Tank detail** | Per-tank view with livestock, plants, water parameters, maintenance schedule, daily tasks, and alerts |
 | **Species** | Searchable catalogue of fish, invertebrates, amphibians, and plants with care data; add and edit entries via the built-in form |
 | **Compatibility checker** | Build a stocklist and instantly see conflicts, temperament warnings, and water parameter overlaps |
-| **Livestock journal** | Per-tank event log — observations, illness, treatments, births, deaths, and more |
-| **Tank designer** | Grid-based layout tool for planning scape and hardscape placement |
+| **Tank journal** | Per-tank event log — observations, illness, treatments, births, deaths, and more |
+| **Calculators** | Tank volume and chemical dosage calculators |
+| **Spending tracker** | Log and categorise aquarium expenses with per-tank and per-category breakdowns |
 | **Settings** | Date format, unit system, and full data backup / restore |
 
 ---
