@@ -15,7 +15,7 @@ services:
       retries: 5
 
   app:
-    build: .
+    image: ghcr.io/tankbook/tankbook-app:latest
     restart: unless-stopped
     depends_on:
       db:
@@ -25,10 +25,13 @@ services:
       SPECIES_DATA_PATH: /app/species-data
       IMAGES_PATH: /app/images
     volumes:
-      - ./species-data:/app/species-data
-      - ./tankbook-images:/app/images
+      - species_data:/app/species-data
+      - tankbook-images:/app/images
     ports:
       - "3000:3000"
 
 volumes:
   postgres_data:
+  species_data:
+  tankbook-images:
+    external: true

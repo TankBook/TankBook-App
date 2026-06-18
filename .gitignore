@@ -2,6 +2,9 @@
 species-data/
 tankbook-images/
 
+# Dev-only compose (prod compose ships as docker-compose.yml)
+docker-compose.dev.yml
+
 # Environment
 .env
 .env.local
