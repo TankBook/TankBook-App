@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Layers, Fish, Leaf, Bug, Waves, Bell, Clock, Plus, AlertTriangle, Timer, type LucideIcon } from 'lucide-react'
+import { Layers, Fish, Leaf, Bug, Waves, Bell, Clock, Plus, AlertTriangle, Timer, Thermometer, FlaskConical, type LucideIcon } from 'lucide-react'
 import { useTanks } from '../hooks'
 import { api } from '../api/client'
 import { useSettings, formatDate, toMM, dimInputProps } from '../context/SettingsContext'
@@ -18,7 +18,7 @@ interface DashboardStats {
     description: string | null; due_at: string; is_recurring: boolean
   }>
   tanks: Array<{
-    id: string; name: string; volume_litres: number; water_type: string; co2_injection: boolean
+    id: string; name: string; volume_litres: number; water_type: string; co2_injection: boolean; has_heater: boolean
     substrate: string | null
     fish_count: number; fish_species: number
     invertebrate_count: number; invertebrate_species: number
@@ -83,12 +83,24 @@ function TankOverviewCard({ tank }: { tank: DashboardStats['tanks'][0] }) {
       {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
         <div style={{ minWidth: 0 }}>
-          <p style={{ fontWeight: 600, fontSize: 15, margin: '0 0 4px', color: 'var(--text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+          <p style={{ fontWeight: 600, fontSize: 15, margin: '0 0 5px', color: 'var(--text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
             {tank.name}
           </p>
-          <span style={{ fontSize: 11, color: 'var(--text-3)', background: 'var(--surface-2)', padding: '1px 7px', borderRadius: 5, border: '0.5px solid var(--border)' }}>
-            {tank.volume_litres} L
-          </span>
+          <div style={{ display: 'flex', gap: 5, alignItems: 'center', flexWrap: 'wrap' }}>
+            <span style={{ fontSize: 11, color: 'var(--text-3)', background: 'var(--surface-2)', padding: '1px 7px', borderRadius: 5, border: '0.5px solid var(--border)' }}>
+              {tank.volume_litres} L
+            </span>
+            {tank.has_heater && (
+              <span title="Heater" style={{ display: 'inline-flex', alignItems: 'center', gap: 3, fontSize: 11, color: 'var(--orange, #ef6c00)', background: 'var(--orange-bg)', padding: '1px 6px', borderRadius: 5, border: '0.5px solid var(--orange-border, color-mix(in srgb, var(--orange, #ef6c00) 30%, transparent))' }}>
+                <Thermometer size={11} /> Heater
+              </span>
+            )}
+            {tank.co2_injection && (
+              <span title="CO₂ Injection" style={{ display: 'inline-flex', alignItems: 'center', gap: 3, fontSize: 11, color: 'var(--green)', background: 'var(--green-bg)', padding: '1px 6px', borderRadius: 5, border: '0.5px solid var(--green-border, color-mix(in srgb, var(--green) 30%, transparent))' }}>
+                <FlaskConical size={11} /> CO₂
+              </span>
+            )}
+          </div>
         </div>
         <WaterTypeBadge type={tank.water_type} />
       </div>
