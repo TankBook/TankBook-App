@@ -547,6 +547,7 @@ function SpeciesImage({ slug, size = 44 }: { slug: string; size?: number }) {
 
 function SpeciesDetailModal({ s, onClose, onEdit }: { s: Species; onClose: () => void; onEdit: () => void }) {
   const [copied, setCopied] = useState(false)
+  const [lightbox, setLightbox] = useState(false)
   const yamlUrl = `/api/species/${s.slug}/yaml`
   const hostedUrl = window.location.origin + yamlUrl
 
@@ -579,6 +580,7 @@ function SpeciesDetailModal({ s, onClose, onEdit }: { s: Species; onClose: () =>
     s.co2_required !== undefined || s.compatibility?.temperament
 
   return (
+    <>
     <div
       onMouseDown={onClose}
       style={{ position: 'fixed', inset: 0, zIndex: 600, background: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
@@ -589,7 +591,10 @@ function SpeciesDetailModal({ s, onClose, onEdit }: { s: Species; onClose: () =>
       >
         {/* Header */}
         <div style={{ display: 'flex', alignItems: 'flex-start', gap: 14, padding: '20px 20px 16px', borderBottom: '0.5px solid var(--border)', flexShrink: 0 }}>
-          <div style={{ width: 72, height: 72, borderRadius: 10, flexShrink: 0, overflow: 'hidden', border: '0.5px solid var(--border)', background: ts.bg, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div
+            onClick={() => setLightbox(true)}
+            style={{ width: 72, height: 72, borderRadius: 10, flexShrink: 0, overflow: 'hidden', border: '0.5px solid var(--border)', background: ts.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'zoom-in' }}
+          >
             <SpeciesImage slug={s.slug} size={72} />
           </div>
           <div style={{ flex: 1, minWidth: 0 }}>
@@ -661,6 +666,20 @@ function SpeciesDetailModal({ s, onClose, onEdit }: { s: Species; onClose: () =>
         </div>
       </div>
     </div>
+
+    {lightbox && (
+      <div
+        onClick={() => setLightbox(false)}
+        style={{ position: 'fixed', inset: 0, zIndex: 700, background: 'rgba(0,0,0,0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'zoom-out' }}
+      >
+        <img
+          src={api.images.speciesUrl(s.slug)}
+          alt={s.common_name}
+          style={{ maxWidth: '80vw', maxHeight: '80vh', borderRadius: 14, objectFit: 'contain', boxShadow: '0 24px 64px rgba(0,0,0,0.5)' }}
+        />
+      </div>
+    )}
+    </>
   )
 }
 

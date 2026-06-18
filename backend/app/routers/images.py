@@ -72,7 +72,7 @@ def fetch_species_image(slug: str, latin_name: str = Query(...)):
     if not photo:
         raise HTTPException(404, f"No photo available for: {latin_name}")
 
-    image_url = photo.get("medium_url") or photo.get("url")
+    image_url = photo.get("large_url") or photo.get("medium_url") or photo.get("url")
     if not image_url:
         raise HTTPException(404, "No image URL in iNaturalist response")
 
