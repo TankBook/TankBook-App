@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
+from sqlalchemy import func
 
 from app.database import get_db
 from app.models.models import Tank
@@ -10,12 +11,21 @@ router = APIRouter()
 
 @router.get("/", response_model=list[TankOut])
 def list_tanks(db: Session = Depends(get_db)):
-    return db.query(Tank).all()
+    return db.query(Tank).order_by(Tank.sort_order, Tank.created_at).all()
+
+
+@router.patch("/reorder")
+def reorder_tanks(order: list[dict], db: Session = Depends(get_db)):
+    for item in order:
+        db.query(Tank).filter_by(id=item["id"]).update({"sort_order": item["sort_order"]})
+    db.commit()
+    return {"ok": True}
 
 
 @router.post("/", response_model=TankOut, status_code=201)
 def create_tank(body: TankCreate, db: Session = Depends(get_db)):
-    tank = Tank(**body.model_dump())
+    count = db.query(func.count(Tank.id)).scalar() or 0
+    tank = Tank(**body.model_dump(), sort_order=count)
     db.add(tank)
     db.commit()
     db.refresh(tank)

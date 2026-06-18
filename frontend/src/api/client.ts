@@ -195,6 +195,7 @@ export const api = {
     get: (id: string) => get<Tank>(`/tanks/${id}`),
     create: (body: Omit<Tank, 'id' | 'created_at'>) => post<Tank>('/tanks/', body),
     delete: (id: string) => del(`/tanks/${id}`),
+    reorder: (order: { id: string; sort_order: number }[]) => patch<{ ok: boolean }>('/tanks/reorder', order),
   },
   fish: {
     list: (tankId: string) => get<TankFish[]>(`/fish/${tankId}/fish`),

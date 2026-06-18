@@ -77,7 +77,7 @@ def dashboard_stats(db=Depends(get_db)):
     from sqlalchemy import func
     from datetime import datetime
 
-    tanks = db.query(Tank).all()
+    tanks = db.query(Tank).order_by(Tank.sort_order, Tank.created_at).all()
     tank_ids = [t.id for t in tanks]
 
     fish_count = db.query(func.sum(TankFish.quantity)).filter(TankFish.tank_id.in_(tank_ids)).scalar() or 0

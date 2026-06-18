@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Layers, Fish, Leaf, Bug, Waves, Bell, Clock, Plus, AlertTriangle, Timer, Thermometer, FlaskConical, type LucideIcon } from 'lucide-react'
+import { Layers, Fish, Leaf, Bug, Waves, Bell, Clock, Plus, AlertTriangle, Timer, Thermometer, FlaskConical, GripVertical, type LucideIcon } from 'lucide-react'
 import { useTanks } from '../hooks'
 import { api } from '../api/client'
 import { useSettings, formatDate, toMM, dimInputProps } from '../context/SettingsContext'
@@ -64,21 +64,38 @@ const PARAMS = [
   { key: 'latest_nitrate', label: 'NO₃',  color: 'var(--green)',             fmt: (v: number) => v.toFixed(0) },
 ] as const
 
-function TankOverviewCard({ tank }: { tank: DashboardStats['tanks'][0] }) {
+type DragProps = {
+  isDragging: boolean
+  isDragOver: boolean
+  onDragStart: (e: React.DragEvent) => void
+  onDragOver: (e: React.DragEvent) => void
+  onDrop: (e: React.DragEvent) => void
+  onDragEnd: () => void
+}
+
+function TankOverviewCard({ tank, drag }: { tank: DashboardStats['tanks'][0]; drag: DragProps }) {
   const navigate = useNavigate()
   const hasAlerts = tank.unack_alerts > 0 || tank.overdue_tasks > 0
 
   return (
     <div
+      draggable
       onClick={() => navigate(`/tanks/${tank.id}`)}
+      onDragStart={drag.onDragStart}
+      onDragOver={drag.onDragOver}
+      onDrop={drag.onDrop}
+      onDragEnd={drag.onDragEnd}
       style={{
-        background: 'var(--surface)', border: '0.5px solid var(--border)',
-        borderRadius: 14, padding: '1rem 1.1rem', cursor: 'pointer',
+        background: 'var(--surface)',
+        border: `0.5px solid ${drag.isDragOver ? 'var(--blue-border)' : 'var(--border)'}`,
+        borderRadius: 14, padding: '1rem 1.1rem', cursor: drag.isDragging ? 'grabbing' : 'grab',
         display: 'flex', flexDirection: 'column', gap: 12,
-        transition: 'border-color 0.15s',
+        transition: 'border-color 0.15s, opacity 0.15s',
+        opacity: drag.isDragging ? 0.4 : 1,
+        boxShadow: drag.isDragOver ? '0 0 0 2px color-mix(in srgb, var(--blue) 20%, transparent)' : 'none',
       }}
-      onMouseEnter={e => (e.currentTarget.style.borderColor = 'var(--blue-border)')}
-      onMouseLeave={e => (e.currentTarget.style.borderColor = 'var(--border)')}
+      onMouseEnter={e => { if (!drag.isDragging) e.currentTarget.style.borderColor = 'var(--blue-border)' }}
+      onMouseLeave={e => { if (!drag.isDragOver) e.currentTarget.style.borderColor = 'var(--border)' }}
     >
       {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
@@ -102,7 +119,10 @@ function TankOverviewCard({ tank }: { tank: DashboardStats['tanks'][0] }) {
             )}
           </div>
         </div>
-        <WaterTypeBadge type={tank.water_type} />
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+          <WaterTypeBadge type={tank.water_type} />
+          <GripVertical size={14} style={{ color: 'var(--text-4)', flexShrink: 0 }} />
+        </div>
       </div>
 
       {/* Parameter grid */}
@@ -194,6 +214,10 @@ export default function Dashboard() {
   const [completingId, setCompletingId] = useState<string | null>(null)
   const [isMobile, setIsMobile] = useState(() => window.matchMedia('(max-width: 768px)').matches)
 
+  const [orderedTanks, setOrderedTanks] = useState<DashboardStats['tanks']>([])
+  const [dragId, setDragId] = useState<string | null>(null)
+  const [dragOverId, setDragOverId] = useState<string | null>(null)
+
   useEffect(() => {
     const mq = window.matchMedia('(max-width: 768px)')
     const handler = (e: MediaQueryListEvent) => setIsMobile(e.matches)
@@ -218,6 +242,18 @@ export default function Dashboard() {
   }
 
   useEffect(() => { loadStats() }, [])
+
+  useEffect(() => {
+    if (!stats) return
+    setOrderedTanks(prev => {
+      if (prev.length === 0) return [...stats.tanks]
+      const kept = prev
+        .filter(t => stats.tanks.some(s => s.id === t.id))
+        .map(t => stats.tanks.find(s => s.id === t.id)!)
+      const added = stats.tanks.filter(s => !prev.some(t => t.id === s.id))
+      return [...kept, ...added]
+    })
+  }, [stats])
 
   async function createTank() {
     if (!name || !volume) return
@@ -313,7 +349,33 @@ export default function Dashboard() {
         <div style={{ flex: 1, minWidth: 0 }}>
           <p style={{ fontWeight: 500, fontSize: 15, margin: '0 0 12px', color: 'var(--text)' }}>Your Tanks</p>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 16 }}>
-            {stats.tanks.map(t => <TankOverviewCard key={t.id} tank={t} />)}
+            {orderedTanks.map(t => (
+              <TankOverviewCard
+                key={t.id}
+                tank={t}
+                drag={{
+                  isDragging: dragId === t.id,
+                  isDragOver: dragOverId === t.id,
+                  onDragStart: (e) => { e.dataTransfer.effectAllowed = 'move'; setDragId(t.id) },
+                  onDragOver: (e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; if (dragId && dragId !== t.id) setDragOverId(t.id) },
+                  onDrop: (e) => {
+                    e.preventDefault()
+                    if (!dragId || dragId === t.id) { setDragId(null); setDragOverId(null); return }
+                    setOrderedTanks(prev => {
+                      const next = [...prev]
+                      const from = next.findIndex(x => x.id === dragId)
+                      const to   = next.findIndex(x => x.id === t.id)
+                      const [moved] = next.splice(from, 1)
+                      next.splice(to, 0, moved)
+                      api.tanks.reorder(next.map((x, i) => ({ id: x.id, sort_order: i })))
+                      return next
+                    })
+                    setDragId(null); setDragOverId(null)
+                  },
+                  onDragEnd: () => { setDragId(null); setDragOverId(null) },
+                }}
+              />
+            ))}
             <button
               onClick={() => setShowForm(true)}
               style={{

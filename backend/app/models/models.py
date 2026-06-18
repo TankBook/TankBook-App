@@ -25,6 +25,7 @@ class Tank(Base):
     water_type: Mapped[str] = mapped_column(String, default="freshwater")
     co2_injection: Mapped[bool] = mapped_column(Boolean, default=False)
     has_heater: Mapped[bool] = mapped_column(Boolean, default=False)
+    sort_order: Mapped[int] = mapped_column(Integer, default=0)
     heater_watts: Mapped[int | None] = mapped_column(Integer)
     setup_date: Mapped[datetime | None] = mapped_column(DateTime)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
