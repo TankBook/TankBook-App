@@ -1,9 +1,9 @@
-import { useState, useMemo } from 'react'
+import React, { useState, useMemo, useRef } from 'react'
 import { Trash2, Plus, X, Pencil } from 'lucide-react'
 import { api, Expense } from '../api/client'
 import { useTanks } from '../hooks'
 import { useSettings, formatDate } from '../context/SettingsContext'
-import { Card, FieldLabel, SectionTitle, Tag } from '../components/ui'
+import { Card, FieldLabel, SectionTitle, Tag, RichTextarea, renderNotes } from '../components/ui'
 
 const CATEGORIES = [
   'Equipment', 'Livestock', 'Plants', 'Food', 'Chemicals',
@@ -30,6 +30,96 @@ function localDateStr() {
   const d = new Date()
   const pad = (n: number) => String(n).padStart(2, '0')
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
+}
+
+function DateInput({ value, onChange, dateFormat }: {
+  value: string
+  onChange: (v: string) => void
+  dateFormat: string
+}) {
+  // Local state avoids the padded-value feedback loop:
+  // emit("2026","06","1") would produce "2026-06-01" which re-parses as pd="01"
+  // (maxLength=2, already full) — blocking the second digit.
+  // By keeping local state we display raw digits while emitting padded values upward.
+  const init = value.split('-')
+  const [ly, setLy] = React.useState(init[0] ?? '')
+  const [lm, setLm] = React.useState(init[1] ?? '')
+  const [ld, setLd] = React.useState(init[2] ?? '')
+
+  const dayRef   = useRef<HTMLInputElement>(null)
+  const monthRef = useRef<HTMLInputElement>(null)
+  const yearRef  = useRef<HTMLInputElement>(null)
+
+  const order: React.RefObject<HTMLInputElement>[] =
+    dateFormat === 'MM/DD/YYYY' ? [monthRef, dayRef, yearRef] :
+    dateFormat === 'YYYY-MM-DD' ? [yearRef, monthRef, dayRef] :
+    [dayRef, monthRef, yearRef]
+
+  function advance(ref: React.RefObject<HTMLInputElement>) {
+    const idx = order.indexOf(ref)
+    if (idx < order.length - 1) {
+      order[idx + 1].current?.focus()
+      order[idx + 1].current?.select()
+    }
+  }
+
+  function emit(y: string, mo: string, d: string) {
+    onChange(`${y.padStart(4, '0')}-${mo.padStart(2, '0')}-${d.padStart(2, '0')}`)
+  }
+
+  const cell: React.CSSProperties = {
+    border: 'none', background: 'transparent', color: 'var(--text)',
+    fontSize: 13, outline: 'none', textAlign: 'center', padding: 0, fontFamily: 'inherit',
+  }
+
+  function seg(
+    ref: React.RefObject<HTMLInputElement>,
+    val: string, placeholder: string, w: number, maxLen: number,
+    setVal: (v: string) => void,
+    emitWith: (v: string) => void,
+  ) {
+    return (
+      <input
+        ref={ref}
+        type="text" inputMode="numeric" maxLength={maxLen}
+        value={val} placeholder={placeholder}
+        onFocus={e => e.target.select()}
+        onChange={e => {
+          const digits = e.target.value.replace(/\D/g, '').slice(0, maxLen)
+          setVal(digits)
+          emitWith(digits)
+          if (digits.length === maxLen) advance(ref)
+        }}
+        onKeyDown={e => {
+          if (e.key === 'Backspace' && val === '') {
+            const idx = order.indexOf(ref)
+            if (idx > 0) order[idx - 1].current?.focus()
+          }
+        }}
+        style={{ ...cell, width: w }}
+      />
+    )
+  }
+
+  const sep = (c: string) => <span style={{ color: 'var(--text-3)', userSelect: 'none', padding: '0 2px' }}>{c}</span>
+  const dS = seg(dayRef,   ld, 'DD',   28, 2, setLd, v => emit(ly, lm, v))
+  const mS = seg(monthRef, lm, 'MM',   28, 2, setLm, v => emit(ly, v,  ld))
+  const yS = seg(yearRef,  ly, 'YYYY', 44, 4, setLy, v => emit(v,  lm, ld))
+
+  let els: React.ReactElement
+  if (dateFormat === 'MM/DD/YYYY')      els = <>{mS}{sep('/')}{dS}{sep('/')}{yS}</>
+  else if (dateFormat === 'YYYY-MM-DD') els = <>{yS}{sep('-')}{mS}{sep('-')}{dS}</>
+  else                                  els = <>{dS}{sep('/')}{mS}{sep('/')}{yS}</>
+
+  return (
+    <div style={{
+      display: 'inline-flex', alignItems: 'center',
+      border: '0.5px solid var(--btn-border)', borderRadius: 8,
+      padding: '6px 12px', background: 'var(--surface)', gap: 1,
+    }}>
+      {els}
+    </div>
+  )
 }
 
 function monthKey(dateStr: string) {
@@ -61,6 +151,7 @@ export default function SpendingTracker() {
 
   const [showAdd, setShowAdd] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
 
   const [formTank, setFormTank] = useState<string>('')
   const [formAmount, setFormAmount] = useState('')
@@ -159,7 +250,7 @@ export default function SpendingTracker() {
           </div>
           <div>
             <FieldLabel>Date</FieldLabel>
-            <input type="date" value={formDate} onChange={e => setFormDate(e.target.value)} style={{ width: '100%', boxSizing: 'border-box' }} />
+            <DateInput key={editingId ?? 'new'} value={formDate} onChange={setFormDate} dateFormat={dateFormat} />
           </div>
         </div>
 
@@ -186,7 +277,7 @@ export default function SpendingTracker() {
 
         <div style={{ marginBottom: 16 }}>
           <FieldLabel>Notes (Optional)</FieldLabel>
-          <textarea value={formNotes} onChange={e => setFormNotes(e.target.value)} rows={2} style={{ width: '100%', boxSizing: 'border-box', resize: 'vertical' }} />
+          <RichTextarea value={formNotes} onChange={setFormNotes} rows={2} placeholder="Notes…" />
         </div>
 
         <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
@@ -258,24 +349,30 @@ export default function SpendingTracker() {
                   const cc = CAT_COLORS[e.category] ?? CAT_COLORS.Other
                   const tankName = tanks?.find(t => t.id === e.tank_id)?.name
                   return (
-                    <div key={e.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 0', borderBottom: i < items.length - 1 ? '0.5px solid var(--border-sub)' : 'none' }}>
-                      <div style={{ minWidth: 0, flex: 1 }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                          <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--text)' }}>
-                            {e.description || e.category}
-                          </span>
+                    <div key={e.id} style={{ display: 'flex', alignItems: 'flex-start', gap: 16, padding: '10px 0', borderBottom: i < items.length - 1 ? '0.5px solid var(--border-sub)' : 'none' }}>
+                      {/* Details */}
+                      <div style={{ flexShrink: 0, minWidth: 160 }}>
+                        <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--text)' }}>
+                          {e.description || e.category}
+                          {tankName && <span style={{ fontWeight: 400, color: 'var(--text-3)', marginLeft: 4 }}>({tankName})</span>}
+                        </span>
+                        <div style={{ marginTop: 3 }}>
                           <Tag bg={cc.bg} color={cc.color}>{e.category}</Tag>
-                          {tankName && <span style={{ fontSize: 11, color: 'var(--text-3)' }}>{tankName}</span>}
                         </div>
-                        <div style={{ display: 'flex', gap: 12, marginTop: 2 }}>
-                          <span style={{ fontSize: 11, color: 'var(--text-3)' }}>{formatDate(e.purchase_date, dateFormat)}</span>
-                          {e.notes && <span style={{ fontSize: 11, color: 'var(--text-2)' }}>{e.notes}</span>}
-                        </div>
+                        <span style={{ display: 'block', fontSize: 11, color: 'var(--text-3)', marginTop: 3 }}>
+                          {formatDate(e.purchase_date, dateFormat)}
+                        </span>
                       </div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0, marginLeft: 12 }}>
+                      {/* Notes */}
+                      {e.notes
+                        ? <div style={{ flex: 1, minWidth: 0, fontSize: 11, color: 'var(--text-2)', paddingTop: 1 }} dangerouslySetInnerHTML={{ __html: renderNotes(e.notes) }} />
+                        : <div style={{ flex: 1 }} />
+                      }
+                      {/* Amount + actions */}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
                         <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)' }}>{fmt(e.amount)}</span>
                         <button onClick={() => openEdit(e)} style={{ lineHeight: 0, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-3)' }}><Pencil size={13} /></button>
-                        <button onClick={async () => { await api.spending.remove(e.id); reload() }} style={{ lineHeight: 0, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--red)' }}><Trash2 size={13} /></button>
+                        <button onClick={() => setConfirmDeleteId(e.id)} style={{ lineHeight: 0, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--red)' }}><Trash2 size={13} /></button>
                       </div>
                     </div>
                   )
@@ -312,6 +409,37 @@ export default function SpendingTracker() {
 
       {showAdd && formModal(false)}
       {editingId && formModal(true)}
+
+      {confirmDeleteId && (() => {
+        const target = expenses.find(e => e.id === confirmDeleteId)
+        return (
+          <div
+            onMouseDown={() => setConfirmDeleteId(null)}
+            style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', zIndex: 300, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}
+          >
+            <div onMouseDown={e => e.stopPropagation()} style={{ background: 'var(--surface)', border: '0.5px solid var(--red-border)', borderRadius: 14, padding: '1.5rem', width: 360, maxWidth: '100%', boxShadow: '0 12px 40px rgba(0,0,0,0.22)' }}>
+              <p style={{ margin: '0 0 6px', fontSize: 15, fontWeight: 600, color: 'var(--red)' }}>Delete expense?</p>
+              <p style={{ margin: '0 0 20px', fontSize: 13, color: 'var(--text-2)' }}>
+                {target ? `"${target.description || target.category}" — ${fmt(target.amount)}` : 'This expense'} will be permanently removed.
+              </p>
+              <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+                <button
+                  onClick={() => setConfirmDeleteId(null)}
+                  style={{ padding: '7px 16px', borderRadius: 8, fontSize: 13, cursor: 'pointer', border: '0.5px solid var(--btn-border)', background: 'transparent', color: 'var(--text)' }}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={async () => { await api.spending.remove(confirmDeleteId); setConfirmDeleteId(null); reload() }}
+                  style={{ padding: '7px 16px', borderRadius: 8, fontSize: 13, cursor: 'pointer', border: '0.5px solid var(--red-border)', background: 'var(--red-bg)', color: 'var(--red)', fontWeight: 600 }}
+                >
+                  Delete
+                </button>
+              </div>
+            </div>
+          </div>
+        )
+      })()}
     </div>
   )
 }
