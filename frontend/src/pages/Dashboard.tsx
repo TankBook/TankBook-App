@@ -4,7 +4,7 @@ import { Layers, Fish, Leaf, Bug, Waves, Bell, Clock, Plus, AlertTriangle, Timer
 import { useTanks } from '../hooks'
 import { api } from '../api/client'
 import { useSettings, formatDate, toMM, dimInputProps } from '../context/SettingsContext'
-import { Card, FieldLabel, Tag, SectionTitle } from '../components/ui'
+import { Card, FieldLabel, Tag } from '../components/ui'
 
 interface DashboardStats {
   total_tanks: number
@@ -299,43 +299,43 @@ export default function Dashboard() {
       <StatCard label="Plant species" value={stats.total_plants} icon={Leaf} />
       <StatCard label="Alerts" value={stats.unack_alerts} icon={Bell} accent={stats.unack_alerts > 0 ? 'var(--amber)' : undefined} />
       <StatCard label="Overdue tasks" value={stats.overdue_tasks} icon={Clock} accent={stats.overdue_tasks > 0 ? 'var(--red)' : undefined} />
+    </div>
+  )
 
-      {stats.upcoming_tasks.length > 0 && (
-        <div style={{ marginTop: 8 }}>
-          <Card>
-            <SectionTitle>Upcoming</SectionTitle>
-            {stats.upcoming_tasks.map(t => {
-              const tank = stats.tanks.find(tk => tk.id === t.tank_id)
-              return (
-                <div key={t.id} style={{ padding: '8px 0', borderBottom: '0.5px solid var(--border-sub)' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 6 }}>
-                    <div style={{ minWidth: 0 }}>
-                      <p style={{ fontSize: 12, fontWeight: 500, color: 'var(--text)', margin: '0 0 2px' }}>{t.task_type}</p>
-                      <p style={{ fontSize: 11, color: 'var(--text-2)', margin: 0 }}>
-                        {tank?.name}{t.is_recurring ? ' ↻' : ''}{t.description ? ` · ${t.description}` : ''}
-                      </p>
-                    </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4, flexShrink: 0 }}>
-                      <span style={{ fontSize: 11, color: 'var(--text-3)' }}>{formatDate(t.due_at, dateFormat)}</span>
-                      <button
-                        onClick={() => completeTask(t.tank_id, t.id)}
-                        disabled={completingId === t.id}
-                        style={{
-                          fontSize: 11, padding: '2px 8px', borderRadius: 6,
-                          border: '0.5px solid var(--green-border)', background: 'var(--green-bg)', color: 'var(--green)',
-                          cursor: 'pointer', opacity: completingId === t.id ? 0.5 : 1,
-                        }}
-                      >
-                        {completingId === t.id ? '…' : 'Done'}
-                      </button>
-                    </div>
-                  </div>
+  const upcomingTasks = stats.upcoming_tasks.length > 0 && (
+    <div style={{ marginTop: 24 }}>
+      <p style={{ fontWeight: 500, fontSize: 15, margin: '0 0 12px', color: 'var(--text)' }}>Upcoming Tasks</p>
+      <Card>
+        {stats.upcoming_tasks.map((t, i) => {
+          const tank = stats.tanks.find(tk => tk.id === t.tank_id)
+          return (
+            <div key={t.id} style={{ padding: '8px 0', borderBottom: i < stats.upcoming_tasks.length - 1 ? '0.5px solid var(--border-sub)' : 'none' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 6 }}>
+                <div style={{ minWidth: 0 }}>
+                  <p style={{ fontSize: 12, fontWeight: 500, color: 'var(--text)', margin: '0 0 2px' }}>{t.task_type}</p>
+                  <p style={{ fontSize: 11, color: 'var(--text-2)', margin: 0 }}>
+                    {tank?.name}{t.is_recurring ? ' ↻' : ''}{t.description ? ` · ${t.description}` : ''}
+                  </p>
                 </div>
-              )
-            })}
-          </Card>
-        </div>
-      )}
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4, flexShrink: 0 }}>
+                  <span style={{ fontSize: 11, color: 'var(--text-3)' }}>{formatDate(t.due_at, dateFormat)}</span>
+                  <button
+                    onClick={() => completeTask(t.tank_id, t.id)}
+                    disabled={completingId === t.id}
+                    style={{
+                      fontSize: 11, padding: '2px 8px', borderRadius: 6,
+                      border: '0.5px solid var(--green-border)', background: 'var(--green-bg)', color: 'var(--green)',
+                      cursor: 'pointer', opacity: completingId === t.id ? 0.5 : 1,
+                    }}
+                  >
+                    {completingId === t.id ? '…' : 'Done'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )
+        })}
+      </Card>
     </div>
   )
 
@@ -392,6 +392,7 @@ export default function Dashboard() {
               <span style={{ fontSize: 13, fontWeight: 500 }}>Add Tank</span>
             </button>
           </div>
+          {upcomingTasks}
         </div>
 
         {!isMobile && <div style={{ width: 220, flexShrink: 0 }}>{statsSidebar}</div>}
