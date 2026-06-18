@@ -12,7 +12,20 @@ export interface Tank {
   height_mm: number | null
   depth_mm: number | null
   co2_injection: boolean
+  has_heater: boolean
+  heater_watts: number | null
   setup_date: string | null
+  created_at: string
+}
+
+export interface Expense {
+  id: string
+  tank_id: string | null
+  amount: number
+  category: string
+  description: string | null
+  purchase_date: string
+  notes: string | null
   created_at: string
 }
 
@@ -310,5 +323,13 @@ export const api = {
       }
       return res.json()
     },
+  },
+  spending: {
+    list: (tankId?: string) => get<Expense[]>(`/expenses${tankId ? `?tank_id=${tankId}` : ''}`),
+    add: (body: Pick<Expense, 'tank_id' | 'amount' | 'category' | 'description' | 'purchase_date' | 'notes'>) =>
+      post<Expense>('/expenses', body),
+    update: (id: string, body: Partial<Pick<Expense, 'tank_id' | 'amount' | 'category' | 'description' | 'purchase_date' | 'notes'>>) =>
+      patch<Expense>(`/expenses/${id}`, body),
+    remove: (id: string) => del(`/expenses/${id}`),
   },
 }

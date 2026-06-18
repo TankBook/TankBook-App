@@ -45,6 +45,7 @@ def export_backup(db: Session = Depends(get_db)):
             "filter_flow_lph": tank.filter_flow_lph,
             "width_mm": tank.width_mm, "height_mm": tank.height_mm, "depth_mm": tank.depth_mm,
             "co2_injection": tank.co2_injection,
+            "has_heater": tank.has_heater, "heater_watts": tank.heater_watts,
             "setup_date": _dt(tank.setup_date), "created_at": _dt(tank.created_at),
             "fish": [{"id": r.id, "species_slug": r.species_slug, "quantity": r.quantity,
                       "organism_type": r.organism_type, "fish_status": r.fish_status,
@@ -117,6 +118,7 @@ def import_backup(payload: dict, db: Session = Depends(get_db)):
             filter_flow_lph=t.get("filter_flow_lph"),
             width_mm=t.get("width_mm"), height_mm=t.get("height_mm"), depth_mm=t.get("depth_mm"),
             co2_injection=t.get("co2_injection", False),
+            has_heater=t.get("has_heater", False), heater_watts=t.get("heater_watts"),
             setup_date=_parse_dt(t.get("setup_date")),
             created_at=_parse_dt(t.get("created_at")) or datetime.utcnow(),
         )

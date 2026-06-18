@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { BrowserRouter, Routes, Route, Link, useLocation } from 'react-router-dom'
-import { LayoutDashboard, BookOpen, Cog, NotebookPen, ShieldCheck, Calculator, Menu, X, type LucideIcon } from 'lucide-react'
+import { LayoutDashboard, BookOpen, Cog, NotebookPen, ShieldCheck, Calculator, Receipt, Menu, X, type LucideIcon } from 'lucide-react'
 
 function GitHubIcon({ size = 14 }: { size?: number }) {
   return (
@@ -24,6 +24,7 @@ function AquaDropIcon({ size = 26 }: { size?: number }) {
   )
 }
 import Dashboard from './pages/Dashboard'
+import SpendingTracker from './pages/SpendingTracker'
 import TankDetail from './pages/TankDetail'
 import SpeciesBrowser from './pages/SpeciesBrowser'
 import Settings from './pages/Settings'
@@ -38,6 +39,7 @@ const NAV_LINKS: [string, string, LucideIcon][] = [
   ['/compatibility', 'Compatibility', ShieldCheck],
   ['/journal', 'Tank Journal', NotebookPen],
   ['/calculators', 'Calculators', Calculator],
+  ['/spending', 'Spending', Receipt],
 ]
 
 function Nav() {
@@ -184,6 +186,7 @@ export default function App() {
               <Route path="/journal" element={<LivestockJournal />} />
               <Route path="/calculators" element={<Calculators />} />
               <Route path="/settings" element={<Settings />} />
+              <Route path="/spending" element={<SpendingTracker />} />
             </Routes>
           </div>
           <Footer />

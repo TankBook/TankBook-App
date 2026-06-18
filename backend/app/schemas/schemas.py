@@ -15,6 +15,8 @@ class TankCreate(BaseModel):
     height_mm: int | None = None
     depth_mm: int | None = None
     co2_injection: bool = False
+    has_heater: bool = False
+    heater_watts: int | None = None
     setup_date: datetime | None = None
 
 
@@ -194,4 +196,30 @@ class AppSettingsOut(BaseModel):
     unit_system: str
     default_tank_id: str | None = None
     updated_at: datetime
+    model_config = {"from_attributes": True}
+
+
+# --- Expenses ---
+
+class ExpenseCreate(BaseModel):
+    tank_id: str | None = None
+    amount: float
+    category: str
+    description: str | None = None
+    purchase_date: str
+    notes: str | None = None
+
+
+class ExpenseUpdate(BaseModel):
+    tank_id: str | None = None
+    amount: float | None = None
+    category: str | None = None
+    description: str | None = None
+    purchase_date: str | None = None
+    notes: str | None = None
+
+
+class ExpenseOut(ExpenseCreate):
+    id: str
+    created_at: datetime
     model_config = {"from_attributes": True}

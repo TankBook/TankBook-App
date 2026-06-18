@@ -220,6 +220,8 @@ export default function Dashboard() {
       width_mm: width ? toMM(Number(width), unitSystem) : null,
       height_mm: height ? toMM(Number(height), unitSystem) : null,
       depth_mm: depth ? toMM(Number(depth), unitSystem) : null,
+      has_heater: false,
+      heater_watts: null,
       setup_date: null,
     })
     setName(''); setVolume(''); setWaterType('freshwater'); setCo2(false)

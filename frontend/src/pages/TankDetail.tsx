@@ -128,6 +128,8 @@ function EditTankPanel({ tank, onSave }: { tank: any; onSave: () => void }) {
   const [height, setHeight] = useState(tank.height_mm != null ? String(fromMM(tank.height_mm, unitSystem)) : '')
   const [depth, setDepth] = useState(tank.depth_mm != null ? String(fromMM(tank.depth_mm, unitSystem)) : '')
   const [co2, setCo2] = useState(tank.co2_injection)
+  const [hasHeater, setHasHeater] = useState(tank.has_heater)
+  const [heaterWatts, setHeaterWatts] = useState(tank.heater_watts != null ? String(tank.heater_watts) : '')
   const [saved, setSaved] = useState(false)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [deleting, setDeleting] = useState(false)
@@ -144,7 +146,10 @@ function EditTankPanel({ tank, onSave }: { tank: any; onSave: () => void }) {
         width_mm: width ? toMM(Number(width), unitSystem) : null,
         height_mm: height ? toMM(Number(height), unitSystem) : null,
         depth_mm: depth ? toMM(Number(depth), unitSystem) : null,
-        co2_injection: co2, setup_date: tank.setup_date,
+        co2_injection: co2,
+        has_heater: hasHeater,
+        heater_watts: hasHeater && heaterWatts ? Number(heaterWatts) : null,
+        setup_date: tank.setup_date,
       }),
     })
     onSave()
@@ -184,9 +189,24 @@ function EditTankPanel({ tank, onSave }: { tank: any; onSave: () => void }) {
           </div>
         ))}
       </div>
-      <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, marginBottom: 16, color: 'var(--text-label)' }}>
-        <input type="checkbox" checked={co2} onChange={e => setCo2(e.target.checked)} /> CO₂ injection
-      </label>
+      <div style={{ display: 'flex', gap: 20, marginBottom: 16, flexWrap: 'wrap' }}>
+        <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: 'var(--text-label)' }}>
+          <input type="checkbox" checked={co2} onChange={e => setCo2(e.target.checked)} /> CO₂ Injection
+        </label>
+        <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: 'var(--text-label)' }}>
+          <input type="checkbox" checked={hasHeater} onChange={e => { setHasHeater(e.target.checked); if (!e.target.checked) setHeaterWatts('') }} /> Heater
+        </label>
+        {hasHeater && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <input
+              type="number" min="1" placeholder="Watts"
+              value={heaterWatts} onChange={e => setHeaterWatts(e.target.value)}
+              style={{ width: 80 }}
+            />
+            <span style={{ fontSize: 13, color: 'var(--text-2)' }}>W</span>
+          </div>
+        )}
+      </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
         <button onClick={save} style={{ padding: '7px 16px', borderRadius: 8, border: '0.5px solid var(--blue-border)', background: 'var(--blue-bg)', color: 'var(--blue)', fontSize: 13, fontWeight: 500, cursor: 'pointer' }}>Save changes</button>
         {saved && <span style={{ fontSize: 12, color: 'var(--green)' }}>Saved ✓</span>}
@@ -695,6 +715,7 @@ export default function TankDetail() {
             {tank.volume_litres}L
             {(tank.width_mm || tank.height_mm || tank.depth_mm) ? ` · ${fmtDim(tank.width_mm, unitSystem)} × ${fmtDim(tank.height_mm, unitSystem)} × ${fmtDim(tank.depth_mm, unitSystem)}` : ''}
             {tank.co2_injection ? ' · CO₂' : ''}
+            {tank.has_heater ? ` · ${tank.heater_watts ? `${tank.heater_watts}W heater` : 'heater'}` : ''}
             {tank.substrate ? ` · ${tank.substrate}` : ''}
             {tank.lighting ? ` · ${tank.lighting}` : ''}
             {tank.filter_flow_lph ? ` · ${tank.filter_flow_lph} L/h filter` : ''}

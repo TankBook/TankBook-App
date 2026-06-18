@@ -24,6 +24,8 @@ class Tank(Base):
     depth_mm: Mapped[int | None] = mapped_column(Integer)
     water_type: Mapped[str] = mapped_column(String, default="freshwater")
     co2_injection: Mapped[bool] = mapped_column(Boolean, default=False)
+    has_heater: Mapped[bool] = mapped_column(Boolean, default=False)
+    heater_watts: Mapped[int | None] = mapped_column(Integer)
     setup_date: Mapped[datetime | None] = mapped_column(DateTime)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
@@ -171,3 +173,16 @@ class AppSettings(Base):
     unit_system: Mapped[str] = mapped_column(String, default="cm")
     default_tank_id: Mapped[str | None] = mapped_column(String, nullable=True)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class Expense(Base):
+    __tablename__ = "expenses"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=new_uuid)
+    tank_id: Mapped[str | None] = mapped_column(String, ForeignKey("tanks.id", ondelete="SET NULL"), nullable=True)
+    amount: Mapped[float] = mapped_column(Float, nullable=False)
+    category: Mapped[str] = mapped_column(String, nullable=False)
+    description: Mapped[str | None] = mapped_column(String)
+    purchase_date: Mapped[str] = mapped_column(String, nullable=False)
+    notes: Mapped[str | None] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
