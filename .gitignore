@@ -43,3 +43,7 @@ Thumbs.db
 .idea/
 *.swp
 *.swo
+
+# Local docs — not part of the published repo
+RELEASE.md
+RELEASE-NOTES-*.md
