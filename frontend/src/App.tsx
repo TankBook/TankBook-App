@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { BrowserRouter, Routes, Route, Link, useLocation } from 'react-router-dom'
-import { LayoutDashboard, BookOpen, Cog, NotebookPen, ShieldCheck, Calculator, Receipt, Menu, X, type LucideIcon } from 'lucide-react'
+import { LayoutDashboard, BookOpen, Cog, NotebookPen, ShieldCheck, Calculator, Receipt, Menu, X, Plus, Fish, Droplets, ChevronLeft, type LucideIcon } from 'lucide-react'
+import { api } from './api/client'
 
 function GitHubIcon({ size = 14 }: { size?: number }) {
   return (
@@ -32,6 +33,236 @@ import LivestockJournal from './pages/LivestockJournal'
 import CompatibilityChecker from './pages/CompatibilityChecker'
 import Calculators from './pages/Calculators'
 import { SettingsProvider, useSettings } from './context/SettingsContext'
+
+const QA_CATEGORIES = ['Equipment', 'Livestock', 'Plants', 'Food', 'Chemicals', 'Medication', 'Decor', 'Subscription', 'Other']
+
+function todayIso() {
+  const d = new Date()
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
+function QuickAdd() {
+  const [open, setOpen] = useState(false)
+  const [mode, setMode] = useState<'pick' | 'tank' | 'param' | 'expense'>('pick')
+  const [tanks, setTanks] = useState<{ id: string; name: string }[]>([])
+  const [saving, setSaving] = useState(false)
+
+  const [qaName, setQaName] = useState('')
+  const [qaVolume, setQaVolume] = useState('')
+  const [qaWaterType, setQaWaterType] = useState('freshwater')
+
+  const [paramTank, setParamTank] = useState('')
+  const [ph, setPh] = useState('')
+  const [temp, setTemp] = useState('')
+  const [ammonia, setAmmonia] = useState('')
+  const [nitrite, setNitrite] = useState('')
+  const [nitrate, setNitrate] = useState('')
+
+  const [expTank, setExpTank] = useState('')
+  const [expAmount, setExpAmount] = useState('')
+  const [expCat, setExpCat] = useState(QA_CATEGORIES[0])
+  const [expDesc, setExpDesc] = useState('')
+  const [expDate, setExpDate] = useState(todayIso)
+
+  useEffect(() => {
+    if (open) api.tanks.list().then(t => {
+      setTanks(t)
+      if (t.length) setParamTank(t[0].id)
+    })
+  }, [open])
+
+  function resetForms() {
+    setMode('pick'); setSaving(false)
+    setQaName(''); setQaVolume(''); setQaWaterType('freshwater')
+    setPh(''); setTemp(''); setAmmonia(''); setNitrite(''); setNitrate('')
+    setExpTank(''); setExpAmount(''); setExpCat(QA_CATEGORIES[0]); setExpDesc(''); setExpDate(todayIso())
+  }
+
+  function close() { setOpen(false); resetForms() }
+
+  async function saveTank() {
+    if (!qaName || !qaVolume) return
+    setSaving(true)
+    try {
+      await api.tanks.create({ name: qaName, volume_litres: Number(qaVolume), water_type: qaWaterType, co2_injection: false, has_heater: false, heater_watts: null, setup_date: null, substrate: null, lighting: null, filter_flow_lph: null, width_mm: null, height_mm: null, depth_mm: null })
+      close()
+    } finally { setSaving(false) }
+  }
+
+  async function saveParam() {
+    if (!paramTank) return
+    setSaving(true)
+    try {
+      await api.parameters.log(paramTank, { ph: ph ? Number(ph) : null, temperature_c: temp ? Number(temp) : null, ammonia_ppm: ammonia ? Number(ammonia) : null, nitrite_ppm: nitrite ? Number(nitrite) : null, nitrate_ppm: nitrate ? Number(nitrate) : null, gh_dgh: null, kh_dkh: null, salinity_ppt: null, specific_gravity: null, notes: null })
+      close()
+    } finally { setSaving(false) }
+  }
+
+  async function saveExpense() {
+    if (!expAmount || isNaN(Number(expAmount))) return
+    setSaving(true)
+    try {
+      await api.spending.add({ tank_id: expTank || null, amount: Number(expAmount), category: expCat, description: expDesc || null, purchase_date: expDate, notes: null })
+      close()
+    } finally { setSaving(false) }
+  }
+
+  const lbl = (text: string) => <p style={{ margin: '0 0 4px', fontSize: 12, color: 'var(--text-2)', fontWeight: 500 }}>{text}</p>
+
+  const backBtn = (
+    <button onClick={() => setMode('pick')} style={{ display: 'flex', alignItems: 'center', gap: 4, background: 'none', border: 'none', color: 'var(--text-2)', cursor: 'pointer', fontSize: 12, padding: 0, marginBottom: 16 }}>
+      <ChevronLeft size={13} />Back
+    </button>
+  )
+
+  const saveRow = (onClick: () => void, disabled: boolean) => (
+    <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 16 }}>
+      <button onClick={onClick} disabled={disabled || saving} style={{ padding: '7px 20px', borderRadius: 8, border: '0.5px solid var(--blue-border)', background: disabled || saving ? 'var(--surface-2)' : 'var(--blue-bg)', color: disabled || saving ? 'var(--text-3)' : 'var(--blue)', fontWeight: 500, fontSize: 13, cursor: disabled || saving ? 'default' : 'pointer' }}>
+        {saving ? 'Saving…' : 'Save'}
+      </button>
+    </div>
+  )
+
+  const inputStyle: React.CSSProperties = { width: '100%', boxSizing: 'border-box' }
+
+  let body: React.ReactNode = null
+
+  if (mode === 'pick') {
+    body = (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        {([
+          { Icon: Fish,     label: 'Add Tank',            sub: 'Create a new tank',            m: 'tank'    },
+          { Icon: Droplets, label: 'Record Parameters',   sub: 'Log water quality for a tank', m: 'param'   },
+          { Icon: Receipt,  label: 'New Expense',         sub: 'Track a purchase',             m: 'expense' },
+        ] as const).map(({ Icon, label, sub, m }) => (
+          <button key={m} onClick={() => setMode(m)} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px', borderRadius: 10, cursor: 'pointer', textAlign: 'left', width: '100%', border: '0.5px solid var(--border)', background: 'var(--surface-2)', color: 'var(--text)' }}>
+            <span style={{ color: 'var(--blue)', lineHeight: 0, flexShrink: 0 }}><Icon size={16} /></span>
+            <span>
+              <span style={{ display: 'block', fontSize: 13, fontWeight: 500 }}>{label}</span>
+              <span style={{ display: 'block', fontSize: 11, color: 'var(--text-2)', marginTop: 2 }}>{sub}</span>
+            </span>
+          </button>
+        ))}
+      </div>
+    )
+  } else if (mode === 'tank') {
+    body = (
+      <>
+        {backBtn}
+        <p style={{ margin: '0 0 16px', fontWeight: 500, fontSize: 15, color: 'var(--text)' }}>Add Tank</p>
+        <div style={{ marginBottom: 12 }}>
+          {lbl('Tank name *')}
+          <input value={qaName} onChange={e => setQaName(e.target.value)} placeholder="e.g. Living Room Display" style={inputStyle} />
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
+          <div>
+            {lbl('Volume (litres) *')}
+            <input type="number" min="1" value={qaVolume} onChange={e => setQaVolume(e.target.value)} placeholder="200" style={inputStyle} />
+          </div>
+          <div>
+            {lbl('Water type')}
+            <select value={qaWaterType} onChange={e => setQaWaterType(e.target.value)} style={{ width: '100%' }}>
+              <option value="freshwater">Freshwater</option>
+              <option value="marine">Marine</option>
+              <option value="brackish">Brackish</option>
+            </select>
+          </div>
+        </div>
+        {saveRow(saveTank, !qaName || !qaVolume)}
+      </>
+    )
+  } else if (mode === 'param') {
+    body = (
+      <>
+        {backBtn}
+        <p style={{ margin: '0 0 16px', fontWeight: 500, fontSize: 15, color: 'var(--text)' }}>Record Parameters</p>
+        <div style={{ marginBottom: 12 }}>
+          {lbl('Tank *')}
+          <select value={paramTank} onChange={e => setParamTank(e.target.value)} style={{ width: '100%' }}>
+            {tanks.length === 0 && <option value="">No tanks yet</option>}
+            {tanks.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+          </select>
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+          {([
+            { label: 'pH',           value: ph,      set: setPh,      ph: '7.0' },
+            { label: 'Temp (°C)',    value: temp,    set: setTemp,    ph: '25'  },
+            { label: 'Ammonia ppm', value: ammonia,  set: setAmmonia, ph: '0.0' },
+            { label: 'Nitrite ppm', value: nitrite,  set: setNitrite, ph: '0.0' },
+            { label: 'Nitrate ppm', value: nitrate,  set: setNitrate, ph: '20'  },
+          ]).map(f => (
+            <div key={f.label}>
+              {lbl(f.label)}
+              <input type="number" step="any" value={f.value} onChange={e => f.set(e.target.value)} placeholder={f.ph} style={inputStyle} />
+            </div>
+          ))}
+        </div>
+        {saveRow(saveParam, !paramTank || tanks.length === 0)}
+      </>
+    )
+  } else if (mode === 'expense') {
+    body = (
+      <>
+        {backBtn}
+        <p style={{ margin: '0 0 16px', fontWeight: 500, fontSize: 15, color: 'var(--text)' }}>New Expense</p>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
+          <div>
+            {lbl('Amount (£) *')}
+            <input type="number" min="0" step="0.01" value={expAmount} onChange={e => setExpAmount(e.target.value)} placeholder="0.00" style={inputStyle} />
+          </div>
+          <div>
+            {lbl('Category')}
+            <select value={expCat} onChange={e => setExpCat(e.target.value)} style={{ width: '100%' }}>
+              {QA_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+            </select>
+          </div>
+        </div>
+        <div style={{ marginBottom: 12 }}>
+          {lbl('Description')}
+          <input value={expDesc} onChange={e => setExpDesc(e.target.value)} placeholder="e.g. Fluval 307 canister filter" style={inputStyle} />
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 4 }}>
+          <div>
+            {lbl('Tank (optional)')}
+            <select value={expTank} onChange={e => setExpTank(e.target.value)} style={{ width: '100%' }}>
+              <option value="">None</option>
+              {tanks.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+            </select>
+          </div>
+          <div>
+            {lbl('Date')}
+            <input type="date" value={expDate} onChange={e => setExpDate(e.target.value)} style={inputStyle} />
+          </div>
+        </div>
+        {saveRow(saveExpense, !expAmount || isNaN(Number(expAmount)))}
+      </>
+    )
+  }
+
+  return (
+    <>
+      <button
+        onClick={() => setOpen(true)}
+        title="Quick add"
+        style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 30, height: 30, border: '0.5px solid var(--border)', borderRadius: 8, background: 'transparent', color: 'var(--text-2)', cursor: 'pointer', marginRight: 6 }}
+      >
+        <Plus size={15} />
+      </button>
+
+      {open && (
+        <div onClick={close} style={{ position: 'fixed', inset: 0, zIndex: 400, background: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div onClick={e => e.stopPropagation()} style={{ background: 'var(--surface)', borderRadius: 12, padding: 24, width: '100%', maxWidth: 440, margin: '0 16px', boxShadow: '0 16px 48px rgba(0,0,0,0.22)', border: '0.5px solid var(--border)' }}>
+            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: mode === 'pick' ? 16 : 0 }}>
+              <p style={{ margin: 0, fontWeight: 500, fontSize: 15, color: 'var(--text)' }}>{mode === 'pick' ? 'Quick Add' : ''}</p>
+              <button onClick={close} style={{ lineHeight: 0, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-3)', padding: 0, marginLeft: 12, flexShrink: 0 }}><X size={16} /></button>
+            </div>
+            {body}
+          </div>
+        </div>
+      )}
+    </>
+  )
+}
 
 const NAV_LINKS: [string, string, LucideIcon][] = [
   ['/', 'Dashboard', LayoutDashboard],
@@ -88,6 +319,8 @@ function Nav() {
       {!isMobile && NAV_LINKS.map(([to, label, Icon]) => link(to, label, Icon))}
 
       <span style={{ flex: 1 }} />
+
+      <QuickAdd />
 
       <button
         onClick={toggleTheme}
