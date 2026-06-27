@@ -80,6 +80,8 @@ def dashboard_stats(db=Depends(get_db)):
     tanks = db.query(Tank).order_by(Tank.sort_order, Tank.created_at).all()
     tank_ids = [t.id for t in tanks]
 
+    today_start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+
     fish_count = db.query(func.sum(TankFish.quantity)).filter(TankFish.tank_id.in_(tank_ids)).scalar() or 0
     plant_count = db.query(func.sum(TankPlant.quantity)).filter(TankPlant.tank_id.in_(tank_ids)).scalar() or 0
     species_count = db.query(func.count(func.distinct(TankFish.species_slug))).filter(TankFish.tank_id.in_(tank_ids)).scalar() or 0
@@ -87,7 +89,7 @@ def dashboard_stats(db=Depends(get_db)):
     overdue_tasks = db.query(MaintenanceTask).filter(
         MaintenanceTask.tank_id.in_(tank_ids),
         MaintenanceTask.status == "pending",
-        MaintenanceTask.due_at < datetime.utcnow()
+        MaintenanceTask.due_at < today_start
     ).count()
     upcoming_tasks = db.query(MaintenanceTask).filter(
         MaintenanceTask.tank_id.in_(tank_ids),
@@ -104,7 +106,7 @@ def dashboard_stats(db=Depends(get_db)):
         tank_overdue = db.query(MaintenanceTask).filter(
             MaintenanceTask.tank_id == tank.id,
             MaintenanceTask.status == "pending",
-            MaintenanceTask.due_at < datetime.utcnow()
+            MaintenanceTask.due_at < today_start
         ).count()
         tank_summaries.append({
             "id": tank.id,
