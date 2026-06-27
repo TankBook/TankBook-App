@@ -34,6 +34,8 @@ class TankFishCreate(BaseModel):
     organism_type: str = "fish"
     fish_status: str = "added"
     health_status: str = "healthy"
+    food_types: str | None = None
+    feeding_times_per_day: int | None = None
     notes: str | None = None
 
 
@@ -42,6 +44,8 @@ class TankFishUpdate(BaseModel):
     organism_type: str | None = None
     fish_status: str | None = None
     health_status: str | None = None
+    food_types: str | None = None
+    feeding_times_per_day: int | None = None
     notes: str | None = None
 
 

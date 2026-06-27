@@ -49,6 +49,8 @@ class TankFish(Base):
     organism_type: Mapped[str] = mapped_column(String, default="fish")
     fish_status: Mapped[str] = mapped_column(String, default="added")
     health_status: Mapped[str] = mapped_column(String, default="healthy")
+    food_types: Mapped[str | None] = mapped_column(Text)
+    feeding_times_per_day: Mapped[int | None] = mapped_column(Integer)
     added_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     notes: Mapped[str | None] = mapped_column(Text)
 
