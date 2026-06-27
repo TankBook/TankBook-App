@@ -1,12 +1,12 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
-import { Fish, Leaf, Droplets, CalendarClock, Bell, Pencil, Trash2, Plus, ChevronLeft, Sun, Camera, X, ChevronLeft as Prev, ChevronRight as Next, type LucideIcon } from 'lucide-react'
+import { Fish, Leaf, Droplets, CalendarClock, Bell, Pencil, Trash2, Plus, ChevronLeft, Sun, Camera, X, Utensils, BookOpen, FlaskConical, ChevronLeft as Prev, ChevronRight as Next, type LucideIcon } from 'lucide-react'
 import {
   LineChart, Line, XAxis, YAxis, Tooltip,
   ResponsiveContainer,
 } from 'recharts'
 import { useTank, useFish, usePlants, useParameters, useAlerts } from '../hooks'
-import { api } from '../api/client'
+import { api, type Tank } from '../api/client'
 import { useSettings, formatDate, formatDateTime, fromMM, toMM, fmtDim, dimInputProps } from '../context/SettingsContext'
 import { Card, FieldLabel, Tag, SectionTitle, tabStyle } from '../components/ui'
 
@@ -48,6 +48,138 @@ const FISH_STATUS_COLORS: Record<string, { bg: string; color: string }> = {
   added:   { bg: 'var(--green-bg)',  color: 'var(--green)'  },
   removed: { bg: 'var(--tag-bg)',    color: 'var(--text-2)' },
 }
+
+type StripEntry = { value: number; color: string; label?: string | number }
+
+// API Master Test Kit — liquid drop tests
+const TEST_STRIP_MASTER: Record<string, StripEntry[]> = {
+  'pH': [
+    { value: 6.0, color: '#f5e03a' },
+    { value: 6.4, color: '#d4c820' },
+    { value: 6.8, color: '#aaba20' },
+    { value: 7.0, color: '#82aa20' },
+    { value: 7.2, color: '#5e9c20' },
+    { value: 7.6, color: '#3e8820' },
+    { value: 8.0, color: '#4a80cc' },
+    { value: 8.2, color: '#3268b8' },
+    { value: 8.4, color: '#1e50a0' },
+  ],
+  'Ammonia': [
+    { value: 0,    color: '#f0e040' },
+    { value: 0.25, color: '#c8d43c' },
+    { value: 0.50, color: '#9cc438' },
+    { value: 1.0,  color: '#70b034' },
+    { value: 2.0,  color: '#4a9430' },
+    { value: 4.0,  color: '#2a7428' },
+    { value: 8.0,  color: '#105420' },
+  ],
+  'Nitrite': [
+    { value: 0,    color: '#f8eef4' },
+    { value: 0.25, color: '#f0b8d8' },
+    { value: 0.50, color: '#e888bc' },
+    { value: 1.0,  color: '#d85ca0' },
+    { value: 2.0,  color: '#c03080' },
+    { value: 5.0,  color: '#9a105c' },
+  ],
+  'Nitrate': [
+    { value: 0,   color: '#f0e840' },
+    { value: 5,   color: '#f0c838' },
+    { value: 10,  color: '#e89838' },
+    { value: 20,  color: '#e06c38' },
+    { value: 40,  color: '#d44038' },
+    { value: 80,  color: '#c01828' },
+    { value: 160, color: '#880c18' },
+  ],
+  'GH (dGH)': [
+    { value: 0,  color: '#e8503c' },
+    { value: 1,  color: '#d0e890' },
+    { value: 2,  color: '#b0d870' },
+    { value: 3,  color: '#90c850' },
+    { value: 6,  color: '#68a838' },
+    { value: 10, color: '#448828' },
+    { value: 14, color: '#2a6818' },
+    { value: 21, color: '#144808' },
+  ],
+  'KH (dKH)': [
+    { value: 0,  color: '#f0e440' },
+    { value: 1,  color: '#c8daf0' },
+    { value: 2,  color: '#98c0e8' },
+    { value: 3,  color: '#70a8e0' },
+    { value: 4,  color: '#4890d8' },
+    { value: 6,  color: '#2870c0' },
+    { value: 8,  color: '#1450a0' },
+    { value: 10, color: '#083480' },
+    { value: 12, color: '#041c60' },
+  ],
+  'KH / Alk': [
+    { value: 0,  color: '#f0e440' },
+    { value: 1,  color: '#c8daf0' },
+    { value: 2,  color: '#98c0e8' },
+    { value: 3,  color: '#70a8e0' },
+    { value: 4,  color: '#4890d8' },
+    { value: 6,  color: '#2870c0' },
+    { value: 8,  color: '#1450a0' },
+    { value: 10, color: '#083480' },
+    { value: 12, color: '#041c60' },
+  ],
+}
+
+// API 5-in-1 Test Strips — dip strips. GH/KH shown in ppm (tube label) but stored as dGH/dKH.
+const PPM_TO_DEG = 17.848
+const TEST_STRIP_5IN1: Record<string, StripEntry[]> = {
+  'pH': [
+    { value: 6.0, color: '#f0d040' },
+    { value: 6.5, color: '#d4c028' },
+    { value: 7.0, color: '#9ab424' },
+    { value: 7.5, color: '#78a020' },
+    { value: 8.0, color: '#5090c0' },
+    { value: 8.5, color: '#3070a8' },
+    { value: 9.0, color: '#1a5090' },
+  ],
+  'Nitrite': [
+    { value: 0,   color: '#faf0f4' },
+    { value: 0.5, color: '#f0c0d4' },
+    { value: 1.0, color: '#e090b4' },
+    { value: 3.0, color: '#d05090' },
+    { value: 5.0, color: '#b02868' },
+    { value: 10,  color: '#880840' },
+  ],
+  'Nitrate': [
+    { value: 0,   color: '#f0e840' },
+    { value: 20,  color: '#f0c038' },
+    { value: 40,  color: '#e89038' },
+    { value: 80,  color: '#e05830' },
+    { value: 160, color: '#c82020' },
+    { value: 200, color: '#a00818' },
+  ],
+  // value stored as dGH, label shows ppm from the tube
+  'GH (dGH)': [
+    { value: 0,                         color: '#f4f0e0', label: '0 ppm'   },
+    { value: +(30  / PPM_TO_DEG).toFixed(1), color: '#c8e898', label: '30 ppm'  },
+    { value: +(60  / PPM_TO_DEG).toFixed(1), color: '#98d068', label: '60 ppm'  },
+    { value: +(120 / PPM_TO_DEG).toFixed(1), color: '#60a838', label: '120 ppm' },
+    { value: +(180 / PPM_TO_DEG).toFixed(1), color: '#286820', label: '180 ppm' },
+  ],
+  // value stored as dKH, label shows ppm from the tube
+  'KH (dKH)': [
+    { value: 0,                          color: '#f0e048', label: '0 ppm'   },
+    { value: +(40  / PPM_TO_DEG).toFixed(1), color: '#b8d8f0', label: '40 ppm'  },
+    { value: +(80  / PPM_TO_DEG).toFixed(1), color: '#88b8e0', label: '80 ppm'  },
+    { value: +(120 / PPM_TO_DEG).toFixed(1), color: '#5898d0', label: '120 ppm' },
+    { value: +(180 / PPM_TO_DEG).toFixed(1), color: '#2878c0', label: '180 ppm' },
+    { value: +(240 / PPM_TO_DEG).toFixed(1), color: '#0c5098', label: '240 ppm' },
+  ],
+  'KH / Alk': [
+    { value: 0,                          color: '#f0e048', label: '0 ppm'   },
+    { value: +(40  / PPM_TO_DEG).toFixed(1), color: '#b8d8f0', label: '40 ppm'  },
+    { value: +(80  / PPM_TO_DEG).toFixed(1), color: '#88b8e0', label: '80 ppm'  },
+    { value: +(120 / PPM_TO_DEG).toFixed(1), color: '#5898d0', label: '120 ppm' },
+    { value: +(180 / PPM_TO_DEG).toFixed(1), color: '#2878c0', label: '180 ppm' },
+    { value: +(240 / PPM_TO_DEG).toFixed(1), color: '#0c5098', label: '240 ppm' },
+  ],
+}
+
+const TEST_STRIP_VALUES = TEST_STRIP_MASTER
 
 // --- Species autocomplete ---
 function SpeciesAutocomplete({ type, value, onChange }: {
@@ -505,6 +637,8 @@ export default function TankDetail() {
   const [editQty, setEditQty] = useState('')
   const [editFishStatus, setEditFishStatus] = useState('added')
   const [editHealth, setEditHealth] = useState('')
+  const [editFoodTypes, setEditFoodTypes] = useState('')
+  const [editFeedingTimes, setEditFeedingTimes] = useState('')
   const [editNotes, setEditNotes] = useState('')
 
   const [plantSlug, setPlantSlug] = useState('')
@@ -526,6 +660,8 @@ export default function TankDetail() {
   const [kh, setKh] = useState('')
   const [salinity, setSalinity] = useState('')
   const [sg, setSg] = useState('')
+  const [stripModal, setStripModal] = useState<{ label: string; setter: (v: string) => void } | null>(null)
+  const [stripKit, setStripKit] = useState<'master' | '5in1'>('master')
 
   const [dailyTasks, setDailyTasks] = useState<any[]>([])
   const [dtName, setDtName] = useState('')
@@ -648,12 +784,14 @@ export default function TankDetail() {
     loadTasks()
   }
 
-  function startEditFish(f: { id: string; quantity: number; organism_type: string; fish_status: string; health_status: string; notes: string | null }) {
+  function startEditFish(f: { id: string; quantity: number; organism_type: string; fish_status: string; health_status: string; food_types: string | null; feeding_times_per_day: number | null; notes: string | null }) {
     setEditingFishId(f.id)
     setEditOrganismType(f.organism_type)
     setEditQty(String(f.quantity))
     setEditFishStatus(f.fish_status)
     setEditHealth(f.health_status)
+    setEditFoodTypes(f.food_types ?? '')
+    setEditFeedingTimes(f.feeding_times_per_day ? String(f.feeding_times_per_day) : '')
     setEditNotes(f.notes ?? '')
   }
 
@@ -664,10 +802,125 @@ export default function TankDetail() {
       organism_type: editOrganismType,
       fish_status: editFishStatus,
       health_status: editHealth,
+      food_types: editFoodTypes || null,
+      feeding_times_per_day: editFeedingTimes ? Number(editFeedingTimes) : null,
       notes: editNotes || null,
     })
     setEditingFishId(null)
     fish.reload()
+  }
+
+  function openCarersGuide(tank: Tank, inhabitants: typeof fish.data, plantList: typeof plants.data, pendingTaskList: typeof tasks) {
+    const today = new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })
+    const byType: Record<string, NonNullable<typeof fish.data>> = {}
+    ;(inhabitants ?? []).filter(f => f.fish_status === 'added').forEach(f => {
+      if (!byType[f.organism_type]) byType[f.organism_type] = []
+      byType[f.organism_type].push(f)
+    })
+    const typeLabel: Record<string, string> = { fish: 'Fish', invertebrate: 'Invertebrates', amphibian: 'Amphibians' }
+
+    const feedingRows = Object.entries(byType).flatMap(([oType, entries]) => {
+      const grouped = new Map<string, NonNullable<typeof fish.data>>()
+      entries.forEach(f => {
+        const key = f.species_slug
+        if (!grouped.has(key)) grouped.set(key, [])
+        grouped.get(key)!.push(f)
+      })
+      return [...grouped.entries()].map(([, rows]) => {
+        const first = rows[0]
+        const totalQty = rows.reduce((s, r) => s + r.quantity, 0)
+        const foodTypes = first.food_types ?? '—'
+        const feedTimes = first.feeding_times_per_day ? `${first.feeding_times_per_day}× daily` : '—'
+        return `
+          <tr>
+            <td>${first.common_name ?? first.species_slug}${first.latin_name ? `<br><em style="font-size:11px;color:#888">${first.latin_name}</em>` : ''}</td>
+            <td>${typeLabel[oType] ?? oType}</td>
+            <td>${totalQty}</td>
+            <td>${foodTypes}</td>
+            <td>${feedTimes}</td>
+            <td>${first.notes ?? '—'}</td>
+          </tr>`
+      })
+    }).join('')
+
+    const taskRows = (pendingTaskList ?? []).map(t => `
+      <tr>
+        <td>${t.task_type}</td>
+        <td>${t.description ?? '—'}</td>
+        <td>${t.due_at ? new Date(t.due_at).toLocaleDateString('en-GB') : '—'}</td>
+        <td>${t.is_recurring ? `Every ${t.recur_every_weeks ?? '?'} week(s)` : 'One-off'}</td>
+      </tr>`).join('')
+
+    const plantRows = (plantList ?? []).filter(p => p.plant_status === 'planted').map(p => `
+      <tr><td>${p.common_name ?? p.species_slug}</td><td>${p.quantity}</td><td>${p.notes ?? '—'}</td></tr>`).join('')
+
+    const heaterInfo = tank.has_heater ? (tank.heater_watts ? `${tank.heater_watts}W heater` : 'Yes') : 'No'
+
+    const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Carer's Guide — ${tank.name}</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-size: 13px; color: #1a1a1a; padding: 32px 40px; max-width: 900px; margin: 0 auto; }
+  h1 { font-size: 24px; font-weight: 600; margin-bottom: 4px; }
+  h2 { font-size: 15px; font-weight: 600; margin: 28px 0 10px; padding-bottom: 4px; border-bottom: 1.5px solid #e0e0e0; color: #333; }
+  .meta { font-size: 12px; color: #888; margin-bottom: 32px; }
+  table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  th { text-align: left; padding: 7px 10px; background: #f5f5f5; font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: #555; border-bottom: 1px solid #e0e0e0; }
+  td { padding: 8px 10px; border-bottom: 0.5px solid #eee; vertical-align: top; }
+  tr:last-child td { border-bottom: none; }
+  .overview-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 10px; margin-bottom: 8px; }
+  .stat { background: #f8f8f8; border-radius: 8px; padding: 10px 12px; }
+  .stat-label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.06em; color: #888; margin-bottom: 2px; }
+  .stat-value { font-size: 14px; font-weight: 600; color: #1a1a1a; }
+  .tip { background: #fffbe6; border: 1px solid #ffe58f; border-radius: 8px; padding: 10px 14px; font-size: 12px; color: #7d5a00; margin-top: 24px; }
+  @media print {
+    body { padding: 20px; }
+    button { display: none; }
+  }
+</style>
+</head>
+<body>
+<h1>${tank.name}</h1>
+<p class="meta">Carer's guide generated ${today}</p>
+
+<h2>Tank Overview</h2>
+<div class="overview-grid">
+  <div class="stat"><div class="stat-label">Volume</div><div class="stat-value">${tank.volume_litres}L</div></div>
+  <div class="stat"><div class="stat-label">Water Type</div><div class="stat-value">${tank.water_type.charAt(0).toUpperCase() + tank.water_type.slice(1)}</div></div>
+  <div class="stat"><div class="stat-label">Heater</div><div class="stat-value">${heaterInfo}</div></div>
+  <div class="stat"><div class="stat-label">CO₂</div><div class="stat-value">${tank.co2_injection ? 'Yes' : 'No'}</div></div>
+  ${tank.lighting ? `<div class="stat"><div class="stat-label">Lighting</div><div class="stat-value">${tank.lighting}</div></div>` : ''}
+  ${tank.filter_flow_lph ? `<div class="stat"><div class="stat-label">Filter</div><div class="stat-value">${tank.filter_flow_lph} L/h</div></div>` : ''}
+</div>
+
+${feedingRows ? `<h2>Feeding Schedule</h2>
+<table>
+  <thead><tr><th>Species</th><th>Type</th><th>Qty</th><th>Food</th><th>Frequency</th><th>Notes</th></tr></thead>
+  <tbody>${feedingRows}</tbody>
+</table>` : ''}
+
+${plantRows ? `<h2>Plants</h2>
+<table>
+  <thead><tr><th>Species</th><th>Qty</th><th>Notes</th></tr></thead>
+  <tbody>${plantRows}</tbody>
+</table>` : ''}
+
+${taskRows ? `<h2>Pending Maintenance</h2>
+<table>
+  <thead><tr><th>Task</th><th>Description</th><th>Due</th><th>Recurrence</th></tr></thead>
+  <tbody>${taskRows}</tbody>
+</table>` : ''}
+
+<div class="tip">💡 If you have any questions, contact the tank owner before making changes to feeding, equipment, or water chemistry.</div>
+<script>window.print()</script>
+</body>
+</html>`
+
+    const w = window.open('', '_blank')
+    if (w) { w.document.write(html); w.document.close() }
   }
 
   const dailyCellMap = useMemo(() => {
@@ -691,14 +944,23 @@ export default function TankDetail() {
 
   const pendingTasks = tasks.filter(t => t.status === 'pending')
   const doneTasks = tasks.filter(t => t.status === 'done')
-  const overdueTasks = pendingTasks.filter(t => new Date(t.due_at) < new Date())
+  const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0)
+  const overdueTasks = pendingTasks.filter(t => { const d = new Date(t.due_at); d.setHours(0, 0, 0, 0); return d < todayStart })
 
   return (
     <div>
       <div style={{ marginBottom: 24 }}>
-        <Link to="/" style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 13, color: 'var(--text-2)', textDecoration: 'none' }}>
-          <ChevronLeft size={13} />All tanks
-        </Link>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <Link to="/" style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 13, color: 'var(--text-2)', textDecoration: 'none' }}>
+            <ChevronLeft size={13} />All tanks
+          </Link>
+          <button
+            onClick={() => openCarersGuide(tank, fish.data ?? [], plants.data ?? [], tasks.filter(t => t.status === 'pending'))}
+            style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 12, padding: '5px 12px', borderRadius: 8, border: '0.5px solid var(--btn-border)', background: 'transparent', color: 'var(--text-2)', cursor: 'pointer' }}
+          >
+            <BookOpen size={13} />Carer's Guide
+          </button>
+        </div>
         <div style={{ marginTop: 8 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
             <h1 style={{ margin: 0, fontSize: 22, fontWeight: 500, color: 'var(--text)' }}>{tank.name}</h1>
@@ -827,11 +1089,21 @@ export default function TankDetail() {
                           const hc = HEALTH_COLORS[f.health_status] ?? HEALTH_COLORS.healthy
                           return (
                             <div key={f.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingLeft: entries.length > 1 ? 12 : 0, marginTop: entries.length > 1 ? 4 : 0 }}>
-                              <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                                <span style={{ fontSize: 12, color: 'var(--text-2)', minWidth: 28 }}>×{f.quantity}</span>
-                                <Tag bg={sc.bg} color={sc.color}>{cap(f.fish_status)}</Tag>
-                                {f.fish_status === 'added' && <Tag bg={hc.bg} color={hc.color}>{cap(f.health_status)}</Tag>}
-                                {f.notes && <span style={{ fontSize: 11, color: 'var(--text-2)' }}>{f.notes}</span>}
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                                <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                                  <span style={{ fontSize: 12, color: 'var(--text-2)', minWidth: 28 }}>×{f.quantity}</span>
+                                  <Tag bg={sc.bg} color={sc.color}>{cap(f.fish_status)}</Tag>
+                                  {f.fish_status === 'added' && <Tag bg={hc.bg} color={hc.color}>{cap(f.health_status)}</Tag>}
+                                  {f.notes && <span style={{ fontSize: 11, color: 'var(--text-2)' }}>{f.notes}</span>}
+                                </div>
+                                {(f.food_types || f.feeding_times_per_day) && (
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: 5, paddingLeft: entries.length > 1 ? 0 : 0 }}>
+                                    <Utensils size={10} style={{ color: 'var(--text-4)', flexShrink: 0 }} />
+                                    <span style={{ fontSize: 11, color: 'var(--text-3)' }}>
+                                      {[f.food_types, f.feeding_times_per_day ? `${f.feeding_times_per_day}× daily` : null].filter(Boolean).join(' · ')}
+                                    </span>
+                                  </div>
+                                )}
                               </div>
                               <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexShrink: 0 }}>
                                 <button onClick={() => startEditFish(f)} style={{ fontSize: 11, color: 'var(--text-2)', background: 'none', border: '0.5px solid var(--btn-border)', borderRadius: 6, padding: '2px 8px', cursor: 'pointer' }}>Edit</button>
@@ -974,7 +1246,18 @@ export default function TankDetail() {
               ] as [string, string, (v: string) => void][]).map(([lbl, val, set]) => (
                 <div key={lbl}>
                   <FieldLabel>{lbl}</FieldLabel>
-                  <input type="number" step="0.01" value={val} onChange={e => set(e.target.value)} style={{ width: '100%', boxSizing: 'border-box' }} />
+                  <div style={{ display: 'flex', gap: 4 }}>
+                    <input type="number" step="0.01" value={val} onChange={e => set(e.target.value)} style={{ flex: 1, minWidth: 0, boxSizing: 'border-box' }} />
+                    {TEST_STRIP_VALUES[lbl] && (
+                      <button
+                        title="Select from API test strip"
+                        onClick={() => setStripModal({ label: lbl, setter: set })}
+                        style={{ padding: '0 8px', borderRadius: 6, border: '0.5px solid var(--btn-border)', background: 'var(--surface-2)', color: 'var(--text-2)', cursor: 'pointer', display: 'flex', alignItems: 'center', flexShrink: 0 }}
+                      >
+                        <FlaskConical size={13} />
+                      </button>
+                    )}
+                  </div>
                 </div>
               ))}
             </div>
@@ -1095,13 +1378,17 @@ export default function TankDetail() {
             <Card>
               <SectionTitle>Upcoming</SectionTitle>
               {pendingTasks.map(t => {
-                const overdue = new Date(t.due_at) < new Date()
+                const today = new Date(); today.setHours(0, 0, 0, 0)
+                const due = new Date(t.due_at); due.setHours(0, 0, 0, 0)
+                const overdue = due < today
+                const dueToday = due.getTime() === today.getTime()
                 return (
                   <div key={t.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 0', borderBottom: '0.5px solid var(--border-sub)' }}>
                     <div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                         <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--text)' }}>{t.task_type}</span>
                         {overdue && <Tag compact bg="var(--red-bg)" color="var(--red)">Overdue</Tag>}
+                        {dueToday && <Tag compact bg="var(--amber-bg)" color="var(--amber)">Due today</Tag>}
                         {t.is_recurring && (
                           <Tag compact bg="var(--blue-bg)" color="var(--blue)">
                             ↻ every {t.recur_every_weeks === 1 ? 'week' : `${t.recur_every_weeks} weeks`} on {DAY_NAMES[t.recur_day_of_week]}
@@ -1109,7 +1396,7 @@ export default function TankDetail() {
                         )}
                       </div>
                       {t.description && <p style={{ margin: '2px 0 0', fontSize: 12, color: 'var(--text-2)' }}>{t.description}</p>}
-                      <p style={{ margin: '2px 0 0', fontSize: 11, color: overdue ? 'var(--red)' : 'var(--text-3)' }}>
+                      <p style={{ margin: '2px 0 0', fontSize: 11, color: overdue ? 'var(--red)' : dueToday ? 'var(--amber)' : 'var(--text-3)' }}>
                         Due {formatDate(t.due_at, dateFormat)}
                       </p>
                     </div>
@@ -1409,9 +1696,22 @@ export default function TankDetail() {
                 </select>
               </div>
             </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 120px', gap: 10, marginBottom: 12 }}>
+              <div>
+                <FieldLabel>Food Types</FieldLabel>
+                <input value={editFoodTypes} onChange={e => setEditFoodTypes(e.target.value)} placeholder="e.g. Flake, frozen bloodworm" style={{ width: '100%', boxSizing: 'border-box' }} />
+              </div>
+              <div>
+                <FieldLabel>Feeds Per Day</FieldLabel>
+                <select value={editFeedingTimes} onChange={e => setEditFeedingTimes(e.target.value)} style={{ width: '100%', boxSizing: 'border-box' }}>
+                  <option value="">—</option>
+                  {[1,2,3,4,5,6].map(n => <option key={n} value={n}>{n}×</option>)}
+                </select>
+              </div>
+            </div>
             <div style={{ marginBottom: 16 }}>
               <FieldLabel>Notes</FieldLabel>
-              <textarea value={editNotes} onChange={e => setEditNotes(e.target.value)} placeholder="e.g. Hikari micro pellets, twice daily" rows={2} style={{ width: '100%', boxSizing: 'border-box', resize: 'vertical' }} />
+              <textarea value={editNotes} onChange={e => setEditNotes(e.target.value)} placeholder="Any extra care notes" rows={2} style={{ width: '100%', boxSizing: 'border-box', resize: 'vertical' }} />
             </div>
             <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
               <button onClick={() => setEditingFishId(null)} style={{ padding: '7px 16px', borderRadius: 8, fontSize: 13, cursor: 'pointer', border: '0.5px solid var(--btn-border)', background: 'transparent', color: 'var(--text)' }}>Cancel</button>
@@ -1592,15 +1892,87 @@ export default function TankDetail() {
                 <span style={{ fontSize: 13, color: 'var(--text)' }}>{a.message}</span>
                 <p style={{ margin: '2px 0 0', fontSize: 11, color: 'var(--text-3)' }}>{formatDateTime(a.triggered_at, dateFormat)}</p>
               </div>
-              {!a.acknowledged && (
-                <button onClick={async () => { await api.alerts.acknowledge(id!, a.id); alerts.reload() }} style={{ fontSize: 11, background: 'none', border: '0.5px solid var(--btn-border)', borderRadius: 6, padding: '2px 8px', cursor: 'pointer', color: 'var(--text-2)', flexShrink: 0 }}>
-                  Ack
+              <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+                {!a.acknowledged && (
+                  <button onClick={async () => { await api.alerts.acknowledge(id!, a.id); alerts.reload() }} style={{ fontSize: 11, background: 'none', border: '0.5px solid var(--btn-border)', borderRadius: 6, padding: '2px 8px', cursor: 'pointer', color: 'var(--text-2)' }}>
+                    Ack
+                  </button>
+                )}
+                <button onClick={async () => { await api.alerts.delete(id!, a.id); alerts.reload() }} style={{ lineHeight: 0, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--red)', padding: '2px 4px' }}>
+                  <Trash2 size={13} />
                 </button>
-              )}
+              </div>
             </div>
           ))}
         </Card>
       )}
+
+      {stripModal && (() => {
+        const kitData = stripKit === '5in1' ? TEST_STRIP_5IN1 : TEST_STRIP_MASTER
+        const entries = kitData[stripModal.label]
+        const isGHKH5in1 = stripKit === '5in1' && (stripModal.label === 'GH (dGH)' || stripModal.label === 'KH (dKH)' || stripModal.label === 'KH / Alk')
+        return (
+          <div
+            style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 300, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}
+            onClick={() => setStripModal(null)}
+          >
+            <div
+              style={{ background: 'var(--surface)', borderRadius: 14, border: '0.5px solid var(--border)', width: '100%', maxWidth: 520, padding: '20px 20px 24px' }}
+              onClick={e => e.stopPropagation()}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+                <span style={{ fontWeight: 600, fontSize: 15, color: 'var(--text)' }}>{stripModal.label}</span>
+                <button onClick={() => setStripModal(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-2)', padding: 4, lineHeight: 0 }}>
+                  <X size={16} />
+                </button>
+              </div>
+              <div style={{ display: 'flex', gap: 6, marginBottom: 16 }}>
+                {(['master', '5in1'] as const).map(kit => (
+                  <button
+                    key={kit}
+                    onClick={() => setStripKit(kit)}
+                    style={{
+                      fontSize: 12, padding: '5px 12px', borderRadius: 7, cursor: 'pointer', fontWeight: 500,
+                      border: '0.5px solid var(--btn-border)',
+                      background: stripKit === kit ? 'var(--blue-bg)' : 'var(--surface-2)',
+                      color: stripKit === kit ? 'var(--blue)' : 'var(--text-2)',
+                    }}
+                  >
+                    {kit === 'master' ? 'Master Test Kit' : '5-in-1 Test Strip'}
+                  </button>
+                ))}
+              </div>
+              {!entries ? (
+                <p style={{ fontSize: 13, color: 'var(--text-3)', margin: 0 }}>
+                  This parameter is not measured by the 5-in-1 strip.
+                </p>
+              ) : (
+                <>
+                  {isGHKH5in1 && (
+                    <p style={{ fontSize: 11, color: 'var(--text-3)', margin: '0 0 12px' }}>
+                      Values shown in ppm (as printed on tube) — converted to dGH/dKH when saved.
+                    </p>
+                  )}
+                  <div style={{ display: 'grid', gridTemplateColumns: `repeat(${entries.length}, 1fr)`, gap: 6 }}>
+                    {entries.map(({ value, color, label }) => (
+                      <button
+                        key={value}
+                        onClick={() => { stripModal.setter(String(value)); setStripModal(null) }}
+                        style={{ border: '0.5px solid rgba(0,0,0,0.12)', borderRadius: 8, background: 'transparent', cursor: 'pointer', padding: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}
+                      >
+                        <div style={{ height: 52, background: color, width: '100%' }} />
+                        <div style={{ padding: '5px 2px', textAlign: 'center', fontSize: 11, fontWeight: 500, color: 'var(--text)', background: 'var(--surface-2)' }}>
+                          {label ?? value}
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        )
+      })()}
     </div>
   )
 }
