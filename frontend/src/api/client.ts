@@ -226,6 +226,8 @@ export const api = {
       get<Alert[]>(`/alerts/${tankId}/alerts?unacknowledged_only=${unacknowledgedOnly}`),
     acknowledge: (tankId: string, alertId: string) =>
       patch<Alert>(`/alerts/${tankId}/alerts/${alertId}/acknowledge`),
+    delete: (tankId: string, alertId: string) =>
+      del(`/alerts/${tankId}/alerts/${alertId}`),
   },
   maintenance: {
     list: (tankId: string) => get<MaintenanceTask[]>(`/tanks/${tankId}/maintenance`),

@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
-import { CalendarDays, Ruler, Info, Download, Upload, Droplets, RefreshCw } from 'lucide-react'
+import { CalendarDays, Ruler, Info, Download, Upload, Droplets, RefreshCw, Bell } from 'lucide-react'
 import { useSettings, formatDate, DateFormat, UnitSystem } from '../context/SettingsContext'
 import { Card } from '../components/ui'
 import { api, Tank } from '../api/client'
@@ -31,7 +31,7 @@ const UNIT_OPTIONS: { value: UnitSystem; label: string; example: string }[] = [
 ]
 
 export default function Settings() {
-  const { dateFormat, setDateFormat, unitSystem, setUnitSystem, defaultTank, setDefaultTank, loading } = useSettings()
+  const { dateFormat, setDateFormat, unitSystem, setUnitSystem, defaultTank, setDefaultTank, alertRetentionDays, setAlertRetentionDays, loading } = useSettings()
   const [tanks, setTanks] = useState<Tank[]>([])
 
   useEffect(() => {
@@ -118,10 +118,10 @@ export default function Settings() {
         App-wide settings for TankBook. There are no user accounts, so these apply to everyone using this instance.
       </p>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(380px, 1fr))', gap: 16, alignItems: 'start' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(380px, 1fr))', gap: 16 }}>
 
         {/* Left column — display preferences */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16, justifyContent: 'space-between', alignSelf: 'stretch' }}>
         <Card>
           <p style={{ fontWeight: 500, fontSize: 14, margin: '0 0 4px', color: 'var(--text)', display: 'flex', alignItems: 'center', gap: 6 }}><CalendarDays size={14} color="var(--text-2)" />Date Format</p>
           <p style={{ fontSize: 12, color: 'var(--text-2)', margin: '0 0 14px' }}>
@@ -187,6 +187,28 @@ export default function Settings() {
         </Card>
 
         <Card>
+          <p style={{ fontWeight: 500, fontSize: 14, margin: '0 0 4px', color: 'var(--text)', display: 'flex', alignItems: 'center', gap: 6 }}><Bell size={14} color="var(--text-2)" />Alert Retention</p>
+          <p style={{ fontSize: 12, color: 'var(--text-2)', margin: '0 0 14px' }}>
+            Alerts older than this are automatically deleted when you view a tank's alert tab. Set to indefinite to keep alerts until manually deleted.
+          </p>
+          <select
+            value={alertRetentionDays ?? ''}
+            onChange={e => setAlertRetentionDays(e.target.value ? Number(e.target.value) : null)}
+            style={{ width: '100%' }}
+          >
+            <option value="">Indefinite (manual delete only)</option>
+            <option value="7">7 days</option>
+            <option value="14">14 days</option>
+            <option value="30">30 days</option>
+            <option value="90">90 days</option>
+            <option value="365">1 year</option>
+          </select>
+        </Card>
+        </div>{/* end left column */}
+
+        {/* Right column — data & info */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16, justifyContent: 'space-between', alignSelf: 'stretch' }}>
+        <Card>
           <p style={{ fontWeight: 500, fontSize: 14, margin: '0 0 4px', color: 'var(--text)', display: 'flex', alignItems: 'center', gap: 6 }}><Droplets size={14} color="var(--text-2)" />Default Tank</p>
           <p style={{ fontSize: 12, color: 'var(--text-2)', margin: '0 0 14px' }}>
             Pre-selects this tank on pages with a tank dropdown, like the Livestock Journal.
@@ -202,10 +224,7 @@ export default function Settings() {
             ))}
           </select>
         </Card>
-        </div>{/* end left column */}
 
-        {/* Right column — data & info */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
         <Card>
           <p style={{ fontWeight: 500, fontSize: 14, margin: '0 0 4px', color: 'var(--text)', display: 'flex', alignItems: 'center', gap: 6 }}>
             <Download size={14} color="var(--text-2)" />Data Backup

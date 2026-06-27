@@ -21,7 +21,13 @@ def check_and_create_alerts(db: Session, tank_id: str, log: WaterParameter) -> l
     fish_rows = db.query(TankFish).filter_by(tank_id=tank_id).all()
     created = []
 
+    seen_slugs: set[str] = set()
     for fish_row in fish_rows:
+        if fish_row.fish_status != 'added':
+            continue
+        if fish_row.species_slug in seen_slugs:
+            continue
+        seen_slugs.add(fish_row.species_slug)
         species = species_service.get(fish_row.species_slug)
         if not species:
             continue
