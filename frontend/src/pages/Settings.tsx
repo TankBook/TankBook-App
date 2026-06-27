@@ -4,7 +4,7 @@ import { useSettings, formatDate, DateFormat, UnitSystem } from '../context/Sett
 import { Card } from '../components/ui'
 import { api, Tank } from '../api/client'
 
-const APP_VERSION = '0.5.0'
+const APP_VERSION = '0.6.0'
 const GITHUB_REPO = 'TankBook/TankBook-App'
 
 function semverNewer(current: string, latest: string): boolean {
