@@ -296,8 +296,8 @@ export default function Dashboard() {
 
   if (loading || !stats) return <p style={{ color: 'var(--text-2)' }}>Loading dashboard…</p>
 
-  const statsSidebar = (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+  const statsRow = (
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: 10, marginBottom: 24 }}>
       <StatCard label="Tanks" value={stats.total_tanks} icon={Layers} />
       <StatCard label="Fish" value={stats.total_fish} icon={Fish} />
       <StatCard label="Fish species" value={stats.total_species} icon={Fish} />
@@ -348,12 +348,12 @@ export default function Dashboard() {
     <div>
       <h1 style={{ margin: '0 0 20px', fontSize: 22, fontWeight: 500, color: 'var(--text)' }}>Dashboard</h1>
 
-      {isMobile && <div style={{ marginBottom: 20 }}>{statsSidebar}</div>}
+      {statsRow}
 
       <div style={{ display: 'flex', gap: 20, alignItems: 'flex-start' }}>
         <div style={{ flex: 1, minWidth: 0 }}>
           <p style={{ fontWeight: 500, fontSize: 15, margin: '0 0 12px', color: 'var(--text)' }}>Your Tanks</p>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 16 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 16 }}>
             {orderedTanks.map(t => (
               <TankOverviewCard
                 key={t.id}
@@ -399,8 +399,6 @@ export default function Dashboard() {
           </div>
           {upcomingTasks}
         </div>
-
-        {!isMobile && <div style={{ width: 220, flexShrink: 0 }}>{statsSidebar}</div>}
       </div>
 
       {showForm && (
