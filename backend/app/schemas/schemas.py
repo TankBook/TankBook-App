@@ -194,6 +194,7 @@ class AppSettingsUpdate(BaseModel):
     unit_system: str | None = None
     default_tank_id: str | None = None
     alert_retention_days: int | None = None
+    app_url: str | None = None
 
 
 class AppSettingsOut(BaseModel):
@@ -201,6 +202,7 @@ class AppSettingsOut(BaseModel):
     unit_system: str
     default_tank_id: str | None = None
     alert_retention_days: int | None = None
+    app_url: str | None = None
     updated_at: datetime
     model_config = {"from_attributes": True}
 

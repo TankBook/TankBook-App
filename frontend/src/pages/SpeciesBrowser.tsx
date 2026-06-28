@@ -3,6 +3,7 @@ import { Fish, Leaf, Upload, Link, Shrimp, Bug, Plus, Pencil, X, Download } from
 import { Tag, tabStyle, Card, FieldLabel } from '../components/ui'
 import { api } from '../api/client'
 import type { SpeciesBody } from '../api/client'
+import { useSettings } from '../context/SettingsContext'
 
 interface Species {
   slug: string
@@ -548,8 +549,9 @@ function SpeciesImage({ slug, size = 44 }: { slug: string; size?: number }) {
 function SpeciesDetailModal({ s, onClose, onEdit }: { s: Species; onClose: () => void; onEdit: () => void }) {
   const [copied, setCopied] = useState(false)
   const [lightbox, setLightbox] = useState(false)
+  const { appUrl } = useSettings()
   const yamlUrl = `/api/species/${s.slug}/yaml`
-  const hostedUrl = window.location.origin + yamlUrl
+  const hostedUrl = (appUrl ? appUrl.replace(/\/$/, '') : window.location.origin) + yamlUrl
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }

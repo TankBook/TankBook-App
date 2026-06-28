@@ -176,6 +176,7 @@ class AppSettings(Base):
     unit_system: Mapped[str] = mapped_column(String, default="cm")
     default_tank_id: Mapped[str | None] = mapped_column(String, nullable=True)
     alert_retention_days: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    app_url: Mapped[str | None] = mapped_column(String, nullable=True)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
 

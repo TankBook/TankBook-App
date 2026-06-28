@@ -13,6 +13,8 @@ interface SettingsContextValue {
   setDefaultTank: (id: string | null) => Promise<void>
   alertRetentionDays: number | null
   setAlertRetentionDays: (days: number | null) => Promise<void>
+  appUrl: string | null
+  setAppUrl: (url: string | null) => Promise<void>
   theme: Theme
   toggleTheme: () => void
   loading: boolean
@@ -27,6 +29,8 @@ const SettingsContext = createContext<SettingsContextValue>({
   setDefaultTank: async () => {},
   alertRetentionDays: null,
   setAlertRetentionDays: async () => {},
+  appUrl: null,
+  setAppUrl: async () => {},
   theme: 'light',
   toggleTheme: () => {},
   loading: true,
@@ -37,6 +41,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
   const [unitSystem, setUnitSystemState] = useState<UnitSystem>('cm')
   const [defaultTank, setDefaultTankState] = useState<string | null>(null)
   const [alertRetentionDays, setAlertRetentionDaysState] = useState<number | null>(null)
+  const [appUrl, setAppUrlState] = useState<string | null>(null)
   const [theme, setTheme] = useState<Theme>(
     () => (localStorage.getItem('theme') as Theme) ?? 'light'
   )
@@ -50,6 +55,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
         setUnitSystemState(d.unit_system ?? 'cm')
         setDefaultTankState(d.default_tank_id ?? null)
         setAlertRetentionDaysState(d.alert_retention_days ?? null)
+        setAppUrlState(d.app_url ?? null)
       })
       .catch(() => {})
       .finally(() => setLoading(false))
@@ -96,12 +102,21 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     })
   }
 
+  async function setAppUrl(url: string | null) {
+    setAppUrlState(url)
+    await fetch('/api/settings/', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ app_url: url || null }),
+    })
+  }
+
   function toggleTheme() {
     setTheme(t => (t === 'light' ? 'dark' : 'light'))
   }
 
   return (
-    <SettingsContext.Provider value={{ dateFormat, setDateFormat, unitSystem, setUnitSystem, defaultTank, setDefaultTank, alertRetentionDays, setAlertRetentionDays, theme, toggleTheme, loading }}>
+    <SettingsContext.Provider value={{ dateFormat, setDateFormat, unitSystem, setUnitSystem, defaultTank, setDefaultTank, alertRetentionDays, setAlertRetentionDays, appUrl, setAppUrl, theme, toggleTheme, loading }}>
       {children}
     </SettingsContext.Provider>
   )

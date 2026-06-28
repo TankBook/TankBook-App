@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
-import { CalendarDays, Ruler, Info, Download, Upload, Droplets, RefreshCw, Bell } from 'lucide-react'
+import { CalendarDays, Ruler, Info, Download, Upload, Droplets, RefreshCw, Bell, Globe } from 'lucide-react'
 import { useSettings, formatDate, DateFormat, UnitSystem } from '../context/SettingsContext'
 import { Card } from '../components/ui'
 import { api, Tank } from '../api/client'
@@ -31,7 +31,7 @@ const UNIT_OPTIONS: { value: UnitSystem; label: string; example: string }[] = [
 ]
 
 export default function Settings() {
-  const { dateFormat, setDateFormat, unitSystem, setUnitSystem, defaultTank, setDefaultTank, alertRetentionDays, setAlertRetentionDays, loading } = useSettings()
+  const { dateFormat, setDateFormat, unitSystem, setUnitSystem, defaultTank, setDefaultTank, alertRetentionDays, setAlertRetentionDays, appUrl, setAppUrl, loading } = useSettings()
   const [tanks, setTanks] = useState<Tank[]>([])
 
   useEffect(() => {
@@ -203,6 +203,20 @@ export default function Settings() {
             <option value="90">90 days</option>
             <option value="365">1 year</option>
           </select>
+        </Card>
+
+        <Card>
+          <p style={{ fontWeight: 500, fontSize: 14, margin: '0 0 4px', color: 'var(--text)', display: 'flex', alignItems: 'center', gap: 6 }}><Globe size={14} color="var(--text-2)" />App URL</p>
+          <p style={{ fontSize: 12, color: 'var(--text-2)', margin: '0 0 14px' }}>
+            The URL this instance is reachable at. Used when sharing species YAML links with other TankBook instances. Leave blank to use the browser's current origin.
+          </p>
+          <input
+            type="url"
+            value={appUrl ?? ''}
+            onChange={e => setAppUrl(e.target.value || null)}
+            placeholder={`e.g. http://192.168.1.100:3000`}
+            style={{ width: '100%', boxSizing: 'border-box' }}
+          />
         </Card>
         </div>{/* end left column */}
 
