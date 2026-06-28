@@ -641,6 +641,10 @@ export default function TankDetail() {
   const [editFeedingTimes, setEditFeedingTimes] = useState('')
   const [editNotes, setEditNotes] = useState('')
 
+  const [feedingModalFish, setFeedingModalFish] = useState<{ id: string; food_types: string | null; feeding_times_per_day: number | null } | null>(null)
+  const [feedingModalFood, setFeedingModalFood] = useState('')
+  const [feedingModalTimes, setFeedingModalTimes] = useState('')
+
   const [plantSlug, setPlantSlug] = useState('')
   const [plantName, setPlantName] = useState('')
   const [plantQty, setPlantQty] = useState('1')
@@ -1096,14 +1100,20 @@ ${taskRows ? `<h2>Pending Maintenance</h2>
                                   {f.fish_status === 'added' && <Tag bg={hc.bg} color={hc.color}>{cap(f.health_status)}</Tag>}
                                   {f.notes && <span style={{ fontSize: 11, color: 'var(--text-2)' }}>{f.notes}</span>}
                                 </div>
-                                {(f.food_types || f.feeding_times_per_day) && (
-                                  <div style={{ display: 'flex', alignItems: 'center', gap: 5, paddingLeft: entries.length > 1 ? 0 : 0 }}>
-                                    <Utensils size={10} style={{ color: 'var(--text-4)', flexShrink: 0 }} />
+                                <div
+                                  onClick={() => { setFeedingModalFish(f); setFeedingModalFood(f.food_types ?? ''); setFeedingModalTimes(f.feeding_times_per_day ? String(f.feeding_times_per_day) : '') }}
+                                  style={{ display: 'flex', alignItems: 'center', gap: 5, cursor: 'pointer' }}
+                                  title="Set feeding plan"
+                                >
+                                  <Utensils size={10} style={{ color: (f.food_types || f.feeding_times_per_day) ? 'var(--text-3)' : 'var(--text-4)', flexShrink: 0 }} />
+                                  {(f.food_types || f.feeding_times_per_day) ? (
                                     <span style={{ fontSize: 11, color: 'var(--text-3)' }}>
                                       {[f.food_types, f.feeding_times_per_day ? `${f.feeding_times_per_day}× daily` : null].filter(Boolean).join(' · ')}
                                     </span>
-                                  </div>
-                                )}
+                                  ) : (
+                                    <span style={{ fontSize: 11, color: 'var(--text-4)' }}>Set feeding plan</span>
+                                  )}
+                                </div>
                               </div>
                               <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexShrink: 0 }}>
                                 <button onClick={() => startEditFish(f)} style={{ fontSize: 11, color: 'var(--text-2)', background: 'none', border: '0.5px solid var(--btn-border)', borderRadius: 6, padding: '2px 8px', cursor: 'pointer' }}>Edit</button>
@@ -1431,158 +1441,151 @@ ${taskRows ? `<h2>Pending Maintenance</h2>
       )}
 
       {/* DAILY TAB */}
-      {tab === 'daily' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-          <Card style={{ padding: 0 }}>
-            {/* Grid header */}
-            <div style={{ display: 'grid', gridTemplateColumns: '60px repeat(7, 1fr)', background: 'var(--surface-2)', borderBottom: '0.5px solid var(--border)' }}>
-              <div style={{ padding: '8px 10px', fontSize: 11, color: 'var(--text-3)', fontWeight: 500 }}>Time</div>
-              {DAY_ABBR.map((d, i) => (
-                <div key={d} style={{
-                  padding: '8px 4px', fontSize: 11, fontWeight: 600, textAlign: 'center',
-                  color: i === todayColIndex ? 'var(--blue)' : 'var(--text-2)',
-                  background: i === todayColIndex ? 'var(--blue-bg)' : 'transparent',
-                }}>
-                  {d}
-                </div>
-              ))}
-            </div>
+      {tab === 'daily' && (() => {
+        const todayTasks = dailyTasks
+          .filter((t: any) => t.days.split(',').map(Number).includes(todayColIndex))
+          .sort((a: any, b: any) => a.hour !== b.hour ? a.hour - b.hour : a.minute - b.minute)
+        return (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
 
-            {/* Scrollable rows */}
-            <div>
-              {Array.from({ length: 24 }, (_, hour) => {
-                const rowHasTasks = [0, 1, 2, 3, 4, 5, 6].some(day => (dailyCellMap[`${day}-${hour}`]?.length ?? 0) > 0)
+            {/* Today's tasks */}
+            <Card>
+              <SectionTitle>Today's Tasks</SectionTitle>
+              {todayTasks.length === 0 && (
+                <p style={{ fontSize: 13, color: 'var(--text-2)', margin: 0 }}>No tasks scheduled for today.</p>
+              )}
+              {todayTasks.map((task: any) => {
+                const c = task.color ?? '#1e88e5'
                 return (
-                  <div key={hour} style={{
-                    display: 'grid',
-                    gridTemplateColumns: '60px repeat(7, 1fr)',
-                    borderBottom: '0.5px solid var(--border-sub)',
-                    minHeight: rowHasTasks ? undefined : 30,
-                    background: hour % 2 === 0 ? 'transparent' : 'var(--surface-2)',
-                  }}>
-                    <div style={{ padding: '7px 10px', fontSize: 11, color: 'var(--text-3)', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap', alignSelf: 'flex-start', paddingTop: 8 }}>
-                      {String(hour).padStart(2, '0')}:00
-                    </div>
-                    {[0, 1, 2, 3, 4, 5, 6].map(day => {
-                      const cellTasks = dailyCellMap[`${day}-${hour}`] ?? []
-                      return (
-                        <div key={day} style={{
-                          padding: '4px 3px',
-                          display: 'flex', flexDirection: 'column', gap: 2,
-                          background: day === todayColIndex ? 'var(--blue-bg)' : 'transparent',
-                        }}>
-                          {cellTasks.map((task: any) => {
-                            const c = task.color ?? '#1e88e5'
-                            return (
-                              <span key={task.id} title={`${task.name} — click × to remove`} style={{
-                                display: 'flex', alignItems: 'center', gap: 2,
-                                fontSize: 10, padding: '2px 5px', borderRadius: 4,
-                                background: `${c}22`, color: c,
-                                border: `0.5px solid ${c}55`,
-                                lineHeight: 1.3, overflow: 'hidden',
-                              }}>
-                                <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                  {task.name}
-                                </span>
-                                <span
-                                  onClick={() => removeDailyTask(task.id)}
-                                  style={{ cursor: 'pointer', opacity: 0.7, flexShrink: 0, lineHeight: 1, fontSize: 11 }}
-                                >×</span>
-                              </span>
-                            )
-                          })}
-                        </div>
-                      )
-                    })}
+                  <div key={task.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 0', borderBottom: '0.5px solid var(--border-sub)' }}>
+                    <span style={{ width: 6, height: 6, borderRadius: '50%', background: c, flexShrink: 0 }} />
+                    <span style={{ fontSize: 12, color: 'var(--text-3)', fontVariantNumeric: 'tabular-nums', flexShrink: 0, minWidth: 36 }}>
+                      {String(task.hour).padStart(2, '0')}:{String(task.minute).padStart(2, '0')}
+                    </span>
+                    <span style={{ fontSize: 13, color: 'var(--text)', flex: 1 }}>{task.name}</span>
+                    <span style={{ fontSize: 11, color: 'var(--text-3)', flexShrink: 0 }}>
+                      {task.days.split(',').map((d: string) => DAY_ABBR[Number(d)]).join(', ')}
+                    </span>
+                    <button onClick={() => removeDailyTask(task.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-3)', lineHeight: 0, padding: 2, flexShrink: 0 }}>
+                      <X size={13} />
+                    </button>
                   </div>
                 )
               })}
-            </div>
-          </Card>
+            </Card>
 
-          {/* Add task form */}
-          <Card>
-            <SectionTitle>Add Routine Task</SectionTitle>
-            <div style={{ display: 'flex', gap: 10, marginBottom: 12, flexWrap: 'wrap' }}>
-              <div style={{ flex: 1, minWidth: 160 }}>
-                <FieldLabel>Task Name</FieldLabel>
-                <input
-                  value={dtName} onChange={e => setDtName(e.target.value)}
-                  placeholder="e.g. Morning feed, CO2 on, Lights on"
-                  style={{ width: '100%', boxSizing: 'border-box' }}
-                  onKeyDown={e => e.key === 'Enter' && addDailyTask()}
-                />
+            {/* All scheduled tasks */}
+            {dailyTasks.filter((t: any) => !t.days.split(',').map(Number).includes(todayColIndex)).length > 0 && (
+              <Card>
+                <SectionTitle>Other Scheduled Tasks</SectionTitle>
+                {dailyTasks
+                  .filter((t: any) => !t.days.split(',').map(Number).includes(todayColIndex))
+                  .sort((a: any, b: any) => a.hour !== b.hour ? a.hour - b.hour : a.minute - b.minute)
+                  .map((task: any) => {
+                    const c = task.color ?? '#1e88e5'
+                    return (
+                      <div key={task.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 0', borderBottom: '0.5px solid var(--border-sub)' }}>
+                        <span style={{ width: 6, height: 6, borderRadius: '50%', background: c, flexShrink: 0 }} />
+                        <span style={{ fontSize: 12, color: 'var(--text-3)', fontVariantNumeric: 'tabular-nums', flexShrink: 0, minWidth: 36 }}>
+                          {String(task.hour).padStart(2, '0')}:{String(task.minute).padStart(2, '0')}
+                        </span>
+                        <span style={{ fontSize: 13, color: 'var(--text)', flex: 1 }}>{task.name}</span>
+                        <span style={{ fontSize: 11, color: 'var(--text-3)', flexShrink: 0 }}>
+                          {task.days.split(',').map((d: string) => DAY_ABBR[Number(d)]).join(', ')}
+                        </span>
+                        <button onClick={() => removeDailyTask(task.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-3)', lineHeight: 0, padding: 2, flexShrink: 0 }}>
+                          <X size={13} />
+                        </button>
+                      </div>
+                    )
+                  })}
+              </Card>
+            )}
+
+            {/* Add task form */}
+            <Card>
+              <SectionTitle>Add Routine Task</SectionTitle>
+              <div style={{ display: 'flex', gap: 10, marginBottom: 12, flexWrap: 'wrap' }}>
+                <div style={{ flex: 1, minWidth: 160 }}>
+                  <FieldLabel>Task Name</FieldLabel>
+                  <input
+                    value={dtName} onChange={e => setDtName(e.target.value)}
+                    placeholder="e.g. CO2 on, Lights on, Dose ferts"
+                    style={{ width: '100%', boxSizing: 'border-box' }}
+                    onKeyDown={e => e.key === 'Enter' && addDailyTask()}
+                  />
+                </div>
+                <div>
+                  <FieldLabel>Hour</FieldLabel>
+                  <select value={dtHour} onChange={e => setDtHour(e.target.value)} style={{ width: 80 }}>
+                    {Array.from({ length: 24 }, (_, h) => (
+                      <option key={h} value={h}>{String(h).padStart(2, '0')}:00</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <FieldLabel>Minute</FieldLabel>
+                  <select value={dtMinute} onChange={e => setDtMinute(e.target.value)} style={{ width: 70 }}>
+                    {[0, 15, 30, 45].map(m => (
+                      <option key={m} value={m}>{String(m).padStart(2, '0')}</option>
+                    ))}
+                  </select>
+                </div>
               </div>
-              <div>
-                <FieldLabel>Hour</FieldLabel>
-                <select value={dtHour} onChange={e => setDtHour(e.target.value)} style={{ width: 80 }}>
-                  {Array.from({ length: 24 }, (_, h) => (
-                    <option key={h} value={h}>{String(h).padStart(2, '0')}:00</option>
+
+              <div style={{ marginBottom: 12 }}>
+                <FieldLabel>Days</FieldLabel>
+                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
+                  {DAY_ABBR.map((d, i) => {
+                    const on = dtDays.includes(i)
+                    return (
+                      <button key={d} onClick={() => setDtDays(prev => on ? prev.filter(x => x !== i) : [...prev, i].sort())}
+                        style={{
+                          padding: '4px 10px', borderRadius: 6, fontSize: 12, cursor: 'pointer',
+                          border: on ? '0.5px solid var(--blue-border)' : '0.5px solid var(--btn-border)',
+                          background: on ? 'var(--blue-bg)' : 'transparent',
+                          color: on ? 'var(--blue)' : 'var(--text-2)',
+                          fontWeight: on ? 500 : 400,
+                        }}
+                      >{d}</button>
+                    )
+                  })}
+                  <button onClick={() => setDtDays(dtDays.length === 7 ? [] : [0, 1, 2, 3, 4, 5, 6])}
+                    style={{ padding: '4px 10px', borderRadius: 6, fontSize: 11, cursor: 'pointer', border: '0.5px solid var(--btn-border)', background: 'transparent', color: 'var(--text-3)' }}>
+                    {dtDays.length === 7 ? 'None' : 'Every day'}
+                  </button>
+                </div>
+              </div>
+
+              <div style={{ marginBottom: 14 }}>
+                <FieldLabel>Colour</FieldLabel>
+                <div style={{ display: 'flex', gap: 6 }}>
+                  {DAILY_COLORS.map(c => (
+                    <button key={c} onClick={() => setDtColor(c)} style={{
+                      width: 24, height: 24, borderRadius: 6, background: c, cursor: 'pointer',
+                      border: dtColor === c ? `2.5px solid var(--text)` : '2px solid transparent',
+                      padding: 0, flexShrink: 0,
+                    }} />
                   ))}
-                </select>
+                </div>
               </div>
-              <div>
-                <FieldLabel>Minute</FieldLabel>
-                <select value={dtMinute} onChange={e => setDtMinute(e.target.value)} style={{ width: 70 }}>
-                  {[0, 15, 30, 45].map(m => (
-                    <option key={m} value={m}>{String(m).padStart(2, '0')}</option>
-                  ))}
-                </select>
-              </div>
-            </div>
 
-            <div style={{ marginBottom: 12 }}>
-              <FieldLabel>Days</FieldLabel>
-              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
-                {DAY_ABBR.map((d, i) => {
-                  const on = dtDays.includes(i)
-                  return (
-                    <button key={d} onClick={() => setDtDays(prev => on ? prev.filter(x => x !== i) : [...prev, i].sort())}
-                      style={{
-                        padding: '4px 10px', borderRadius: 6, fontSize: 12, cursor: 'pointer',
-                        border: on ? '0.5px solid var(--blue-border)' : '0.5px solid var(--btn-border)',
-                        background: on ? 'var(--blue-bg)' : 'transparent',
-                        color: on ? 'var(--blue)' : 'var(--text-2)',
-                        fontWeight: on ? 500 : 400,
-                      }}
-                    >{d}</button>
-                  )
-                })}
-                <button onClick={() => setDtDays(dtDays.length === 7 ? [] : [0, 1, 2, 3, 4, 5, 6])}
-                  style={{ padding: '4px 10px', borderRadius: 6, fontSize: 11, cursor: 'pointer', border: '0.5px solid var(--btn-border)', background: 'transparent', color: 'var(--text-3)' }}>
-                  {dtDays.length === 7 ? 'None' : 'Every day'}
-                </button>
-              </div>
-            </div>
-
-            <div style={{ marginBottom: 14 }}>
-              <FieldLabel>Colour</FieldLabel>
-              <div style={{ display: 'flex', gap: 6 }}>
-                {DAILY_COLORS.map(c => (
-                  <button key={c} onClick={() => setDtColor(c)} style={{
-                    width: 24, height: 24, borderRadius: 6, background: c, cursor: 'pointer',
-                    border: dtColor === c ? `2.5px solid var(--text)` : '2px solid transparent',
-                    padding: 0, flexShrink: 0,
-                  }} />
-                ))}
-              </div>
-            </div>
-
-            <button
-              onClick={addDailyTask}
-              disabled={!dtName.trim() || dtDays.length === 0}
-              style={{
-                display: 'flex', alignItems: 'center', gap: 6,
-                padding: '7px 18px', borderRadius: 8, fontSize: 13, fontWeight: 500, cursor: 'pointer',
-                border: '0.5px solid var(--blue-border)', background: 'var(--blue-bg)', color: 'var(--blue)',
-                opacity: dtName.trim() && dtDays.length > 0 ? 1 : 0.45,
-              }}
-            >
-              <Plus size={13} />Add to schedule
-            </button>
-          </Card>
-        </div>
-      )}
+              <button
+                onClick={addDailyTask}
+                disabled={!dtName.trim() || dtDays.length === 0}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 6,
+                  padding: '7px 18px', borderRadius: 8, fontSize: 13, fontWeight: 500, cursor: 'pointer',
+                  border: '0.5px solid var(--blue-border)', background: 'var(--blue-bg)', color: 'var(--blue)',
+                  opacity: dtName.trim() && dtDays.length > 0 ? 1 : 0.45,
+                }}
+              >
+                <Plus size={13} />Add to schedule
+              </button>
+            </Card>
+          </div>
+        )
+      })()}
 
       {/* GALLERY TAB */}
       {tab === 'gallery' && (
@@ -1663,6 +1666,43 @@ ${taskRows ? `<h2>Pending Maintenance</h2>
 
       {/* EDIT TAB */}
       {tab === 'edit' && <EditTankPanel tank={tank} onSave={reloadTank} />}
+
+      {/* FEEDING PLAN MODAL */}
+      {feedingModalFish && (
+        <div onMouseDown={() => setFeedingModalFish(null)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', zIndex: 300, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+          <div onMouseDown={e => e.stopPropagation()} style={{ background: 'var(--surface)', border: '0.5px solid var(--border)', borderRadius: 14, padding: '1.5rem', width: 340, maxWidth: '100%', boxShadow: '0 12px 40px rgba(0,0,0,0.22)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+              <p style={{ margin: 0, fontWeight: 600, fontSize: 15, color: 'var(--text)', display: 'flex', alignItems: 'center', gap: 7 }}><Utensils size={14} />Feeding Plan</p>
+              <button onClick={() => setFeedingModalFish(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-2)', lineHeight: 0 }}><X size={18} /></button>
+            </div>
+            <div style={{ marginBottom: 12 }}>
+              <FieldLabel>Food Types</FieldLabel>
+              <input value={feedingModalFood} onChange={e => setFeedingModalFood(e.target.value)} placeholder="e.g. Flake, frozen bloodworm, pellets" style={{ width: '100%', boxSizing: 'border-box' }} />
+            </div>
+            <div style={{ marginBottom: 20 }}>
+              <FieldLabel>Feeds Per Day</FieldLabel>
+              <select value={feedingModalTimes} onChange={e => setFeedingModalTimes(e.target.value)} style={{ width: '100%', boxSizing: 'border-box' }}>
+                <option value="">Not set</option>
+                {[1,2,3,4,5,6].map(n => <option key={n} value={n}>{n}×</option>)}
+              </select>
+            </div>
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+              <button onClick={() => setFeedingModalFish(null)} style={{ padding: '7px 16px', borderRadius: 8, fontSize: 13, cursor: 'pointer', border: '0.5px solid var(--btn-border)', background: 'transparent', color: 'var(--text)' }}>Cancel</button>
+              <button
+                onClick={async () => {
+                  await api.fish.update(id!, feedingModalFish.id, {
+                    food_types: feedingModalFood || null,
+                    feeding_times_per_day: feedingModalTimes ? Number(feedingModalTimes) : null,
+                  })
+                  fish.reload()
+                  setFeedingModalFish(null)
+                }}
+                style={{ padding: '7px 16px', borderRadius: 8, fontSize: 13, fontWeight: 500, cursor: 'pointer', border: '0.5px solid var(--blue-border)', background: 'var(--blue-bg)', color: 'var(--blue)' }}
+              >Save</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* EDIT FISH MODAL */}
       {editingFishId && (
