@@ -641,9 +641,7 @@ export default function TankDetail() {
   const [editFeedingTimes, setEditFeedingTimes] = useState('')
   const [editNotes, setEditNotes] = useState('')
 
-  const [feedingModalFish, setFeedingModalFish] = useState<{ id: string; food_types: string | null; feeding_times_per_day: number | null } | null>(null)
-  const [feedingModalFood, setFeedingModalFood] = useState('')
-  const [feedingModalTimes, setFeedingModalTimes] = useState('')
+
 
   const [plantSlug, setPlantSlug] = useState('')
   const [plantName, setPlantName] = useState('')
@@ -1132,22 +1130,6 @@ ${taskRows ? `<h2>Pending Maintenance</h2>
                                   {f.fish_status === 'added' && <Tag bg={hc.bg} color={hc.color}>{cap(f.health_status)}</Tag>}
                                   {f.notes && <span style={{ fontSize: 11, color: 'var(--text-2)' }}>{f.notes}</span>}
                                 </div>
-                                {f.fish_status === 'added' && (
-                                  <div
-                                    onClick={() => { setFeedingModalFish(f); setFeedingModalFood(f.food_types ?? ''); setFeedingModalTimes(f.feeding_times_per_day ? String(f.feeding_times_per_day) : '') }}
-                                    style={{ display: 'flex', alignItems: 'center', gap: 5, cursor: 'pointer' }}
-                                    title="Set feeding plan"
-                                  >
-                                    <Utensils size={10} style={{ color: (f.food_types || f.feeding_times_per_day) ? 'var(--text-3)' : 'var(--text-4)', flexShrink: 0 }} />
-                                    {(f.food_types || f.feeding_times_per_day) ? (
-                                      <span style={{ fontSize: 11, color: 'var(--text-3)' }}>
-                                        {[f.food_types, f.feeding_times_per_day ? `${f.feeding_times_per_day}× daily` : null].filter(Boolean).join(' · ')}
-                                      </span>
-                                    ) : (
-                                      <span style={{ fontSize: 11, color: 'var(--text-4)' }}>Set feeding plan</span>
-                                    )}
-                                  </div>
-                                )}
                               </div>
                               <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexShrink: 0 }}>
                                 <button onClick={() => startEditFish(f)} style={{ fontSize: 11, color: 'var(--text-2)', background: 'none', border: '0.5px solid var(--btn-border)', borderRadius: 6, padding: '2px 8px', cursor: 'pointer' }}>Edit</button>
@@ -1728,41 +1710,6 @@ ${taskRows ? `<h2>Pending Maintenance</h2>
       {tab === 'edit' && <EditTankPanel tank={tank} onSave={reloadTank} />}
 
       {/* FEEDING PLAN MODAL */}
-      {feedingModalFish && (
-        <div onMouseDown={() => setFeedingModalFish(null)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', zIndex: 300, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-          <div onMouseDown={e => e.stopPropagation()} style={{ background: 'var(--surface)', border: '0.5px solid var(--border)', borderRadius: 14, padding: '1.5rem', width: 340, maxWidth: '100%', boxShadow: '0 12px 40px rgba(0,0,0,0.22)' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-              <p style={{ margin: 0, fontWeight: 600, fontSize: 15, color: 'var(--text)', display: 'flex', alignItems: 'center', gap: 7 }}><Utensils size={14} />Feeding Plan</p>
-              <button onClick={() => setFeedingModalFish(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-2)', lineHeight: 0 }}><X size={18} /></button>
-            </div>
-            <div style={{ marginBottom: 12 }}>
-              <FieldLabel>Food Types</FieldLabel>
-              <input value={feedingModalFood} onChange={e => setFeedingModalFood(e.target.value)} placeholder="e.g. Flake, frozen bloodworm, pellets" style={{ width: '100%', boxSizing: 'border-box' }} />
-            </div>
-            <div style={{ marginBottom: 20 }}>
-              <FieldLabel>Feeds Per Day</FieldLabel>
-              <select value={feedingModalTimes} onChange={e => setFeedingModalTimes(e.target.value)} style={{ width: '100%', boxSizing: 'border-box' }}>
-                <option value="">Not set</option>
-                {[1,2,3,4,5,6].map(n => <option key={n} value={n}>{n}×</option>)}
-              </select>
-            </div>
-            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-              <button onClick={() => setFeedingModalFish(null)} style={{ padding: '7px 16px', borderRadius: 8, fontSize: 13, cursor: 'pointer', border: '0.5px solid var(--btn-border)', background: 'transparent', color: 'var(--text)' }}>Cancel</button>
-              <button
-                onClick={async () => {
-                  await api.fish.update(id!, feedingModalFish.id, {
-                    food_types: feedingModalFood || null,
-                    feeding_times_per_day: feedingModalTimes ? Number(feedingModalTimes) : null,
-                  })
-                  fish.reload()
-                  setFeedingModalFish(null)
-                }}
-                style={{ padding: '7px 16px', borderRadius: 8, fontSize: 13, fontWeight: 500, cursor: 'pointer', border: '0.5px solid var(--blue-border)', background: 'var(--blue-bg)', color: 'var(--blue)' }}
-              >Save</button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* EDIT FISH MODAL */}
       {editingFishId && (
