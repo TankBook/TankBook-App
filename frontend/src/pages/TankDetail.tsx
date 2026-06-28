@@ -1479,13 +1479,39 @@ ${taskRows ? `<h2>Pending Maintenance</h2>
         const todayTasks = dailyTasks
           .filter((t: any) => t.days.split(',').map(Number).includes(todayColIndex))
           .sort((a: any, b: any) => a.hour !== b.hour ? a.hour - b.hour : a.minute - b.minute)
+
+        // Derive feeding entries from added inhabitants — one entry per unique species
+        const feedingEntries = (() => {
+          const seen = new Set<string>()
+          const entries: { name: string; times: number; food: string | null }[] = []
+          for (const f of (fish.data ?? [])) {
+            if (f.fish_status !== 'added' || !f.feeding_times_per_day) continue
+            if (seen.has(f.species_slug)) continue
+            seen.add(f.species_slug)
+            entries.push({ name: f.common_name ?? f.species_slug, times: f.feeding_times_per_day, food: f.food_types ?? null })
+          }
+          return entries
+        })()
+
         return (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
 
             {/* Today's tasks */}
             <Card>
               <SectionTitle>Today's Tasks</SectionTitle>
-              {todayTasks.length === 0 && (
+              {feedingEntries.map(entry => (
+                <div key={entry.name} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 0', borderBottom: '0.5px solid var(--border-sub)' }}>
+                  <Utensils size={12} style={{ color: 'var(--text-3)', flexShrink: 0 }} />
+                  <span style={{ fontSize: 13, color: 'var(--text)', flex: 1 }}>
+                    Feed {entry.name}
+                    {entry.food && <span style={{ fontSize: 11, color: 'var(--text-3)', marginLeft: 5 }}>({entry.food})</span>}
+                  </span>
+                  <span style={{ fontSize: 11, fontWeight: 500, color: 'var(--blue)', background: 'var(--blue-bg)', border: '0.5px solid var(--blue-border)', borderRadius: 5, padding: '1px 6px', flexShrink: 0 }}>
+                    ×{entry.times} daily
+                  </span>
+                </div>
+              ))}
+              {todayTasks.length === 0 && feedingEntries.length === 0 && (
                 <p style={{ fontSize: 13, color: 'var(--text-2)', margin: 0 }}>No tasks scheduled for today.</p>
               )}
               {todayTasks.map((task: any) => {
