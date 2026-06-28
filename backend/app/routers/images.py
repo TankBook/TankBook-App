@@ -1,5 +1,4 @@
 import json
-import os
 import urllib.parse
 import urllib.request
 import uuid
@@ -9,7 +8,7 @@ from fastapi.responses import FileResponse
 
 router = APIRouter()
 
-IMAGES_PATH = Path(os.environ.get("IMAGES_PATH", "images"))
+IMAGES_PATH = Path("/app/images")
 
 ALLOWED_TYPES = {"image/jpeg", "image/png", "image/webp", "image/gif"}
 EXT_MAP = {"image/jpeg": ".jpg", "image/png": ".png", "image/webp": ".webp", "image/gif": ".gif"}

@@ -1,4 +1,3 @@
-import os
 import yaml
 from pathlib import Path
 
@@ -8,7 +7,7 @@ class SpeciesService:
 
     def __init__(self):
         self._index: dict[str, dict] = {}
-        self._data_path = Path(os.environ.get("SPECIES_DATA_PATH", "species-data"))
+        self._data_path = Path("/app/species-data")
 
     def load(self):
         self._index.clear()

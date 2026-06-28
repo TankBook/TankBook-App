@@ -22,8 +22,6 @@ services:
         condition: service_healthy
     environment:
       DATABASE_URL: postgresql://${DB_USER:-tankbook}:${DB_PASSWORD:-changeme}@db/tankbook
-      SPECIES_DATA_PATH: /app/species-data
-      IMAGES_PATH: /app/images
     volumes:
       - species_data:/app/species-data
       - tankbook-images:/app/images
