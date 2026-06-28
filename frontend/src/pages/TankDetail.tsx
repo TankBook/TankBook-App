@@ -919,7 +919,10 @@ ${taskRows ? `<h2>Pending Maintenance</h2>
 </table>` : ''}
 
 <div class="tip">💡 If you have any questions, contact the tank owner before making changes to feeding, equipment, or water chemistry.</div>
-<script>window.print()</script>
+
+<div class="no-print" style="margin-top:32px;text-align:center">
+  <button onclick="window.print()" style="padding:10px 28px;font-size:14px;font-weight:600;border-radius:8px;border:1.5px solid #1e88e5;background:#e3f2fd;color:#1e88e5;cursor:pointer;">🖨️ Print / Save as PDF</button>
+</div>
 </body>
 </html>`
 
