@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Layers, Fish, Leaf, Bug, Waves, Bell, Clock, Plus, AlertTriangle, Timer, Thermometer, FlaskConical, GripVertical, type LucideIcon } from 'lucide-react'
+import { Layers, Fish, Leaf, Bug, Waves, Bell, Clock, Plus, AlertTriangle, Timer, Thermometer, FlaskConical, GripVertical, Filter, type LucideIcon } from 'lucide-react'
 import { useTanks } from '../hooks'
 import { api } from '../api/client'
 import { useSettings, formatDate, toMM, dimInputProps } from '../context/SettingsContext'
@@ -18,7 +18,7 @@ interface DashboardStats {
     description: string | null; due_at: string; is_recurring: boolean
   }>
   tanks: Array<{
-    id: string; name: string; volume_litres: number; water_type: string; co2_injection: boolean; has_heater: boolean
+    id: string; name: string; volume_litres: number; water_type: string; co2_injection: boolean; has_heater: boolean; filter_flow_lph: number | null
     substrate: string | null
     fish_count: number; fish_species: number
     invertebrate_count: number; invertebrate_species: number
@@ -110,6 +110,11 @@ function TankOverviewCard({ tank, drag }: { tank: DashboardStats['tanks'][0]; dr
             {tank.has_heater && (
               <span title="Heater" style={{ display: 'inline-flex', alignItems: 'center', gap: 3, fontSize: 11, color: 'var(--orange, #ef6c00)', background: 'var(--orange-bg)', padding: '1px 6px', borderRadius: 5, border: '0.5px solid var(--orange-border, color-mix(in srgb, var(--orange, #ef6c00) 30%, transparent))' }}>
                 <Thermometer size={11} /> Heater
+              </span>
+            )}
+            {tank.filter_flow_lph && (
+              <span title={`Filter — ${tank.filter_flow_lph} L/h`} style={{ display: 'inline-flex', alignItems: 'center', gap: 3, fontSize: 11, color: 'var(--blue)', background: 'var(--blue-bg)', padding: '1px 6px', borderRadius: 5, border: '0.5px solid var(--blue-border, color-mix(in srgb, var(--blue) 30%, transparent))' }}>
+                <Filter size={11} /> Filter
               </span>
             )}
             {tank.co2_injection && (
