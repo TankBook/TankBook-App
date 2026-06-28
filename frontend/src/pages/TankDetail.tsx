@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
-import { Fish, Leaf, Droplets, CalendarClock, Bell, Pencil, Trash2, Plus, ChevronLeft, Sun, Camera, X, Utensils, BookOpen, FlaskConical, ChevronLeft as Prev, ChevronRight as Next, type LucideIcon } from 'lucide-react'
+import { Fish, Leaf, Droplets, CalendarClock, Bell, Pencil, Trash2, Plus, ChevronLeft, Sun, Camera, X, Utensils, BookOpen, FlaskConical, Thermometer, Filter, Layers, Lightbulb, Ruler, ChevronLeft as Prev, ChevronRight as Next, type LucideIcon } from 'lucide-react'
 import {
   LineChart, Line, XAxis, YAxis, Tooltip,
   ResponsiveContainer,
@@ -980,15 +980,44 @@ ${taskRows ? `<h2>Pending Maintenance</h2>
               return s ? <Tag bg={s.bg} color={s.color}>{s.label}</Tag> : null
             })()}
           </div>
-          <p style={{ margin: 0, fontSize: 13, color: 'var(--text-2)' }}>
-            {tank.volume_litres}L
-            {(tank.width_mm || tank.height_mm || tank.depth_mm) ? ` · ${fmtDim(tank.width_mm, unitSystem)} × ${fmtDim(tank.height_mm, unitSystem)} × ${fmtDim(tank.depth_mm, unitSystem)}` : ''}
-            {tank.co2_injection ? ' · CO₂' : ''}
-            {tank.has_heater ? ` · ${tank.heater_watts ? `${tank.heater_watts}W heater` : 'heater'}` : ''}
-            {tank.substrate ? ` · ${tank.substrate}` : ''}
-            {tank.lighting ? ` · ${tank.lighting}` : ''}
-            {tank.filter_flow_lph ? ` · ${tank.filter_flow_lph} L/h filter` : ''}
-          </p>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 4, flexWrap: 'wrap' }}>
+            <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-2)' }}>{tank.volume_litres} L</span>
+            {(tank.width_mm || tank.height_mm || tank.depth_mm) && (
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3, fontSize: 12, color: 'var(--text-3)' }}>
+                <Ruler size={11} />
+                {fmtDim(tank.width_mm, unitSystem)} × {fmtDim(tank.height_mm, unitSystem)} × {fmtDim(tank.depth_mm, unitSystem)}
+              </span>
+            )}
+          </div>
+          {(tank.has_heater || tank.co2_injection || tank.filter_flow_lph || tank.substrate || tank.lighting) && (
+            <div style={{ display: 'flex', gap: 6, marginTop: 8, flexWrap: 'wrap' }}>
+              {tank.has_heater && (
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11, fontWeight: 500, padding: '3px 8px', borderRadius: 6, background: 'var(--orange-bg)', color: 'var(--orange)', border: '0.5px solid var(--orange-border)' }}>
+                  <Thermometer size={11} />{tank.heater_watts ? `${tank.heater_watts}W Heater` : 'Heater'}
+                </span>
+              )}
+              {tank.co2_injection && (
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11, fontWeight: 500, padding: '3px 8px', borderRadius: 6, background: 'var(--green-bg)', color: 'var(--green)', border: '0.5px solid var(--green-border)' }}>
+                  <FlaskConical size={11} />CO₂
+                </span>
+              )}
+              {tank.filter_flow_lph && (
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11, fontWeight: 500, padding: '3px 8px', borderRadius: 6, background: 'var(--blue-bg)', color: 'var(--blue)', border: '0.5px solid var(--blue-border)' }}>
+                  <Filter size={11} />{tank.filter_flow_lph} L/h
+                </span>
+              )}
+              {tank.substrate && (
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11, fontWeight: 500, padding: '3px 8px', borderRadius: 6, background: 'var(--amber-bg)', color: 'var(--amber)', border: '0.5px solid var(--amber-border)' }}>
+                  <Layers size={11} />{tank.substrate}
+                </span>
+              )}
+              {tank.lighting && (
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11, fontWeight: 500, padding: '3px 8px', borderRadius: 6, background: 'var(--surface-2)', color: 'var(--text-2)', border: '0.5px solid var(--border)' }}>
+                  <Lightbulb size={11} />{tank.lighting}
+                </span>
+              )}
+            </div>
+          )}
         </div>
       </div>
 
