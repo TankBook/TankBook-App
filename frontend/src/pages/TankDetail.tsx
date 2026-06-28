@@ -1100,20 +1100,22 @@ ${taskRows ? `<h2>Pending Maintenance</h2>
                                   {f.fish_status === 'added' && <Tag bg={hc.bg} color={hc.color}>{cap(f.health_status)}</Tag>}
                                   {f.notes && <span style={{ fontSize: 11, color: 'var(--text-2)' }}>{f.notes}</span>}
                                 </div>
-                                <div
-                                  onClick={() => { setFeedingModalFish(f); setFeedingModalFood(f.food_types ?? ''); setFeedingModalTimes(f.feeding_times_per_day ? String(f.feeding_times_per_day) : '') }}
-                                  style={{ display: 'flex', alignItems: 'center', gap: 5, cursor: 'pointer' }}
-                                  title="Set feeding plan"
-                                >
-                                  <Utensils size={10} style={{ color: (f.food_types || f.feeding_times_per_day) ? 'var(--text-3)' : 'var(--text-4)', flexShrink: 0 }} />
-                                  {(f.food_types || f.feeding_times_per_day) ? (
-                                    <span style={{ fontSize: 11, color: 'var(--text-3)' }}>
-                                      {[f.food_types, f.feeding_times_per_day ? `${f.feeding_times_per_day}× daily` : null].filter(Boolean).join(' · ')}
-                                    </span>
-                                  ) : (
-                                    <span style={{ fontSize: 11, color: 'var(--text-4)' }}>Set feeding plan</span>
-                                  )}
-                                </div>
+                                {f.fish_status === 'added' && (
+                                  <div
+                                    onClick={() => { setFeedingModalFish(f); setFeedingModalFood(f.food_types ?? ''); setFeedingModalTimes(f.feeding_times_per_day ? String(f.feeding_times_per_day) : '') }}
+                                    style={{ display: 'flex', alignItems: 'center', gap: 5, cursor: 'pointer' }}
+                                    title="Set feeding plan"
+                                  >
+                                    <Utensils size={10} style={{ color: (f.food_types || f.feeding_times_per_day) ? 'var(--text-3)' : 'var(--text-4)', flexShrink: 0 }} />
+                                    {(f.food_types || f.feeding_times_per_day) ? (
+                                      <span style={{ fontSize: 11, color: 'var(--text-3)' }}>
+                                        {[f.food_types, f.feeding_times_per_day ? `${f.feeding_times_per_day}× daily` : null].filter(Boolean).join(' · ')}
+                                      </span>
+                                    ) : (
+                                      <span style={{ fontSize: 11, color: 'var(--text-4)' }}>Set feeding plan</span>
+                                    )}
+                                  </div>
+                                )}
                               </div>
                               <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexShrink: 0 }}>
                                 <button onClick={() => startEditFish(f)} style={{ fontSize: 11, color: 'var(--text-2)', background: 'none', border: '0.5px solid var(--btn-border)', borderRadius: 6, padding: '2px 8px', cursor: 'pointer' }}>Edit</button>
