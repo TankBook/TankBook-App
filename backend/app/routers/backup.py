@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models.models import (
     Tank, TankFish, TankPlant, WaterParameter, MaintenanceTask,
-    Alert, DailyTask, JournalEntry, AppSettings,
+    Alert, DailyTask, JournalEntry, AppSettings, Expense,
 )
 
 router = APIRouter()
@@ -41,6 +41,7 @@ def export_backup(db: Session = Depends(get_db)):
 
         tanks_out.append({
             "id": tank.id, "name": tank.name, "volume_litres": tank.volume_litres,
+            "water_type": tank.water_type, "sort_order": tank.sort_order,
             "substrate": tank.substrate, "lighting": tank.lighting,
             "filter_flow_lph": tank.filter_flow_lph,
             "width_mm": tank.width_mm, "height_mm": tank.height_mm, "depth_mm": tank.depth_mm,
@@ -49,7 +50,9 @@ def export_backup(db: Session = Depends(get_db)):
             "setup_date": _dt(tank.setup_date), "created_at": _dt(tank.created_at),
             "fish": [{"id": r.id, "species_slug": r.species_slug, "quantity": r.quantity,
                       "organism_type": r.organism_type, "fish_status": r.fish_status,
-                      "health_status": r.health_status, "notes": r.notes, "added_at": _dt(r.added_at)}
+                      "health_status": r.health_status, "food_types": r.food_types,
+                      "feeding_times_per_day": r.feeding_times_per_day,
+                      "notes": r.notes, "added_at": _dt(r.added_at)}
                      for r in fish],
             "plants": [{"id": r.id, "species_slug": r.species_slug, "quantity": r.quantity,
                         "notes": r.notes, "added_at": _dt(r.added_at)}
@@ -57,6 +60,7 @@ def export_backup(db: Session = Depends(get_db)):
             "parameters": [{"id": r.id, "ph": r.ph, "ammonia_ppm": r.ammonia_ppm,
                              "nitrite_ppm": r.nitrite_ppm, "nitrate_ppm": r.nitrate_ppm,
                              "temperature_c": r.temperature_c, "gh_dgh": r.gh_dgh, "kh_dkh": r.kh_dkh,
+                             "salinity_ppt": r.salinity_ppt, "specific_gravity": r.specific_gravity,
                              "notes": r.notes, "recorded_at": _dt(r.recorded_at)}
                             for r in parameters],
             "maintenance_tasks": [{"id": r.id, "task_type": r.task_type, "description": r.description,
@@ -79,14 +83,25 @@ def export_backup(db: Session = Depends(get_db)):
                                  for r in journal],
         })
 
+    expenses_out = [
+        {"id": e.id, "tank_id": e.tank_id, "amount": e.amount, "category": e.category,
+         "description": e.description, "purchase_date": e.purchase_date,
+         "notes": e.notes, "created_at": _dt(e.created_at)}
+        for e in db.query(Expense).all()
+    ]
+
     return {
         "exported_at": datetime.utcnow().isoformat(),
         "version": BACKUP_VERSION,
         "settings": {
             "date_format": settings.date_format if settings else "DD/MM/YYYY",
             "unit_system": settings.unit_system if settings else "cm",
+            "default_tank_id": settings.default_tank_id if settings else None,
+            "alert_retention_days": settings.alert_retention_days if settings else None,
+            "app_url": settings.app_url if settings else None,
         },
         "tanks": tanks_out,
+        "expenses": expenses_out,
     }
 
 
@@ -98,6 +113,8 @@ def import_backup(payload: dict, db: Session = Depends(get_db)):
     # Wipe existing data — ORM delete cascades all children
     for tank in db.query(Tank).all():
         db.delete(tank)
+    for expense in db.query(Expense).all():
+        db.delete(expense)
     db.commit()
 
     # Restore settings
@@ -108,12 +125,16 @@ def import_backup(payload: dict, db: Session = Depends(get_db)):
         db.add(s)
     s.date_format = src_settings.get("date_format", "DD/MM/YYYY")
     s.unit_system = src_settings.get("unit_system", "cm")
+    s.default_tank_id = src_settings.get("default_tank_id")
+    s.alert_retention_days = src_settings.get("alert_retention_days")
+    s.app_url = src_settings.get("app_url")
     db.commit()
 
     tanks_restored = 0
     for t in payload.get("tanks", []):
         tank = Tank(
             id=t["id"], name=t["name"], volume_litres=t["volume_litres"],
+            water_type=t.get("water_type", "freshwater"), sort_order=t.get("sort_order", 0),
             substrate=t.get("substrate"), lighting=t.get("lighting"),
             filter_flow_lph=t.get("filter_flow_lph"),
             width_mm=t.get("width_mm"), height_mm=t.get("height_mm"), depth_mm=t.get("depth_mm"),
@@ -131,6 +152,7 @@ def import_backup(payload: dict, db: Session = Depends(get_db)):
                 id=f["id"], tank_id=tank.id, species_slug=f["species_slug"],
                 quantity=f["quantity"], organism_type=f.get("organism_type", "fish"),
                 fish_status=f.get("fish_status", "added"), health_status=f.get("health_status", "healthy"),
+                food_types=f.get("food_types"), feeding_times_per_day=f.get("feeding_times_per_day"),
                 notes=f.get("notes"), added_at=_parse_dt(f.get("added_at")) or datetime.utcnow(),
             ))
         db.flush()
@@ -148,6 +170,7 @@ def import_backup(payload: dict, db: Session = Depends(get_db)):
                 id=p["id"], tank_id=tank.id, ph=p.get("ph"), ammonia_ppm=p.get("ammonia_ppm"),
                 nitrite_ppm=p.get("nitrite_ppm"), nitrate_ppm=p.get("nitrate_ppm"),
                 temperature_c=p.get("temperature_c"), gh_dgh=p.get("gh_dgh"), kh_dkh=p.get("kh_dkh"),
+                salinity_ppt=p.get("salinity_ppt"), specific_gravity=p.get("specific_gravity"),
                 notes=p.get("notes"), recorded_at=_parse_dt(p.get("recorded_at")) or datetime.utcnow(),
             ))
         db.flush()
@@ -191,6 +214,15 @@ def import_backup(payload: dict, db: Session = Depends(get_db)):
             ))
 
         tanks_restored += 1
+
+    # Restore expenses (top-level, not per-tank)
+    for e in payload.get("expenses", []):
+        db.add(Expense(
+            id=e["id"], tank_id=e.get("tank_id"), amount=e["amount"],
+            category=e["category"], description=e.get("description"),
+            purchase_date=e["purchase_date"], notes=e.get("notes"),
+            created_at=_parse_dt(e.get("created_at")) or datetime.utcnow(),
+        ))
 
     db.commit()
     return {"ok": True, "tanks_restored": tanks_restored}
