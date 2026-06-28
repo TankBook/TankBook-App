@@ -4,6 +4,27 @@ All notable changes to TankBook are documented here.
 
 ---
 
+## [0.6.1] — 2026-06-28
+
+### Fixed
+- Planned and removed inhabitants are now excluded from all dashboard counts (fish, species, sidebar totals).
+- Maintenance tasks due today no longer appear as overdue in the dashboard sidebar count.
+- Feeding plan is now only editable on inhabitants with status "Added" — planned inhabitants no longer show the option.
+- Carer's guide no longer auto-opens the print dialog; a print button is shown at the bottom of the guide instead.
+- `.env.example` corrected — `DATABASE_URL` removed as Docker Compose constructs it automatically from `DB_USER` and `DB_PASSWORD`.
+
+### Improvements
+- Dashboard stats moved from a right-hand sidebar to a row of cards at the top, below the page title.
+- Tank cards on the dashboard now show 2 per row.
+- Filter badge added to dashboard tank cards when `filter_flow_lph` is set, matching the existing Heater and CO₂ badges.
+- Daily tab replaced: the 7-day/24-hour grid is gone. Today's tasks are shown as a simple list; other scheduled tasks appear in a separate section below.
+- Feeding plan moved from the daily tab to each inhabitant card — click the utensil icon to set food types and feeds per day without opening the full edit form.
+- Docker image now builds for both `linux/amd64` and `linux/arm64` (Raspberry Pi support).
+- GitHub issue templates added for bug reports and feature requests.
+- Configurable App URL setting added — set your instance's IP/hostname so species YAML shared links use the correct address instead of `localhost`.
+
+---
+
 ## [0.6.0] — 2026-06-27
 
 ### Features
