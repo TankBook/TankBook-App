@@ -82,9 +82,9 @@ def dashboard_stats(db=Depends(get_db)):
 
     today_start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
 
-    fish_count = db.query(func.sum(TankFish.quantity)).filter(TankFish.tank_id.in_(tank_ids)).scalar() or 0
+    fish_count = db.query(func.sum(TankFish.quantity)).filter(TankFish.tank_id.in_(tank_ids), TankFish.fish_status == "added").scalar() or 0
     plant_count = db.query(func.sum(TankPlant.quantity)).filter(TankPlant.tank_id.in_(tank_ids)).scalar() or 0
-    species_count = db.query(func.count(func.distinct(TankFish.species_slug))).filter(TankFish.tank_id.in_(tank_ids)).scalar() or 0
+    species_count = db.query(func.count(func.distinct(TankFish.species_slug))).filter(TankFish.tank_id.in_(tank_ids), TankFish.fish_status == "added").scalar() or 0
     unack_alerts = db.query(Alert).filter(Alert.tank_id.in_(tank_ids), Alert.acknowledged == False).count()
     overdue_tasks = db.query(MaintenanceTask).filter(
         MaintenanceTask.tank_id.in_(tank_ids),
@@ -100,7 +100,7 @@ def dashboard_stats(db=Depends(get_db)):
     tank_summaries = []
     for tank in tanks:
         latest = db.query(WaterParameter).filter_by(tank_id=tank.id).order_by(WaterParameter.recorded_at.desc()).first()
-        fish = db.query(TankFish).filter_by(tank_id=tank.id).all()
+        fish = db.query(TankFish).filter_by(tank_id=tank.id, fish_status="added").all()
         plants = db.query(TankPlant).filter_by(tank_id=tank.id).all()
         tank_alerts = db.query(Alert).filter_by(tank_id=tank.id, acknowledged=False).count()
         tank_overdue = db.query(MaintenanceTask).filter(
