@@ -1114,18 +1114,19 @@ ${taskRows ? `<h2>Pending Maintenance</h2>
               if (ofType.length === 0) return null
               const grouped = new Map<string, FishEntry[]>()
               for (const f of ofType) {
-                if (!grouped.has(f.species_slug)) grouped.set(f.species_slug, [])
-                grouped.get(f.species_slug)!.push(f)
+                const key = `${f.species_slug}::${f.fish_status}`
+                if (!grouped.has(key)) grouped.set(key, [])
+                grouped.get(key)!.push(f)
               }
               return (
                 <div key={oType} style={{ marginBottom: 16 }}>
                   <p style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.06em', margin: '0 0 8px' }}>{oLabel}</p>
-                  {[...grouped.entries()].map(([slug, entries]) => {
+                  {[...grouped.entries()].map(([, entries]) => {
                     const first = entries[0]
                     return (
-                      <div key={slug} style={{ borderBottom: '0.5px solid var(--border-sub)', padding: '10px 0' }}>
+                      <div key={`${first.species_slug}::${first.fish_status}`} style={{ borderBottom: '0.5px solid var(--border-sub)', padding: '10px 0' }}>
                         <div style={{ marginBottom: entries.length > 1 ? 6 : 0 }}>
-                          <span style={{ fontSize: 13, color: 'var(--text)', fontWeight: 500 }}>{first.common_name ?? slug}</span>
+                          <span style={{ fontSize: 13, color: 'var(--text)', fontWeight: 500 }}>{first.common_name ?? first.species_slug}</span>
                           {first.latin_name && <span style={{ fontSize: 11, color: 'var(--text-3)', fontStyle: 'italic', marginLeft: 8 }}>{first.latin_name}</span>}
                         </div>
                         {entries.map(f => {
@@ -1759,7 +1760,7 @@ ${taskRows ? `<h2>Pending Maintenance</h2>
               <p style={{ margin: 0, fontWeight: 600, fontSize: 15, color: 'var(--text)' }}>Edit Inhabitant</p>
               <button onClick={() => setEditingFishId(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-2)', lineHeight: 0 }}><X size={18} /></button>
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '80px 1fr 1fr', gap: 10, marginBottom: 12 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: editFishStatus === 'added' ? '80px 1fr 1fr' : '80px 1fr', gap: 10, marginBottom: 12 }}>
               <div>
                 <FieldLabel>Quantity</FieldLabel>
                 <input type="number" min="1" value={editQty} onChange={e => setEditQty(e.target.value)} style={{ width: '100%', boxSizing: 'border-box' }} />
@@ -1770,12 +1771,14 @@ ${taskRows ? `<h2>Pending Maintenance</h2>
                   {FISH_STATUSES.map(s => <option key={s} value={s}>{cap(s)}</option>)}
                 </select>
               </div>
-              <div>
-                <FieldLabel>Health Status</FieldLabel>
-                <select value={editHealth} onChange={e => setEditHealth(e.target.value)} style={{ width: '100%', boxSizing: 'border-box' }} disabled={editFishStatus !== 'added'}>
-                  {HEALTH_STATUSES.map(s => <option key={s} value={s}>{cap(s)}</option>)}
-                </select>
-              </div>
+              {editFishStatus === 'added' && (
+                <div>
+                  <FieldLabel>Health Status</FieldLabel>
+                  <select value={editHealth} onChange={e => setEditHealth(e.target.value)} style={{ width: '100%', boxSizing: 'border-box' }}>
+                    {HEALTH_STATUSES.map(s => <option key={s} value={s}>{cap(s)}</option>)}
+                  </select>
+                </div>
+              )}
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 120px', gap: 10, marginBottom: 12 }}>
               <div>
