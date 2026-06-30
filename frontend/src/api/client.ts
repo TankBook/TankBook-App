@@ -21,10 +21,22 @@ export interface Tank {
 export interface Expense {
   id: string
   tank_id: string | null
+  inventory_item_id: string | null
   amount: number
   category: string
   description: string | null
   purchase_date: string
+  notes: string | null
+  created_at: string
+}
+
+export interface InventoryItem {
+  id: string
+  name: string
+  category: 'Equipment' | 'Plants' | 'Food' | 'Chemicals' | 'Medication' | 'Decor' | 'Tanks' | 'Other'
+  quantity: number
+  low_stock_threshold: number
+  unit_label: string | null
   notes: string | null
   created_at: string
 }
@@ -336,5 +348,16 @@ export const api = {
     update: (id: string, body: Partial<Pick<Expense, 'tank_id' | 'amount' | 'category' | 'description' | 'purchase_date' | 'notes'>>) =>
       patch<Expense>(`/expenses/${id}`, body),
     remove: (id: string) => del(`/expenses/${id}`),
+  },
+  inventory: {
+    list: () => get<InventoryItem[]>('/inventory/'),
+    create: (body: Pick<InventoryItem, 'name' | 'category' | 'quantity' | 'low_stock_threshold' | 'unit_label' | 'notes'>) =>
+      post<InventoryItem>('/inventory/', body),
+    update: (id: string, body: Partial<Pick<InventoryItem, 'name' | 'category' | 'low_stock_threshold' | 'unit_label' | 'notes'>>) =>
+      patch<InventoryItem>(`/inventory/${id}`, body),
+    remove: (id: string) => del(`/inventory/${id}`),
+    adjust: (id: string, delta: number) => patch<InventoryItem>(`/inventory/${id}/adjust`, { delta }),
+    restock: (id: string, body: { quantity: number; amount?: number | null; purchase_date?: string | null }) =>
+      post<InventoryItem>(`/inventory/${id}/restock`, body),
   },
 }

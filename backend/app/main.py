@@ -6,7 +6,7 @@ from fastapi import FastAPI, Depends
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 
-from app.routers import tanks, fish, plants, parameters, alerts, species, maintenance, settings, daily_tasks, journal, backup, images, spending
+from app.routers import tanks, fish, plants, parameters, alerts, species, maintenance, settings, daily_tasks, journal, backup, images, spending, inventory
 from app.services.species import species_service
 from app.database import get_db
 
@@ -39,6 +39,7 @@ app.include_router(journal.router, prefix="/api/tanks", tags=["journal"])
 app.include_router(backup.router, prefix="/api/backup", tags=["backup"])
 app.include_router(images.router, prefix="/api/images", tags=["images"])
 app.include_router(spending.router, prefix="/api", tags=["spending"])
+app.include_router(inventory.router, prefix="/api/inventory", tags=["inventory"])
 
 
 @app.get("/api/tanks/{tank_id}/compatibility")

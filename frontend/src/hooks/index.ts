@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { api, Tank, TankFish, TankPlant, WaterParameter, Alert } from '../api/client'
+import { api, Tank, TankFish, TankPlant, WaterParameter, Alert, InventoryItem } from '../api/client'
 
 function useFetch<T>(fetcher: () => Promise<T>, deps: unknown[] = []) {
   const [data, setData] = useState<T | null>(null)
@@ -45,4 +45,8 @@ export function useParameters(tankId: string, limit = 50) {
 
 export function useAlerts(tankId: string, unacknowledgedOnly = false) {
   return useFetch<Alert[]>(() => api.alerts.list(tankId, unacknowledgedOnly), [tankId, unacknowledgedOnly])
+}
+
+export function useInventory() {
+  return useFetch<InventoryItem[]>(() => api.inventory.list())
 }

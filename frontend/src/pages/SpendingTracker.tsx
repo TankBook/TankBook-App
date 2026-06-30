@@ -6,12 +6,13 @@ import { useSettings, formatDate } from '../context/SettingsContext'
 import { Card, FieldLabel, SectionTitle, Tag, RichTextarea, renderNotes } from '../components/ui'
 
 const CATEGORIES = [
-  'Equipment', 'Livestock', 'Plants', 'Food', 'Chemicals',
+  'Equipment', 'Tanks', 'Livestock', 'Plants', 'Food', 'Chemicals',
   'Medication', 'Decor', 'Subscription', 'Other',
 ]
 
 const CAT_COLORS: Record<string, { bg: string; color: string }> = {
   Equipment:    { bg: 'var(--blue-bg)',   color: 'var(--blue)'   },
+  Tanks:        { bg: 'var(--teal-bg, #e0f2f1)', color: 'var(--teal, #00897b)' },
   Livestock:    { bg: 'var(--cyan-bg)',   color: 'var(--cyan)'   },
   Plants:       { bg: 'var(--green-bg)',  color: 'var(--green)'  },
   Food:         { bg: 'var(--amber-bg)',  color: 'var(--amber)'  },
