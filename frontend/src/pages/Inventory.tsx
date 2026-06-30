@@ -4,11 +4,17 @@ import { api, InventoryItem } from '../api/client'
 import { useInventory } from '../hooks'
 import { Card, FieldLabel, SectionTitle, Tag, Modal, ConfirmDialog } from '../components/ui'
 
-const CATEGORIES = ['Food', 'Chemicals'] as const
+const CATEGORIES = ['Equipment', 'Plants', 'Food', 'Chemicals', 'Medication', 'Decor', 'Tanks', 'Other'] as const
 
 const CAT_COLORS: Record<string, { bg: string; color: string }> = {
+  Equipment: { bg: 'var(--blue-bg)', color: 'var(--blue)' },
+  Plants: { bg: 'var(--green-bg)', color: 'var(--green)' },
   Food: { bg: 'var(--amber-bg)', color: 'var(--amber)' },
   Chemicals: { bg: 'var(--violet-bg)', color: 'var(--violet)' },
+  Medication: { bg: 'var(--red-bg)', color: 'var(--red)' },
+  Decor: { bg: 'var(--orange-bg)', color: 'var(--orange)' },
+  Tanks: { bg: 'var(--teal-bg, #e0f2f1)', color: 'var(--teal, #00897b)' },
+  Other: { bg: 'var(--tag-bg)', color: 'var(--text-2)' },
 }
 
 function todayIso() {
@@ -21,7 +27,7 @@ export default function Inventory() {
 
   const [editing, setEditing] = useState<InventoryItem | 'new' | null>(null)
   const [formName, setFormName] = useState('')
-  const [formCat, setFormCat] = useState<'Food' | 'Chemicals'>('Food')
+  const [formCat, setFormCat] = useState<InventoryItem['category']>('Food')
   const [formQty, setFormQty] = useState('1')
   const [formThreshold, setFormThreshold] = useState('1')
   const [formUnit, setFormUnit] = useState('')
@@ -174,7 +180,7 @@ export default function Inventory() {
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 12 }}>
             <div>
               <FieldLabel>Category</FieldLabel>
-              <select value={formCat} onChange={e => setFormCat(e.target.value as 'Food' | 'Chemicals')} style={{ width: '100%' }}>
+              <select value={formCat} onChange={e => setFormCat(e.target.value as InventoryItem['category'])} style={{ width: '100%' }}>
                 {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
               </select>
             </div>

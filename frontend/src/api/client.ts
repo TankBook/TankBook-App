@@ -33,7 +33,7 @@ export interface Expense {
 export interface InventoryItem {
   id: string
   name: string
-  category: 'Food' | 'Chemicals'
+  category: 'Equipment' | 'Plants' | 'Food' | 'Chemicals' | 'Medication' | 'Decor' | 'Tanks' | 'Other'
   quantity: number
   low_stock_threshold: number
   unit_label: string | null

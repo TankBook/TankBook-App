@@ -240,7 +240,7 @@ class ExpenseOut(ExpenseCreate):
 
 class InventoryItemCreate(BaseModel):
     name: str
-    category: Literal["Food", "Chemicals"]
+    category: Literal["Equipment", "Plants", "Food", "Chemicals", "Medication", "Decor", "Tanks", "Other"]
     quantity: int = 0
     low_stock_threshold: int = 1
     unit_label: str | None = None
@@ -249,7 +249,7 @@ class InventoryItemCreate(BaseModel):
 
 class InventoryItemUpdate(BaseModel):
     name: str | None = None
-    category: Literal["Food", "Chemicals"] | None = None
+    category: Literal["Equipment", "Plants", "Food", "Chemicals", "Medication", "Decor", "Tanks", "Other"] | None = None
     low_stock_threshold: int | None = None
     unit_label: str | None = None
     notes: str | None = None
