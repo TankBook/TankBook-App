@@ -36,6 +36,8 @@ import Inventory from './pages/Inventory'
 import { SettingsProvider, useSettings } from './context/SettingsContext'
 
 const QA_CATEGORIES = ['Equipment', 'Livestock', 'Plants', 'Food', 'Chemicals', 'Medication', 'Decor', 'Subscription', 'Other']
+const QA_INV_CATEGORIES = ['Equipment', 'Plants', 'Food', 'Chemicals', 'Medication', 'Decor', 'Tanks', 'Other'] as const
+type InvCategory = typeof QA_INV_CATEGORIES[number]
 
 function todayIso() {
   const d = new Date()
@@ -44,7 +46,7 @@ function todayIso() {
 
 function QuickAdd() {
   const [open, setOpen] = useState(false)
-  const [mode, setMode] = useState<'pick' | 'tank' | 'param' | 'expense'>('pick')
+  const [mode, setMode] = useState<'pick' | 'tank' | 'param' | 'expense' | 'inventory'>('pick')
   const [tanks, setTanks] = useState<{ id: string; name: string }[]>([])
   const [saving, setSaving] = useState(false)
 
@@ -65,6 +67,12 @@ function QuickAdd() {
   const [expDesc, setExpDesc] = useState('')
   const [expDate, setExpDate] = useState(todayIso)
 
+  const [invName, setInvName] = useState('')
+  const [invCat, setInvCat] = useState<InvCategory>(QA_INV_CATEGORIES[0])
+  const [invQty, setInvQty] = useState('1')
+  const [invThreshold, setInvThreshold] = useState('1')
+  const [invUnit, setInvUnit] = useState('')
+
   useEffect(() => {
     if (open) api.tanks.list().then(t => {
       setTanks(t)
@@ -77,6 +85,7 @@ function QuickAdd() {
     setQaName(''); setQaVolume(''); setQaWaterType('freshwater')
     setPh(''); setTemp(''); setAmmonia(''); setNitrite(''); setNitrate('')
     setExpTank(''); setExpAmount(''); setExpCat(QA_CATEGORIES[0]); setExpDesc(''); setExpDate(todayIso())
+    setInvName(''); setInvCat(QA_INV_CATEGORIES[0]); setInvQty('1'); setInvThreshold('1'); setInvUnit('')
   }
 
   function close() { setOpen(false); resetForms() }
@@ -95,6 +104,15 @@ function QuickAdd() {
     setSaving(true)
     try {
       await api.parameters.log(paramTank, { ph: ph ? Number(ph) : null, temperature_c: temp ? Number(temp) : null, ammonia_ppm: ammonia ? Number(ammonia) : null, nitrite_ppm: nitrite ? Number(nitrite) : null, nitrate_ppm: nitrate ? Number(nitrate) : null, gh_dgh: null, kh_dkh: null, salinity_ppt: null, specific_gravity: null, notes: null })
+      close()
+    } finally { setSaving(false) }
+  }
+
+  async function saveInventory() {
+    if (!invName) return
+    setSaving(true)
+    try {
+      await api.inventory.create({ name: invName, category: invCat, quantity: Number(invQty) || 0, low_stock_threshold: Number(invThreshold) || 1, unit_label: invUnit || null, notes: null })
       close()
     } finally { setSaving(false) }
   }
@@ -132,9 +150,10 @@ function QuickAdd() {
     body = (
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
         {([
-          { Icon: Fish,     label: 'Add Tank',            sub: 'Create a new tank',            m: 'tank'    },
-          { Icon: Droplets, label: 'Record Parameters',   sub: 'Log water quality for a tank', m: 'param'   },
-          { Icon: Receipt,  label: 'New Expense',         sub: 'Track a purchase',             m: 'expense' },
+          { Icon: Fish,     label: 'Add Tank',            sub: 'Create a new tank',            m: 'tank'      },
+          { Icon: Droplets, label: 'Record Parameters',   sub: 'Log water quality for a tank', m: 'param'     },
+          { Icon: Receipt,  label: 'New Expense',         sub: 'Track a purchase',             m: 'expense'   },
+          { Icon: Package,  label: 'Add Inventory Item',  sub: 'Log stock for food or supplies', m: 'inventory' },
         ] as const).map(({ Icon, label, sub, m }) => (
           <button key={m} onClick={() => setMode(m)} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px', borderRadius: 10, cursor: 'pointer', textAlign: 'left', width: '100%', border: '0.5px solid var(--border)', background: 'var(--surface-2)', color: 'var(--text)' }}>
             <span style={{ color: 'var(--blue)', lineHeight: 0, flexShrink: 0 }}><Icon size={16} /></span>
@@ -236,6 +255,40 @@ function QuickAdd() {
           </div>
         </div>
         {saveRow(saveExpense, !expAmount || isNaN(Number(expAmount)))}
+      </>
+    )
+  } else if (mode === 'inventory') {
+    body = (
+      <>
+        {backBtn}
+        <p style={{ margin: '0 0 16px', fontWeight: 500, fontSize: 15, color: 'var(--text)' }}>Add Inventory Item</p>
+        <div style={{ marginBottom: 12 }}>
+          {lbl('Name *')}
+          <input value={invName} onChange={e => setInvName(e.target.value)} placeholder="e.g. API Stress Coat+" style={inputStyle} />
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
+          <div>
+            {lbl('Category')}
+            <select value={invCat} onChange={e => setInvCat(e.target.value as InvCategory)} style={{ width: '100%' }}>
+              {QA_INV_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+            </select>
+          </div>
+          <div>
+            {lbl('Unit Label (optional)')}
+            <input value={invUnit} onChange={e => setInvUnit(e.target.value)} placeholder="e.g. bottles" style={inputStyle} />
+          </div>
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 4 }}>
+          <div>
+            {lbl('Starting Quantity')}
+            <input type="number" min="0" value={invQty} onChange={e => setInvQty(e.target.value)} style={inputStyle} />
+          </div>
+          <div>
+            {lbl('Low Stock Threshold')}
+            <input type="number" min="0" value={invThreshold} onChange={e => setInvThreshold(e.target.value)} style={inputStyle} />
+          </div>
+        </div>
+        {saveRow(saveInventory, !invName)}
       </>
     )
   }
