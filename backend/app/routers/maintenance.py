@@ -3,7 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models.models import MaintenanceTask
-from app.schemas.schemas import MaintenanceTaskCreate, MaintenanceTaskOut
+from app.schemas.schemas import MaintenanceTaskCreate, MaintenanceTaskOut, MaintenanceTaskSkip
 
 router = APIRouter()
 
@@ -70,6 +70,23 @@ def complete_task(tank_id: str, task_id: str, db: Session = Depends(get_db)):
         )
         db.add(next_task)
 
+    db.commit(); db.refresh(task)
+    return task
+
+
+@router.patch("/{tank_id}/maintenance/{task_id}/skip", response_model=MaintenanceTaskOut)
+def skip_task(tank_id: str, task_id: str, body: MaintenanceTaskSkip, db: Session = Depends(get_db)):
+    task = db.query(MaintenanceTask).filter_by(id=task_id, tank_id=tank_id).first()
+    if not task:
+        raise HTTPException(404, "Task not found")
+    if task.status != "pending":
+        raise HTTPException(422, "Only pending tasks can be skipped")
+    if body.times < 1:
+        raise HTTPException(422, "times must be at least 1")
+    if task.is_recurring:
+        task.due_at = task.due_at + timedelta(weeks=(task.recur_every_weeks or 1) * body.times)
+    else:
+        task.due_at = task.due_at + timedelta(days=body.times)
     db.commit(); db.refresh(task)
     return task
 

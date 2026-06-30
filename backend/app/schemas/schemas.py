@@ -128,6 +128,10 @@ class MaintenanceTaskOut(MaintenanceTaskCreate):
     model_config = {"from_attributes": True}
 
 
+class MaintenanceTaskSkip(BaseModel):
+    times: int
+
+
 # --- Alerts ---
 
 class AlertOut(BaseModel):

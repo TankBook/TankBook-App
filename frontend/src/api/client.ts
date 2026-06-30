@@ -81,6 +81,9 @@ export interface MaintenanceTask {
   due_at: string
   completed_at: string | null
   status: string
+  is_recurring: boolean
+  recur_every_weeks: number | null
+  recur_day_of_week: number | null
 }
 
 export interface DailyTask {
@@ -235,6 +238,8 @@ export const api = {
       post<MaintenanceTask>(`/tanks/${tankId}/maintenance`, body),
     complete: (tankId: string, taskId: string) =>
       patch<MaintenanceTask>(`/tanks/${tankId}/maintenance/${taskId}/complete`),
+    skip: (tankId: string, taskId: string, times: number) =>
+      patch<MaintenanceTask>(`/tanks/${tankId}/maintenance/${taskId}/skip`, { times }),
     delete: (tankId: string, taskId: string) => del(`/tanks/${tankId}/maintenance/${taskId}`),
   },
   dailyTasks: {
