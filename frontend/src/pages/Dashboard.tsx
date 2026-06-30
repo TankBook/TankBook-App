@@ -15,7 +15,7 @@ interface DashboardStats {
   overdue_tasks: number
   upcoming_tasks: Array<{
     id: string; tank_id: string; task_type: string
-    description: string | null; due_at: string; is_recurring: boolean
+    description: string | null; due_at: string; is_recurring: boolean; recur_every_weeks: number | null
   }>
   tanks: Array<{
     id: string; name: string; volume_litres: number; water_type: string; co2_injection: boolean; has_heater: boolean; filter_flow_lph: number | null
@@ -217,6 +217,8 @@ export default function Dashboard() {
   const [stats, setStats] = useState<DashboardStats | null>(null)
   const [showForm, setShowForm] = useState(false)
   const [completingId, setCompletingId] = useState<string | null>(null)
+  const [skipTaskId, setSkipTaskId] = useState<string | null>(null)
+  const [skipTimes, setSkipTimes] = useState('1')
   const [isMobile, setIsMobile] = useState(() => window.matchMedia('(max-width: 768px)').matches)
 
   const [orderedTanks, setOrderedTanks] = useState<DashboardStats['tanks']>([])
@@ -294,6 +296,14 @@ export default function Dashboard() {
     }
   }
 
+  async function skipTask(tankId: string, taskId: string) {
+    const times = Math.max(1, Number(skipTimes) || 1)
+    await api.maintenance.skip(tankId, taskId, times)
+    setSkipTaskId(null)
+    setSkipTimes('1')
+    await loadStats()
+  }
+
   if (loading || !stats) return <p style={{ color: 'var(--text-2)' }}>Loading dashboard…</p>
 
   const statsRow = (
@@ -313,8 +323,10 @@ export default function Dashboard() {
       <Card>
         {stats.upcoming_tasks.map((t, i) => {
           const tank = stats.tanks.find(tk => tk.id === t.tank_id)
+          const skipping = skipTaskId === t.id
+          const isLast = i === stats.upcoming_tasks.length - 1
           return (
-            <div key={t.id} style={{ padding: '8px 0', borderBottom: i < stats.upcoming_tasks.length - 1 ? '0.5px solid var(--border-sub)' : 'none' }}>
+            <div key={t.id} style={{ padding: '8px 0', borderBottom: !isLast || skipping ? '0.5px solid var(--border-sub)' : 'none' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 6 }}>
                 <div style={{ minWidth: 0 }}>
                   <p style={{ fontSize: 12, fontWeight: 500, color: 'var(--text)', margin: '0 0 2px' }}>{t.task_type}</p>
@@ -324,19 +336,38 @@ export default function Dashboard() {
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4, flexShrink: 0 }}>
                   <span style={{ fontSize: 11, color: 'var(--text-3)' }}>{formatDate(t.due_at, dateFormat)}</span>
-                  <button
-                    onClick={() => completeTask(t.tank_id, t.id)}
-                    disabled={completingId === t.id}
-                    style={{
-                      fontSize: 11, padding: '2px 8px', borderRadius: 6,
-                      border: '0.5px solid var(--green-border)', background: 'var(--green-bg)', color: 'var(--green)',
-                      cursor: 'pointer', opacity: completingId === t.id ? 0.5 : 1,
-                    }}
-                  >
-                    {completingId === t.id ? '…' : 'Done'}
-                  </button>
+                  <div style={{ display: 'flex', gap: 4 }}>
+                    <button
+                      onClick={() => completeTask(t.tank_id, t.id)}
+                      disabled={completingId === t.id}
+                      style={{ fontSize: 11, padding: '2px 8px', borderRadius: 6, border: '0.5px solid var(--green-border)', background: 'var(--green-bg)', color: 'var(--green)', cursor: 'pointer', opacity: completingId === t.id ? 0.5 : 1 }}
+                    >
+                      {completingId === t.id ? '…' : 'Done'}
+                    </button>
+                    <button
+                      onClick={() => { setSkipTaskId(skipping ? null : t.id); setSkipTimes('1') }}
+                      style={{ fontSize: 11, padding: '2px 8px', borderRadius: 6, border: '0.5px solid var(--amber-border)', background: skipping ? 'var(--amber-bg)' : 'transparent', color: 'var(--amber)', cursor: 'pointer' }}
+                    >Skip</button>
+                  </div>
                 </div>
               </div>
+              {skipping && (
+                <div style={{ marginTop: 6, display: 'flex', alignItems: 'center', gap: 6, padding: '6px 8px', borderRadius: 8, background: 'var(--amber-bg)', border: '0.5px solid var(--amber-border)' }}>
+                  <span style={{ fontSize: 11, color: 'var(--amber)', whiteSpace: 'nowrap' }}>
+                    {t.is_recurring ? 'Skip next' : 'Skip for'}
+                  </span>
+                  <input
+                    type="number" min="1" value={skipTimes}
+                    onChange={e => setSkipTimes(e.target.value)}
+                    style={{ width: 44, fontSize: 11, padding: '2px 4px', borderRadius: 6, border: '0.5px solid var(--amber-border)', background: 'var(--surface)', color: 'var(--text)', textAlign: 'center' }}
+                  />
+                  <span style={{ fontSize: 11, color: 'var(--amber)', whiteSpace: 'nowrap' }}>
+                    {t.is_recurring ? `occurrence${Number(skipTimes) === 1 ? '' : 's'}` : `day${Number(skipTimes) === 1 ? '' : 's'}`}
+                  </span>
+                  <button onClick={() => skipTask(t.tank_id, t.id)} style={{ fontSize: 11, padding: '2px 8px', borderRadius: 6, border: '0.5px solid var(--amber-border)', background: 'var(--amber)', color: '#fff', cursor: 'pointer', fontWeight: 500 }}>Confirm</button>
+                  <button onClick={() => setSkipTaskId(null)} style={{ fontSize: 11, padding: '2px 6px', borderRadius: 6, border: '0.5px solid var(--btn-border)', background: 'transparent', color: 'var(--text-2)', cursor: 'pointer' }}>Cancel</button>
+                </div>
+              )}
             </div>
           )
         })}
