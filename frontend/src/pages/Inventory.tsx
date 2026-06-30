@@ -25,6 +25,8 @@ function todayIso() {
 export default function Inventory() {
   const { data: items, reload } = useInventory()
 
+  const [selectedCategory, setSelectedCategory] = useState<InventoryItem['category']>(CATEGORIES[0])
+
   const [editing, setEditing] = useState<InventoryItem | 'new' | null>(null)
   const [formName, setFormName] = useState('')
   const [formCat, setFormCat] = useState<InventoryItem['category']>('Food')
@@ -97,6 +99,7 @@ export default function Inventory() {
     reload()
   }
 
+  const categoryItems = (items ?? []).filter(i => i.category === selectedCategory)
   const lowStock = (items ?? []).filter(i => i.quantity <= i.low_stock_threshold)
 
   function itemRow(item: InventoryItem) {
@@ -149,27 +152,61 @@ export default function Inventory() {
         </button>
       </div>
 
-      {lowStock.length > 0 && (
-        <div style={{ marginBottom: 20, padding: '12px 16px', borderRadius: 10, background: 'var(--red-bg)', border: '0.5px solid var(--red-border)', display: 'flex', alignItems: 'flex-start', gap: 10 }}>
-          <AlertTriangle size={16} color="var(--red)" style={{ flexShrink: 0, marginTop: 1 }} />
-          <p style={{ margin: 0, fontSize: 13, color: 'var(--red)' }}>
-            <strong>{lowStock.length} item{lowStock.length > 1 ? 's' : ''} low on stock:</strong> {lowStock.map(i => i.name).join(', ')}
-          </p>
-        </div>
-      )}
+      <div style={{ display: 'flex', gap: 20, alignItems: 'flex-start', flexWrap: 'wrap' }}>
+        {/* Main content */}
+        <div style={{ flex: 1, minWidth: 0 }}>
+          {lowStock.length > 0 && (
+            <div style={{ marginBottom: 16, padding: '12px 16px', borderRadius: 10, background: 'var(--red-bg)', border: '0.5px solid var(--red-border)', display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+              <AlertTriangle size={16} color="var(--red)" style={{ flexShrink: 0, marginTop: 1 }} />
+              <p style={{ margin: 0, fontSize: 13, color: 'var(--red)' }}>
+                <strong>{lowStock.length} item{lowStock.length > 1 ? 's' : ''} low on stock across all categories:</strong> {lowStock.map(i => i.name).join(', ')}
+              </p>
+            </div>
+          )}
 
-      {CATEGORIES.map(cat => {
-        const catItems = (items ?? []).filter(i => i.category === cat)
-        return (
-          <Card key={cat} style={{ marginBottom: 16 }}>
+          <Card>
             <SectionTitle>
-              <Tag bg={CAT_COLORS[cat].bg} color={CAT_COLORS[cat].color} style={{ marginRight: 8 }}>{cat}</Tag>
+              <Tag bg={CAT_COLORS[selectedCategory].bg} color={CAT_COLORS[selectedCategory].color} style={{ marginRight: 8 }}>{selectedCategory}</Tag>
             </SectionTitle>
-            {catItems.length === 0 && <p style={{ fontSize: 13, color: 'var(--text-2)' }}>No {cat.toLowerCase()} items yet.</p>}
-            {catItems.map(itemRow)}
+            {categoryItems.length === 0 && <p style={{ fontSize: 13, color: 'var(--text-2)' }}>No {selectedCategory.toLowerCase()} items yet.</p>}
+            {categoryItems.map(itemRow)}
           </Card>
-        )
-      })}
+        </div>
+
+        {/* Category menu */}
+        <div style={{ width: 200, flexShrink: 0 }}>
+          <Card>
+            <SectionTitle muted>Categories</SectionTitle>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+              {CATEGORIES.map(cat => {
+                const count = (items ?? []).filter(i => i.category === cat).length
+                const low = (items ?? []).some(i => i.category === cat && i.quantity <= i.low_stock_threshold)
+                const active = cat === selectedCategory
+                return (
+                  <button
+                    key={cat}
+                    onClick={() => setSelectedCategory(cat)}
+                    style={{
+                      display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8,
+                      padding: '8px 10px', borderRadius: 8, cursor: 'pointer', textAlign: 'left',
+                      border: active ? `0.5px solid ${CAT_COLORS[cat].color}` : '0.5px solid transparent',
+                      background: active ? CAT_COLORS[cat].bg : 'transparent',
+                      color: active ? CAT_COLORS[cat].color : 'var(--text-2)',
+                      fontWeight: active ? 500 : 400, fontSize: 13,
+                    }}
+                  >
+                    <span>{cat}</span>
+                    <span style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
+                      {low && <AlertTriangle size={11} color="var(--red)" />}
+                      <span style={{ fontSize: 11, opacity: 0.7 }}>{count}</span>
+                    </span>
+                  </button>
+                )
+              })}
+            </div>
+          </Card>
+        </div>
+      </div>
 
       {editing && (
         <Modal title={editing === 'new' ? 'Add Item' : 'Edit Item'} onClose={() => setEditing(null)} width={420}>
