@@ -1,4 +1,5 @@
 from datetime import datetime
+from typing import Literal
 from pydantic import BaseModel
 
 
@@ -211,6 +212,7 @@ class AppSettingsOut(BaseModel):
 
 class ExpenseCreate(BaseModel):
     tank_id: str | None = None
+    inventory_item_id: str | None = None
     amount: float
     category: str
     description: str | None = None
@@ -220,6 +222,7 @@ class ExpenseCreate(BaseModel):
 
 class ExpenseUpdate(BaseModel):
     tank_id: str | None = None
+    inventory_item_id: str | None = None
     amount: float | None = None
     category: str | None = None
     description: str | None = None
@@ -231,3 +234,38 @@ class ExpenseOut(ExpenseCreate):
     id: str
     created_at: datetime
     model_config = {"from_attributes": True}
+
+
+# --- Inventory ---
+
+class InventoryItemCreate(BaseModel):
+    name: str
+    category: Literal["Food", "Chemicals"]
+    quantity: int = 0
+    low_stock_threshold: int = 1
+    unit_label: str | None = None
+    notes: str | None = None
+
+
+class InventoryItemUpdate(BaseModel):
+    name: str | None = None
+    category: Literal["Food", "Chemicals"] | None = None
+    low_stock_threshold: int | None = None
+    unit_label: str | None = None
+    notes: str | None = None
+
+
+class InventoryItemOut(InventoryItemCreate):
+    id: str
+    created_at: datetime
+    model_config = {"from_attributes": True}
+
+
+class InventoryAdjust(BaseModel):
+    delta: int
+
+
+class InventoryRestock(BaseModel):
+    quantity: int
+    amount: float | None = None
+    purchase_date: str | None = None

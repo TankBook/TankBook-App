@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { BrowserRouter, Routes, Route, Link, useLocation } from 'react-router-dom'
-import { LayoutDashboard, BookOpen, Cog, NotebookPen, ShieldCheck, Calculator, Receipt, Menu, X, Plus, Fish, Droplets, ChevronLeft, type LucideIcon } from 'lucide-react'
+import { LayoutDashboard, BookOpen, Cog, NotebookPen, ShieldCheck, Calculator, Receipt, Menu, X, Plus, Fish, Droplets, ChevronLeft, Package, type LucideIcon } from 'lucide-react'
 import { api } from './api/client'
 
 function GitHubIcon({ size = 14 }: { size?: number }) {
@@ -32,6 +32,7 @@ import Settings from './pages/Settings'
 import LivestockJournal from './pages/LivestockJournal'
 import CompatibilityChecker from './pages/CompatibilityChecker'
 import Calculators from './pages/Calculators'
+import Inventory from './pages/Inventory'
 import { SettingsProvider, useSettings } from './context/SettingsContext'
 
 const QA_CATEGORIES = ['Equipment', 'Livestock', 'Plants', 'Food', 'Chemicals', 'Medication', 'Decor', 'Subscription', 'Other']
@@ -271,6 +272,7 @@ const NAV_LINKS: [string, string, LucideIcon][] = [
   ['/journal', 'Tank Journal', NotebookPen],
   ['/calculators', 'Calculators', Calculator],
   ['/spending', 'Spending', Receipt],
+  ['/inventory', 'Inventory', Package],
 ]
 
 function Nav() {
@@ -420,6 +422,7 @@ export default function App() {
               <Route path="/calculators" element={<Calculators />} />
               <Route path="/settings" element={<Settings />} />
               <Route path="/spending" element={<SpendingTracker />} />
+              <Route path="/inventory" element={<Inventory />} />
             </Routes>
           </div>
           <Footer />

@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models.models import (
     Tank, TankFish, TankPlant, WaterParameter, MaintenanceTask,
-    Alert, DailyTask, JournalEntry, AppSettings, Expense,
+    Alert, DailyTask, JournalEntry, AppSettings, Expense, InventoryItem,
 )
 
 router = APIRouter()
@@ -83,8 +83,16 @@ def export_backup(db: Session = Depends(get_db)):
                                  for r in journal],
         })
 
+    inventory_out = [
+        {"id": i.id, "name": i.name, "category": i.category, "quantity": i.quantity,
+         "low_stock_threshold": i.low_stock_threshold, "unit_label": i.unit_label,
+         "notes": i.notes, "created_at": _dt(i.created_at)}
+        for i in db.query(InventoryItem).all()
+    ]
+
     expenses_out = [
-        {"id": e.id, "tank_id": e.tank_id, "amount": e.amount, "category": e.category,
+        {"id": e.id, "tank_id": e.tank_id, "inventory_item_id": e.inventory_item_id,
+         "amount": e.amount, "category": e.category,
          "description": e.description, "purchase_date": e.purchase_date,
          "notes": e.notes, "created_at": _dt(e.created_at)}
         for e in db.query(Expense).all()
@@ -102,6 +110,7 @@ def export_backup(db: Session = Depends(get_db)):
         },
         "tanks": tanks_out,
         "expenses": expenses_out,
+        "inventory_items": inventory_out,
     }
 
 
@@ -115,6 +124,8 @@ def import_backup(payload: dict, db: Session = Depends(get_db)):
         db.delete(tank)
     for expense in db.query(Expense).all():
         db.delete(expense)
+    for item in db.query(InventoryItem).all():
+        db.delete(item)
     db.commit()
 
     # Restore settings
@@ -215,11 +226,21 @@ def import_backup(payload: dict, db: Session = Depends(get_db)):
 
         tanks_restored += 1
 
+    # Restore inventory items before expenses, since expenses may reference them
+    for i in payload.get("inventory_items", []):
+        db.add(InventoryItem(
+            id=i["id"], name=i["name"], category=i["category"],
+            quantity=i.get("quantity", 0), low_stock_threshold=i.get("low_stock_threshold", 1),
+            unit_label=i.get("unit_label"), notes=i.get("notes"),
+            created_at=_parse_dt(i.get("created_at")) or datetime.utcnow(),
+        ))
+    db.flush()
+
     # Restore expenses (top-level, not per-tank)
     for e in payload.get("expenses", []):
         db.add(Expense(
-            id=e["id"], tank_id=e.get("tank_id"), amount=e["amount"],
-            category=e["category"], description=e.get("description"),
+            id=e["id"], tank_id=e.get("tank_id"), inventory_item_id=e.get("inventory_item_id"),
+            amount=e["amount"], category=e["category"], description=e.get("description"),
             purchase_date=e["purchase_date"], notes=e.get("notes"),
             created_at=_parse_dt(e.get("created_at")) or datetime.utcnow(),
         ))
