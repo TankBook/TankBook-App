@@ -145,7 +145,7 @@ def dashboard_stats(db=Depends(get_db)):
             {
                 "id": t.id, "tank_id": t.tank_id, "task_type": t.task_type,
                 "description": t.description, "due_at": t.due_at.isoformat(),
-                "is_recurring": t.is_recurring,
+                "is_recurring": t.is_recurring, "recur_every_weeks": t.recur_every_weeks,
             } for t in upcoming_tasks
         ],
         "tanks": tank_summaries,
