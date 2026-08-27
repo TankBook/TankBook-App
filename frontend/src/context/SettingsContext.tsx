@@ -2,7 +2,7 @@ import { createContext, useContext, useState, useEffect, ReactNode } from 'react
 
 export type DateFormat = 'DD/MM/YYYY' | 'MM/DD/YYYY' | 'YYYY-MM-DD'
 export type Theme = 'light' | 'dark'
-export type UnitSystem = 'mm' | 'cm' | 'm'
+export type UnitSystem = 'mm' | 'cm' | 'm' | 'imperial'
 
 interface SettingsContextValue {
   dateFormat: DateFormat
@@ -153,12 +153,14 @@ export function formatDateTime(date: string | Date, format: DateFormat): string 
 export function fromMM(mm: number, unit: UnitSystem): number {
   if (unit === 'cm') return mm / 10
   if (unit === 'm') return mm / 1000
+  if (unit === 'imperial') return mm / 25.4
   return mm
 }
 
 export function toMM(value: number, unit: UnitSystem): number {
   if (unit === 'cm') return Math.round(value * 10)
   if (unit === 'm') return Math.round(value * 1000)
+  if (unit === 'imperial') return Math.round(value * 25.4)
   return Math.round(value)
 }
 
@@ -167,11 +169,13 @@ export function fmtDim(mm: number | null | undefined, unit: UnitSystem): string 
   const v = fromMM(mm, unit)
   if (unit === 'mm') return `${v} mm`
   if (unit === 'cm') return `${parseFloat(v.toFixed(1))} cm`
+  if (unit === 'imperial') return `${parseFloat(v.toFixed(2))} in`
   return `${parseFloat(v.toFixed(3))} m`
 }
 
 export function dimInputProps(unit: UnitSystem): { step: string; placeholder: string } {
   if (unit === 'mm') return { step: '1', placeholder: 'e.g. 600' }
   if (unit === 'cm') return { step: '0.1', placeholder: 'e.g. 60' }
+  if (unit === 'imperial') return { step: '0.01', placeholder: 'e.g. 23.62' }
   return { step: '0.001', placeholder: 'e.g. 0.6' }
 }

@@ -28,15 +28,56 @@ const UNIT_OPTIONS: { value: UnitSystem; label: string; example: string }[] = [
   { value: 'mm', label: 'Millimetres (mm)', example: '600 × 400 × 300 mm' },
   { value: 'cm', label: 'Centimetres (cm)', example: '60 × 40 × 30 cm' },
   { value: 'm',  label: 'Metres (m)',        example: '0.6 × 0.4 × 0.3 m' },
+  { value: 'imperial', label: 'Imperial (inches)', example: '23.62 × 15.75 × 11.81 in' },
 ]
 
 export default function Settings() {
   const { dateFormat, setDateFormat, unitSystem, setUnitSystem, defaultTank, setDefaultTank, alertRetentionDays, setAlertRetentionDays, appUrl, setAppUrl, loading } = useSettings()
   const [tanks, setTanks] = useState<Tank[]>([])
+  const [draftDateFormat, setDraftDateFormat] = useState<DateFormat>(dateFormat)
+  const [draftUnitSystem, setDraftUnitSystem] = useState<UnitSystem>(unitSystem)
+  const [draftDefaultTank, setDraftDefaultTank] = useState(defaultTank ?? '')
+  const [draftAlertRetentionDays, setDraftAlertRetentionDays] = useState<number | null>(alertRetentionDays)
+  const [draftAppUrl, setDraftAppUrl] = useState(appUrl ?? '')
+  const [savingSettings, setSavingSettings] = useState(false)
+  const [settingsSaved, setSettingsSaved] = useState(false)
+
+  useEffect(() => {
+    if (!loading) {
+      setDraftDateFormat(dateFormat)
+      setDraftUnitSystem(unitSystem)
+      setDraftDefaultTank(defaultTank ?? '')
+      setDraftAlertRetentionDays(alertRetentionDays)
+      setDraftAppUrl(appUrl ?? '')
+    }
+  }, [loading])
 
   useEffect(() => {
     api.tanks.list().then(setTanks)
   }, [])
+
+  const settingsChanged = draftDateFormat !== dateFormat
+    || draftUnitSystem !== unitSystem
+    || draftDefaultTank !== (defaultTank ?? '')
+    || draftAlertRetentionDays !== alertRetentionDays
+    || draftAppUrl !== (appUrl ?? '')
+
+  async function saveSettings() {
+    setSavingSettings(true)
+    setSettingsSaved(false)
+    try {
+      await Promise.all([
+        draftDateFormat !== dateFormat && setDateFormat(draftDateFormat),
+        draftUnitSystem !== unitSystem && setUnitSystem(draftUnitSystem),
+        draftDefaultTank !== (defaultTank ?? '') && setDefaultTank(draftDefaultTank || null),
+        draftAlertRetentionDays !== alertRetentionDays && setAlertRetentionDays(draftAlertRetentionDays),
+        draftAppUrl !== (appUrl ?? '') && setAppUrl(draftAppUrl || null),
+      ])
+      setSettingsSaved(true)
+    } finally {
+      setSavingSettings(false)
+    }
+  }
 
   const [checking, setChecking] = useState(false)
   const [updateStatus, setUpdateStatus] = useState<'idle' | 'up-to-date' | 'available' | 'no-releases' | 'error'>('idle')
@@ -120,6 +161,23 @@ export default function Settings() {
 
       <Card style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 28, padding: 24 }}>
 
+        <section style={{ paddingBottom: 20, borderBottom: '0.5px solid var(--border-sub)' }}>
+          <p style={{ fontWeight: 500, fontSize: 14, margin: '0 0 4px', color: 'var(--text)', display: 'flex', alignItems: 'center', gap: 6 }}><Droplets size={14} color="var(--text-2)" />Default Tank</p>
+          <p style={{ fontSize: 12, color: 'var(--text-2)', margin: '0 0 14px' }}>
+            Pre-selects this tank on pages with a tank dropdown, like the Livestock Journal.
+          </p>
+          <select
+            value={draftDefaultTank}
+            onChange={e => { setDraftDefaultTank(e.target.value); setSettingsSaved(false) }}
+            style={{ width: '100%' }}
+          >
+            <option value="">No default</option>
+            {tanks.map(t => (
+              <option key={t.id} value={t.id}>{t.name}</option>
+            ))}
+          </select>
+        </section>
+
         {/* Left column — display preferences */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16, justifyContent: 'space-between', alignSelf: 'stretch' }}>
         <section style={{ paddingBottom: 20, borderBottom: '0.5px solid var(--border-sub)' }}>
@@ -134,16 +192,16 @@ export default function Settings() {
                 style={{
                   display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                   padding: '10px 12px', borderRadius: 8, cursor: 'pointer',
-                  border: dateFormat === opt.value ? '1px solid var(--blue-border)' : '0.5px solid var(--border)',
-                  background: dateFormat === opt.value ? 'var(--blue-bg)' : 'transparent',
+                    border: draftDateFormat === opt.value ? '1px solid var(--blue-border)' : '0.5px solid var(--border)',
+                    background: draftDateFormat === opt.value ? 'var(--blue-bg)' : 'transparent',
                 }}
               >
                 <span style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                   <input
                     type="radio"
                     name="dateFormat"
-                    checked={dateFormat === opt.value}
-                    onChange={() => setDateFormat(opt.value)}
+                    checked={draftDateFormat === opt.value}
+                    onChange={() => { setDraftDateFormat(opt.value); setSettingsSaved(false) }}
                   />
                   <span style={{ fontSize: 13, color: 'var(--text)' }}>{opt.label}</span>
                 </span>
@@ -167,16 +225,16 @@ export default function Settings() {
                 style={{
                   display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                   padding: '10px 12px', borderRadius: 8, cursor: 'pointer',
-                  border: unitSystem === opt.value ? '1px solid var(--blue-border)' : '0.5px solid var(--border)',
-                  background: unitSystem === opt.value ? 'var(--blue-bg)' : 'transparent',
+                  border: draftUnitSystem === opt.value ? '1px solid var(--blue-border)' : '0.5px solid var(--border)',
+                  background: draftUnitSystem === opt.value ? 'var(--blue-bg)' : 'transparent',
                 }}
               >
                 <span style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                   <input
                     type="radio"
                     name="unitSystem"
-                    checked={unitSystem === opt.value}
-                    onChange={() => setUnitSystem(opt.value)}
+                    checked={draftUnitSystem === opt.value}
+                    onChange={() => { setDraftUnitSystem(opt.value); setSettingsSaved(false) }}
                   />
                   <span style={{ fontSize: 13, color: 'var(--text)' }}>{opt.label}</span>
                 </span>
@@ -192,8 +250,8 @@ export default function Settings() {
             Alerts older than this are automatically deleted when you view a tank's alert tab. Set to indefinite to keep alerts until manually deleted.
           </p>
           <select
-            value={alertRetentionDays ?? ''}
-            onChange={e => setAlertRetentionDays(e.target.value ? Number(e.target.value) : null)}
+            value={draftAlertRetentionDays ?? ''}
+            onChange={e => { setDraftAlertRetentionDays(e.target.value ? Number(e.target.value) : null); setSettingsSaved(false) }}
             style={{ width: '100%' }}
           >
             <option value="">Indefinite (manual delete only)</option>
@@ -205,15 +263,15 @@ export default function Settings() {
           </select>
         </section>
 
-        <section style={{ paddingBottom: 20 }}>
+        <section style={{ paddingBottom: 20, borderBottom: '0.5px solid var(--border-sub)' }}>
           <p style={{ fontWeight: 500, fontSize: 14, margin: '0 0 4px', color: 'var(--text)', display: 'flex', alignItems: 'center', gap: 6 }}><Globe size={14} color="var(--text-2)" />App URL</p>
           <p style={{ fontSize: 12, color: 'var(--text-2)', margin: '0 0 14px' }}>
             The URL this instance is reachable at. Used when sharing species YAML links with other TankBook instances. Leave blank to use the browser's current origin.
           </p>
           <input
             type="url"
-            value={appUrl ?? ''}
-            onChange={e => setAppUrl(e.target.value || null)}
+            value={draftAppUrl}
+            onChange={e => { setDraftAppUrl(e.target.value); setSettingsSaved(false) }}
             placeholder={`e.g. http://192.168.1.100:3000`}
             style={{ width: '100%', boxSizing: 'border-box' }}
           />
@@ -222,23 +280,6 @@ export default function Settings() {
 
         {/* Right column — data & info */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16, justifyContent: 'space-between', alignSelf: 'stretch' }}>
-        <section style={{ paddingBottom: 20, borderBottom: '0.5px solid var(--border-sub)' }}>
-          <p style={{ fontWeight: 500, fontSize: 14, margin: '0 0 4px', color: 'var(--text)', display: 'flex', alignItems: 'center', gap: 6 }}><Droplets size={14} color="var(--text-2)" />Default Tank</p>
-          <p style={{ fontSize: 12, color: 'var(--text-2)', margin: '0 0 14px' }}>
-            Pre-selects this tank on pages with a tank dropdown, like the Livestock Journal.
-          </p>
-          <select
-            value={defaultTank ?? ''}
-            onChange={e => setDefaultTank(e.target.value || null)}
-            style={{ width: '100%' }}
-          >
-            <option value="">No default</option>
-            {tanks.map(t => (
-              <option key={t.id} value={t.id}>{t.name}</option>
-            ))}
-          </select>
-        </section>
-
         <section style={{ paddingBottom: 20, borderBottom: '0.5px solid var(--border-sub)' }}>
           <p style={{ fontWeight: 500, fontSize: 14, margin: '0 0 4px', color: 'var(--text)', display: 'flex', alignItems: 'center', gap: 6 }}>
             <Download size={14} color="var(--text-2)" />Data Backup
@@ -361,7 +402,7 @@ export default function Settings() {
           </div>
         </section>
 
-        <section>
+        <section style={{ paddingBottom: 20, borderBottom: '0.5px solid var(--border-sub)' }}>
           <p style={{ fontWeight: 500, fontSize: 14, margin: '0 0 12px', color: 'var(--text)', display: 'flex', alignItems: 'center', gap: 6 }}>
             <Info size={14} color="var(--text-2)" />About
           </p>
@@ -433,6 +474,17 @@ export default function Settings() {
           </p>
         </section>
         </div>{/* end right column */}
+
+        <section style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 12, paddingTop: 20 }}>
+          {settingsSaved && <span style={{ fontSize: 12, color: 'var(--green)' }}>Settings saved</span>}
+          <button
+            onClick={saveSettings}
+            disabled={!settingsChanged || savingSettings}
+            style={{ padding: '8px 18px', borderRadius: 8, border: '0.5px solid var(--blue-border)', background: settingsChanged && !savingSettings ? 'var(--blue-bg)' : 'var(--surface-2)', color: settingsChanged && !savingSettings ? 'var(--blue)' : 'var(--text-3)', fontWeight: 500, cursor: settingsChanged && !savingSettings ? 'pointer' : 'default' }}
+          >
+            {savingSettings ? 'Saving…' : 'Save Settings'}
+          </button>
+        </section>
 
       </Card>
     </div>
