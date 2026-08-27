@@ -1736,9 +1736,248 @@ ${taskRows ? `<h2>Pending Maintenance</h2>
       )}
 
       {/* DAILY TAB */}
-      {tab === 'daily' && (
-        <div />
-      )}
+      {tab === 'daily' && (() => {
+        const todayTasks = dailyTasks
+          .filter((t: any) => t.days.split(',').map(Number).includes(todayColIndex))
+          .sort((a: any, b: any) => a.hour !== b.hour ? a.hour - b.hour : a.minute - b.minute)
+
+        // Derive feeding entries from added inhabitants — one entry per unique species
+        const feedingEntries = (() => {
+          const seen = new Set<string>()
+          const entries: { name: string; times: number; food: string | null }[] = []
+          for (const f of (fish.data ?? [])) {
+            if (f.fish_status !== 'added' || !f.feeding_times_per_day) continue
+            if (seen.has(f.species_slug)) continue
+            seen.add(f.species_slug)
+            entries.push({ name: f.common_name ?? f.species_slug, times: f.feeding_times_per_day, food: f.food_types ?? null })
+          }
+          return entries
+        })()
+
+        return (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+
+            {/* Add task form */}
+            <Card>
+              <SectionTitle>Add Daily Task</SectionTitle>
+              <div style={{ display: 'flex', gap: 10, marginBottom: 12, flexWrap: 'wrap' }}>
+                <div style={{ flex: 1, minWidth: 160 }}>
+                  <FieldLabel>Task Name</FieldLabel>
+                  <input
+                    value={dtName} onChange={e => setDtName(e.target.value)}
+                    placeholder="e.g. CO2 on, Lights on, Dose ferts"
+                    style={{ width: '100%', boxSizing: 'border-box' }}
+                    onKeyDown={e => e.key === 'Enter' && addDailyTask()}
+                  />
+                </div>
+                {(() => {
+                  const hour24 = Number(dtHour)
+                  const h12 = (hour24 % 12) || 12
+                  const ampm = hour24 < 12 ? 'AM' : 'PM'
+                  const setHourFrom12 = (newH12: number) => {
+                    const newHour24 = ampm === 'AM' ? newH12 % 12 : (newH12 % 12) + 12
+                    setDtHour(String(newHour24))
+                  }
+                  const setAmPm = (period: 'AM' | 'PM') => {
+                    const newHour24 = period === 'AM' ? h12 % 12 : (h12 % 12) + 12
+                    setDtHour(String(newHour24))
+                  }
+                  const pillStyle = (on: boolean): React.CSSProperties => ({
+                    padding: '6px 0', borderRadius: 6, fontSize: 12, cursor: 'pointer',
+                    border: on ? '0.5px solid var(--blue-border)' : '0.5px solid var(--btn-border)',
+                    background: on ? 'var(--blue-bg)' : 'transparent',
+                    color: on ? 'var(--blue)' : 'var(--text-2)',
+                    fontWeight: on ? 500 : 400,
+                  })
+                  return (
+                    <div style={{ position: 'relative', width: isMobile ? '100%' : undefined }}>
+                      <FieldLabel>Time</FieldLabel>
+                      <button
+                        type="button"
+                        onClick={() => setDtTimePickerOpen(o => !o)}
+                        style={{
+                          display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10,
+                          width: isMobile ? '100%' : 120, boxSizing: 'border-box',
+                          padding: '6px 10px', borderRadius: 8, border: '0.5px solid var(--btn-border)',
+                          background: 'var(--surface)', color: 'var(--text)', fontSize: 13, cursor: 'pointer',
+                        }}
+                      >
+                        <span>{h12}:{String(Number(dtMinute)).padStart(2, '0')} {ampm}</span>
+                        <Clock size={14} style={{ color: 'var(--text-3)', flexShrink: 0 }} />
+                      </button>
+
+                      {dtTimePickerOpen && (
+                        <>
+                          <div onClick={() => setDtTimePickerOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 90 }} />
+                          <div style={{
+                            position: 'absolute', top: 'calc(100% + 4px)', left: 0, right: isMobile ? 0 : 'auto', zIndex: 100,
+                            width: isMobile ? '100%' : 250,
+                            background: 'var(--surface)', border: '0.5px solid var(--border)', borderRadius: 10,
+                            boxShadow: '0 8px 24px rgba(0,0,0,0.16)', padding: 12,
+                          }}>
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 4, marginBottom: 10 }}>
+                              {Array.from({ length: 12 }, (_, i) => i + 1).map(h => (
+                                <button key={h} type="button" onClick={() => setHourFrom12(h)} style={pillStyle(h === h12)}>{h}</button>
+                              ))}
+                            </div>
+                            <div style={{ display: 'flex', gap: 4, marginBottom: 10 }}>
+                              {[0, 15, 30, 45].map(m => (
+                                <button key={m} type="button" onClick={() => setDtMinute(String(m))} style={{ ...pillStyle(m === Number(dtMinute)), flex: 1 }}>
+                                  {String(m).padStart(2, '0')}
+                                </button>
+                              ))}
+                            </div>
+                            <div style={{ display: 'flex', gap: 4 }}>
+                              {(['AM', 'PM'] as const).map(period => (
+                                <button key={period} type="button" onClick={() => setAmPm(period)} style={{ ...pillStyle(period === ampm), flex: 1 }}>
+                                  {period}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  )
+                })()}
+              </div>
+
+              <div style={{ marginBottom: 12 }}>
+                <FieldLabel>Days</FieldLabel>
+                <div style={{ display: 'flex', gap: isMobile ? 3 : 6, width: '100%' }}>
+                  {DAY_NAMES.map((name, i) => {
+                    const on = dtDays.includes(i)
+                    return (
+                      <button key={name} onClick={() => setDtDays(prev => on ? prev.filter(x => x !== i) : [...prev, i].sort())}
+                        style={{
+                          flex: 1, minWidth: 0, padding: isMobile ? '7px 1px' : '4px 6px', borderRadius: 6,
+                          fontSize: isMobile ? 12 : 12, cursor: 'pointer',
+                          border: on ? '0.5px solid var(--blue-border)' : '0.5px solid var(--btn-border)',
+                          background: on ? 'var(--blue-bg)' : 'transparent',
+                          color: on ? 'var(--blue)' : 'var(--text-2)',
+                          fontWeight: on ? 500 : 400,
+                          whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'clip',
+                        }}
+                      >{isMobile ? name[0] : name}</button>
+                    )
+                  })}
+                  <button onClick={() => setDtDays(dtDays.length === 7 ? [] : [0, 1, 2, 3, 4, 5, 6])}
+                    style={{
+                      flex: isMobile ? 1.4 : 1.2, minWidth: 0, padding: isMobile ? '7px 1px' : '4px 6px', borderRadius: 6,
+                      fontSize: isMobile ? 11 : 11, cursor: 'pointer', border: '0.5px solid var(--btn-border)',
+                      background: 'transparent', color: 'var(--text-3)',
+                      whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'clip',
+                    }}>
+                    {dtDays.length === 7 ? 'None' : (isMobile ? 'All' : 'Every day')}
+                  </button>
+                </div>
+              </div>
+
+              <div style={{ marginBottom: 14 }}>
+                <FieldLabel>Colour</FieldLabel>
+                <div style={{ display: 'flex', gap: isMobile ? 3 : 6, width: '100%' }}>
+                  {DAILY_COLORS.map(c => (
+                    <button key={c} onClick={() => setDtColor(c)} style={{
+                      flex: 1, minWidth: 0, height: 32, borderRadius: 6, background: c, cursor: 'pointer',
+                      border: dtColor === c ? `2.5px solid var(--text)` : '2px solid transparent',
+                      padding: 0,
+                    }} />
+                  ))}
+                </div>
+              </div>
+
+              <button
+                onClick={addDailyTask}
+                disabled={!dtName.trim() || dtDays.length === 0}
+                style={{
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                  padding: '7px 18px', borderRadius: 8, fontSize: 13, fontWeight: 500, cursor: 'pointer',
+                  border: '0.5px solid var(--green-border)', background: 'var(--green-bg)', color: 'var(--green)',
+                  opacity: dtName.trim() && dtDays.length > 0 ? 1 : 0.45,
+                  width: '100%', boxSizing: 'border-box',
+                }}
+              >
+                <Plus size={13} />Add Daily Task
+              </button>
+            </Card>
+
+            {/* Today's tasks */}
+            <Card>
+              <SectionTitle>Today's Tasks</SectionTitle>
+              {feedingEntries.map((entry, i) => (
+                <div key={entry.name} style={{ display: 'flex', alignItems: isMobile ? 'flex-start' : 'center', gap: 10, padding: '8px 0', borderBottom: (i === feedingEntries.length - 1 && todayTasks.length === 0) ? 'none' : '0.5px solid var(--border-sub)' }}>
+                  <Utensils size={12} style={{ color: 'var(--text-3)', flexShrink: 0, marginTop: isMobile ? 3 : 0 }} />
+                  {isMobile ? (
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <span style={{ fontSize: 13, color: 'var(--text)' }}>Feed {entry.name}</span>
+                      {entry.food && <p style={{ margin: '2px 0 0', fontSize: 11, color: 'var(--text-3)' }}>{entry.food}</p>}
+                    </div>
+                  ) : (
+                    <span style={{ fontSize: 13, color: 'var(--text)', flex: 1 }}>
+                      Feed {entry.name}
+                      {entry.food && <span style={{ fontSize: 11, color: 'var(--text-3)', marginLeft: 5 }}>({entry.food})</span>}
+                    </span>
+                  )}
+                  <span style={{ fontSize: 11, fontWeight: 500, color: 'var(--blue)', background: 'var(--blue-bg)', border: '0.5px solid var(--blue-border)', borderRadius: 5, padding: '1px 6px', flexShrink: 0 }}>
+                    ×{entry.times} daily
+                  </span>
+                </div>
+              ))}
+              {todayTasks.length === 0 && feedingEntries.length === 0 && (
+                <p style={{ fontSize: 13, color: 'var(--text-2)', margin: 0 }}>No tasks scheduled for today.</p>
+              )}
+              {todayTasks.map((task: any, i: number) => {
+                const c = task.color ?? '#1e88e5'
+                return (
+                  <div key={task.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 0', borderBottom: i === todayTasks.length - 1 ? 'none' : '0.5px solid var(--border-sub)' }}>
+                    <span style={{ width: 6, height: 6, borderRadius: '50%', background: c, flexShrink: 0 }} />
+                    <span style={{ fontSize: 12, color: 'var(--text-3)', fontVariantNumeric: 'tabular-nums', flexShrink: 0, minWidth: 36 }}>
+                      {String(task.hour).padStart(2, '0')}:{String(task.minute).padStart(2, '0')}
+                    </span>
+                    <span style={{ fontSize: 13, color: 'var(--text)', flex: 1 }}>{task.name}</span>
+                    <span style={{ fontSize: 11, color: 'var(--text-3)', flexShrink: 0 }}>
+                      {task.days.split(',').map((d: string) => DAY_ABBR[Number(d)]).join(', ')}
+                    </span>
+                    <button onClick={() => removeDailyTask(task.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-3)', lineHeight: 0, padding: 2, flexShrink: 0 }}>
+                      <X size={13} />
+                    </button>
+                  </div>
+                )
+              })}
+            </Card>
+
+            {/* All scheduled tasks */}
+            {dailyTasks.filter((t: any) => !t.days.split(',').map(Number).includes(todayColIndex)).length > 0 && (
+              <Card>
+                <SectionTitle>Other Scheduled Tasks</SectionTitle>
+                {(() => {
+                  const otherTasks = dailyTasks
+                    .filter((t: any) => !t.days.split(',').map(Number).includes(todayColIndex))
+                    .sort((a: any, b: any) => a.hour !== b.hour ? a.hour - b.hour : a.minute - b.minute)
+                  return otherTasks.map((task: any, i: number) => {
+                    const c = task.color ?? '#1e88e5'
+                    return (
+                      <div key={task.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 0', borderBottom: i === otherTasks.length - 1 ? 'none' : '0.5px solid var(--border-sub)' }}>
+                        <span style={{ width: 6, height: 6, borderRadius: '50%', background: c, flexShrink: 0 }} />
+                        <span style={{ fontSize: 12, color: 'var(--text-3)', fontVariantNumeric: 'tabular-nums', flexShrink: 0, minWidth: 36 }}>
+                          {String(task.hour).padStart(2, '0')}:{String(task.minute).padStart(2, '0')}
+                        </span>
+                        <span style={{ fontSize: 13, color: 'var(--text)', flex: 1 }}>{task.name}</span>
+                        <span style={{ fontSize: 11, color: 'var(--text-3)', flexShrink: 0 }}>
+                          {task.days.split(',').map((d: string) => DAY_ABBR[Number(d)]).join(', ')}
+                        </span>
+                        <button onClick={() => removeDailyTask(task.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-3)', lineHeight: 0, padding: 2, flexShrink: 0 }}>
+                          <X size={13} />
+                        </button>
+                      </div>
+                    )
+                  })
+                })()}
+              </Card>
+            )}
+          </div>
+        )
+      })()}
 
       {/* GALLERY TAB */}
       {tab === 'gallery' && (
