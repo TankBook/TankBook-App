@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
-import { useParams, Link, useNavigate } from 'react-router-dom'
-import { Fish, Leaf, Droplets, CalendarClock, Bell, Pencil, Trash2, Plus, ChevronLeft, Sun, Camera, X, Utensils, BookOpen, FlaskConical, Thermometer, Filter, Layers, Lightbulb, Ruler, ChevronLeft as Prev, ChevronRight as Next, type LucideIcon } from 'lucide-react'
+import { useParams, Link, useNavigate, useSearchParams } from 'react-router-dom'
+import { Fish, Leaf, Droplets, CalendarCheck, Bell, Pencil, Trash2, Plus, ChevronLeft, ChevronDown, ListChecks, Camera, X, Utensils, BookOpen, FlaskConical, Home, Clock, Calendar, ChevronLeft as Prev, ChevronRight as Next, type LucideIcon } from 'lucide-react'
 import {
   LineChart, Line, XAxis, YAxis, Tooltip,
   ResponsiveContainer,
@@ -10,20 +10,33 @@ import { api, type Tank } from '../api/client'
 import { useSettings, formatDate, formatDateTime, fromMM, toMM, fmtDim, dimInputProps } from '../context/SettingsContext'
 import { Card, FieldLabel, Tag, SectionTitle, tabStyle } from '../components/ui'
 
-type Tab = 'inhabitants' | 'plants' | 'parameters' | 'schedule' | 'daily' | 'alerts' | 'gallery' | 'edit'
+type Tab = 'home' | 'inhabitants' | 'plants' | 'parameters' | 'weekly' | 'daily' | 'alerts' | 'gallery' | 'edit'
 
 const TASK_TYPES = ['Water change', 'Filter clean', 'Fertiliser dose', 'CO2 check', 'Glass clean', 'Gravel vac', 'Other']
 const DAY_NAMES = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
 const HEALTH_STATUSES = ['healthy', 'sick', 'quarantine', 'deceased']
 const TAB_ICONS: Record<string, LucideIcon> = {
+  home: Home,
   inhabitants: Fish,
   plants: Leaf,
   parameters: Droplets,
-  schedule: CalendarClock,
-  daily: Sun,
+  weekly: CalendarCheck,
+  daily: ListChecks,
   alerts: Bell,
   gallery: Camera,
   edit: Pencil,
+}
+
+const TAB_LABELS: Record<Tab, string> = {
+  home: 'Home',
+  inhabitants: 'Inhabitants',
+  plants: 'Plants',
+  parameters: 'Parameters',
+  weekly: 'Weekly Tasks',
+  daily: 'Daily Tasks',
+  alerts: 'Alerts',
+  gallery: 'Gallery',
+  edit: 'Edit',
 }
 
 const DAY_ABBR = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
@@ -47,11 +60,176 @@ const PLANT_STATUS_COLORS: Record<string, { bg: string; color: string }> = {
   removed: { bg: 'var(--tag-bg)',   color: 'var(--text-2)' },
 }
 
+// General fishkeeping guideline ranges used to colour-code the latest-parameter cards.
+// idealMin/idealMax = healthy range (green); okMin/okMax = borderline (amber); outside = danger (red).
+type ParamRange = { idealMin: number; idealMax: number; okMin: number; okMax: number }
+function getParamRange(key: string, waterType: string): ParamRange | null {
+  const marine = waterType !== 'freshwater'
+  switch (key) {
+    case 'ph': return marine
+      ? { idealMin: 8.0, idealMax: 8.4, okMin: 7.8, okMax: 8.6 }
+      : { idealMin: 6.5, idealMax: 7.5, okMin: 6.0, okMax: 8.0 }
+    case 'temperature_c': return { idealMin: 23, idealMax: 27, okMin: 20, okMax: 30 }
+    case 'ammonia_ppm': return { idealMin: 0, idealMax: 0, okMin: 0, okMax: 0.25 }
+    case 'nitrite_ppm': return { idealMin: 0, idealMax: 0, okMin: 0, okMax: 0.5 }
+    case 'nitrate_ppm': return marine
+      ? { idealMin: 0, idealMax: 5, okMin: 0, okMax: 20 }
+      : { idealMin: 0, idealMax: 20, okMin: 0, okMax: 40 }
+    case 'gh_dgh': return { idealMin: 4, idealMax: 12, okMin: 2, okMax: 20 }
+    case 'kh_dkh': return { idealMin: 3, idealMax: 8, okMin: 1, okMax: 12 }
+    case 'salinity_ppt': return { idealMin: 32, idealMax: 35, okMin: 28, okMax: 38 }
+    case 'specific_gravity': return { idealMin: 1.023, idealMax: 1.025, okMin: 1.020, okMax: 1.026 }
+    default: return null
+  }
+}
+type ParamStatus = 'ideal' | 'ok' | 'bad'
+function getParamStatus(key: string, value: number, waterType: string): ParamStatus | null {
+  const r = getParamRange(key, waterType)
+  if (!r) return null
+  if (value >= r.idealMin && value <= r.idealMax) return 'ideal'
+  if (value >= r.okMin && value <= r.okMax) return 'ok'
+  return 'bad'
+}
+const PARAM_STATUS_COLORS: Record<ParamStatus, { bg: string; color: string; border: string }> = {
+  ideal: { bg: 'var(--green-bg)', color: 'var(--green)', border: 'var(--green-border)' },
+  ok:    { bg: 'var(--amber-bg)', color: 'var(--amber)', border: 'var(--amber-border)' },
+  bad:   { bg: 'var(--red-bg)',   color: 'var(--red)',   border: 'var(--red-border)' },
+}
+
 const FISH_STATUSES = ['planned', 'added', 'removed']
 const FISH_STATUS_COLORS: Record<string, { bg: string; color: string }> = {
   planned: { bg: 'var(--blue-bg)',   color: 'var(--blue)'   },
   added:   { bg: 'var(--green-bg)',  color: 'var(--green)'  },
   removed: { bg: 'var(--tag-bg)',    color: 'var(--text-2)' },
+}
+
+function TankDimensionWireframe({ tank, unitSystem }: { tank: Tank; unitSystem: Parameters<typeof fmtDim>[1] }) {
+  const width = fmtDim(tank.width_mm, unitSystem)
+  const height = fmtDim(tank.height_mm, unitSystem)
+  const depth = fmtDim(tank.depth_mm, unitSystem)
+  const stroke = 'var(--blue)'
+  const faintStroke = 'var(--blue-border)'
+
+  return (
+    <div style={{ width: '100%', maxWidth: 760, margin: '0 auto', overflow: 'hidden' }}>
+      <svg viewBox="0 0 640 360" role="img" aria-label={`Tank wireframe: width ${width}, depth ${depth}, height ${height}`} style={{ display: 'block', width: '100%', height: 'auto' }}>
+        <g fill="none" stroke={stroke} strokeWidth="2">
+          <path d="M170 120 L460 120 L460 280 L170 280 Z" fill="var(--surface)" fillOpacity="0.72" />
+          <path d="M170 120 L250 65 L540 65 L460 120 Z" fill="var(--surface)" fillOpacity="0.32" />
+          <path d="M460 120 L540 65 L540 225 L460 280 Z" fill="var(--surface-2)" fillOpacity="0.6" />
+          <path d="M170 280 L250 225 L540 225" stroke={faintStroke} strokeDasharray="6 6" />
+          <path d="M170 120 L250 65 M170 280 L250 225" stroke={faintStroke} />
+        </g>
+        <g fill="none" stroke={stroke} strokeWidth="1.5">
+          <path d="M170 293 L460 293 M170 286 L170 300 M460 286 L460 300" />
+          <path d="M475 292 L555 237 M475 286 L475 298 M555 231 L555 243" />
+          <path d="M157 120 L157 280 M150 120 L164 120 M150 280 L164 280" />
+        </g>
+        <g fill="var(--text)" fontFamily="system-ui, sans-serif" textAnchor="middle">
+          <text x="315" y="313" fontSize="15" fontWeight="600">Width: {width}</text>
+          <text x="531" y="288" fontSize="15" fontWeight="600" transform="rotate(-34.5 531 288)">Depth: {depth}</text>
+          <text x="137" y="205" fontSize="15" fontWeight="600" transform="rotate(-90 137 205)">Height: {height}</text>
+        </g>
+      </svg>
+    </div>
+  )
+}
+
+function DatePickerField({ value, onChange, isMobile }: { value: string; onChange: (v: string) => void; isMobile: boolean }) {
+  const { dateFormat } = useSettings()
+  const [open, setOpen] = useState(false)
+  const [viewMonth, setViewMonth] = useState(() => {
+    const d = value ? new Date(`${value}T00:00:00`) : new Date()
+    return new Date(d.getFullYear(), d.getMonth(), 1)
+  })
+
+  const pad = (n: number) => String(n).padStart(2, '0')
+  const toIso = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
+  const selected = value ? new Date(`${value}T00:00:00`) : null
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+
+  const year = viewMonth.getFullYear()
+  const month = viewMonth.getMonth()
+  const firstDay = new Date(year, month, 1)
+  const startOffset = (firstDay.getDay() + 6) % 7
+  const daysInMonth = new Date(year, month + 1, 0).getDate()
+  const cells: (Date | null)[] = []
+  for (let i = 0; i < startOffset; i++) cells.push(null)
+  for (let d = 1; d <= daysInMonth; d++) cells.push(new Date(year, month, d))
+
+  const monthLabel = viewMonth.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' })
+
+  return (
+    <div style={{ position: 'relative', width: isMobile ? '100%' : undefined }}>
+      <button
+        type="button"
+        onClick={() => {
+          if (!open && value) setViewMonth(new Date(new Date(`${value}T00:00:00`).getFullYear(), new Date(`${value}T00:00:00`).getMonth(), 1))
+          setOpen(o => !o)
+        }}
+        style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10,
+          width: '100%', boxSizing: 'border-box',
+          padding: '6px 10px', borderRadius: 8, border: '0.5px solid var(--btn-border)',
+          background: 'var(--surface)', color: value ? 'var(--text)' : 'var(--text-3)', fontSize: 13, cursor: 'pointer',
+        }}
+      >
+        <span>{value ? formatDate(value, dateFormat) : 'Select date'}</span>
+        <Calendar size={14} style={{ color: 'var(--text-3)', flexShrink: 0 }} />
+      </button>
+
+      {open && (
+        <>
+          <div onClick={() => setOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 90 }} />
+          <div style={{
+            position: 'absolute', top: 'calc(100% + 4px)', left: 0, right: isMobile ? 0 : 'auto', zIndex: 100,
+            width: isMobile ? '100%' : 250,
+            background: 'var(--surface)', border: '0.5px solid var(--border)', borderRadius: 10,
+            boxShadow: '0 8px 24px rgba(0,0,0,0.16)', padding: 12,
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+              <button type="button" onClick={() => setViewMonth(new Date(year, month - 1, 1))} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-2)', padding: 4, lineHeight: 0 }}>
+                <Prev size={16} />
+              </button>
+              <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--text)' }}>{monthLabel}</span>
+              <button type="button" onClick={() => setViewMonth(new Date(year, month + 1, 1))} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-2)', padding: 4, lineHeight: 0 }}>
+                <Next size={16} />
+              </button>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 2, marginBottom: 4 }}>
+              {['M', 'T', 'W', 'T', 'F', 'S', 'S'].map((d, i) => (
+                <div key={i} style={{ textAlign: 'center', fontSize: 10, color: 'var(--text-3)', fontWeight: 600 }}>{d}</div>
+              ))}
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 2 }}>
+              {cells.map((d, i) => {
+                if (!d) return <div key={i} />
+                const iso = toIso(d)
+                const isSelected = selected != null && d.getTime() === selected.getTime()
+                const isToday = d.getTime() === today.getTime()
+                return (
+                  <button
+                    key={i} type="button"
+                    onClick={() => { onChange(iso); setOpen(false) }}
+                    style={{
+                      padding: '6px 0', borderRadius: 6, fontSize: 12, cursor: 'pointer',
+                      border: isSelected ? '0.5px solid var(--blue-border)' : isToday ? '0.5px solid var(--btn-border)' : '0.5px solid transparent',
+                      background: isSelected ? 'var(--blue-bg)' : 'transparent',
+                      color: isSelected ? 'var(--blue)' : 'var(--text)',
+                      fontWeight: isSelected ? 500 : 400,
+                    }}
+                  >
+                    {d.getDate()}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  )
 }
 
 type StripEntry = { value: number; color: string; label?: string | number }
@@ -270,6 +448,14 @@ function EditTankPanel({ tank, onSave }: { tank: any; onSave: () => void }) {
   const [saved, setSaved] = useState(false)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [deleting, setDeleting] = useState(false)
+  const [isMobile, setIsMobile] = useState(() => window.matchMedia('(max-width: 768px)').matches)
+
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 768px)')
+    const handler = (e: MediaQueryListEvent) => setIsMobile(e.matches)
+    mq.addEventListener('change', handler)
+    return () => mq.removeEventListener('change', handler)
+  }, [])
 
   async function save() {
     await fetch(`/api/tanks/${tank.id}`, {
@@ -344,8 +530,8 @@ function EditTankPanel({ tank, onSave }: { tank: any; onSave: () => void }) {
           </div>
         )}
       </div>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-        <button onClick={save} style={{ padding: '7px 16px', borderRadius: 8, border: '0.5px solid var(--blue-border)', background: 'var(--blue-bg)', color: 'var(--blue)', fontSize: 13, fontWeight: 500, cursor: 'pointer' }}>Save changes</button>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+        <button onClick={save} style={{ padding: '7px 16px', borderRadius: 8, border: '0.5px solid var(--blue-border)', background: 'var(--blue-bg)', color: 'var(--blue)', fontSize: 13, fontWeight: 500, cursor: 'pointer', width: isMobile ? '100%' : undefined, boxSizing: 'border-box' }}>Save changes</button>
         {saved && <span style={{ fontSize: 12, color: 'var(--green)' }}>Saved ✓</span>}
       </div>
 
@@ -354,7 +540,7 @@ function EditTankPanel({ tank, onSave }: { tank: any; onSave: () => void }) {
         {!showDeleteConfirm ? (
           <button
             onClick={() => setShowDeleteConfirm(true)}
-            style={{ padding: '7px 16px', borderRadius: 8, border: '0.5px solid var(--red-border)', background: 'transparent', color: 'var(--red)', fontSize: 13, cursor: 'pointer' }}
+            style={{ padding: '7px 16px', borderRadius: 8, border: '0.5px solid var(--red-border)', background: 'transparent', color: 'var(--red)', fontSize: 13, cursor: 'pointer', width: isMobile ? '100%' : undefined, boxSizing: 'border-box' }}
           >
             Delete Tank…
           </button>
@@ -620,7 +806,19 @@ function TankGraphic({ fishCount, plantCount, co2 }: { fishCount: number; plantC
 
 export default function TankDetail() {
   const { id } = useParams<{ id: string }>()
-  const [tab, setTab] = useState<Tab>('inhabitants')
+  const [searchParams, setSearchParams] = useSearchParams()
+  const [tab, setTab] = useState<Tab>(() => {
+    const t = searchParams.get('tab')
+    return t && t in TAB_ICONS ? (t as Tab) : 'home'
+  })
+
+  useEffect(() => {
+    setSearchParams(prev => {
+      const next = new URLSearchParams(prev)
+      next.set('tab', tab)
+      return next
+    }, { replace: true })
+  }, [tab])
   const { data: tank, reload: reloadTank } = useTank(id!)
   const fish = useFish(id!)
   const plants = usePlants(id!)
@@ -675,13 +873,23 @@ export default function TankDetail() {
   const [dtHour, setDtHour] = useState('8')
   const [dtMinute, setDtMinute] = useState('0')
   const [dtDays, setDtDays] = useState<number[]>([0, 1, 2, 3, 4, 5, 6])
+  const [dtTimePickerOpen, setDtTimePickerOpen] = useState(false)
   const [dtColor, setDtColor] = useState(DAILY_COLORS[0])
 
   const [isMobile, setIsMobile] = useState(() => window.matchMedia('(max-width: 768px)').matches)
+  const [isCompactTabs, setIsCompactTabs] = useState(() => window.matchMedia('(max-width: 900px)').matches)
+  const [tabMenuOpen, setTabMenuOpen] = useState(false)
 
   useEffect(() => {
     const mq = window.matchMedia('(max-width: 768px)')
     const handler = (e: MediaQueryListEvent) => setIsMobile(e.matches)
+    mq.addEventListener('change', handler)
+    return () => mq.removeEventListener('change', handler)
+  }, [])
+
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 900px)')
+    const handler = (e: MediaQueryListEvent) => setIsCompactTabs(e.matches)
     mq.addEventListener('change', handler)
     return () => mq.removeEventListener('change', handler)
   }, [])
@@ -703,9 +911,10 @@ export default function TankDetail() {
   const [skipTimes, setSkipTimes] = useState('1')
   const [editingCompletedTaskId, setEditingCompletedTaskId] = useState<string | null>(null)
   const [editingCompletedDate, setEditingCompletedDate] = useState('')
+  const [completedExpanded, setCompletedExpanded] = useState(false)
 
   useEffect(() => {
-    if (tab === 'schedule') loadTasks()
+    if (tab === 'weekly' || tab === 'home') loadTasks()
     if (tab === 'daily') loadDailyTasks()
     if (tab === 'gallery') loadGallery()
   }, [tab, id])
@@ -977,6 +1186,11 @@ ${taskRows ? `<h2>Pending Maintenance</h2>
 
   const pendingTasks = tasks.filter(t => t.status === 'pending')
   const doneTasks = tasks.filter(t => t.status === 'done')
+  const inhabitantCounts = {
+    fish: (fish.data ?? []).filter(f => f.organism_type === 'fish').reduce((sum, f) => sum + f.quantity, 0),
+    invertebrate: (fish.data ?? []).filter(f => f.organism_type === 'invertebrate').reduce((sum, f) => sum + f.quantity, 0),
+    amphibian: (fish.data ?? []).filter(f => f.organism_type === 'amphibian').reduce((sum, f) => sum + f.quantity, 0),
+  }
   const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0)
   const overdueTasks = pendingTasks.filter(t => { const d = new Date(t.due_at); d.setHours(0, 0, 0, 0); return d < todayStart })
 
@@ -984,7 +1198,7 @@ ${taskRows ? `<h2>Pending Maintenance</h2>
     <div>
       <div style={{ marginBottom: 24 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <Link to="/" style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 13, color: 'var(--text-2)', textDecoration: 'none' }}>
+          <Link to="/" style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 13, color: 'var(--text-2)', textDecoration: 'none', padding: '6px 10px', border: '0.5px solid var(--btn-border)', borderRadius: 7, background: 'transparent' }}>
             <ChevronLeft size={13} />All tanks
           </Link>
           <button
@@ -996,7 +1210,6 @@ ${taskRows ? `<h2>Pending Maintenance</h2>
         </div>
         <div style={{ marginTop: 8 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
-            <h1 style={{ margin: 0, fontSize: 22, fontWeight: 500, color: 'var(--text)' }}>{tank.name}</h1>
             {tank.water_type && tank.water_type !== 'freshwater' && (() => {
               const styles: Record<string, { bg: string; color: string; label: string }> = {
                 saltwater: { bg: 'var(--blue-bg)',  color: 'var(--blue)',  label: 'Saltwater' },
@@ -1006,40 +1219,11 @@ ${taskRows ? `<h2>Pending Maintenance</h2>
               return s ? <Tag bg={s.bg} color={s.color}>{s.label}</Tag> : null
             })()}
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 4, flexWrap: 'wrap' }}>
-            <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-2)' }}>{tank.volume_litres} L</span>
-            {(tank.width_mm || tank.height_mm || tank.depth_mm) && (
-              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3, fontSize: 12, color: 'var(--text-3)' }}>
-                <Ruler size={11} />
-                {fmtDim(tank.width_mm, unitSystem)} × {fmtDim(tank.height_mm, unitSystem)} × {fmtDim(tank.depth_mm, unitSystem)}
-              </span>
-            )}
-          </div>
-          {(tank.has_heater || tank.co2_injection || tank.filter_flow_lph || tank.substrate || tank.lighting) && (
+          {tank.co2_injection && (
             <div style={{ display: 'flex', gap: 6, marginTop: 8, flexWrap: 'wrap' }}>
-              {tank.has_heater && (
-                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11, fontWeight: 500, padding: '3px 8px', borderRadius: 6, background: 'var(--orange-bg)', color: 'var(--orange)', border: '0.5px solid var(--orange-border)' }}>
-                  <Thermometer size={11} />{tank.heater_watts ? `${tank.heater_watts}W Heater` : 'Heater'}
-                </span>
-              )}
               {tank.co2_injection && (
                 <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11, fontWeight: 500, padding: '3px 8px', borderRadius: 6, background: 'var(--green-bg)', color: 'var(--green)', border: '0.5px solid var(--green-border)' }}>
                   <FlaskConical size={11} />CO₂
-                </span>
-              )}
-              {tank.filter_flow_lph && (
-                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11, fontWeight: 500, padding: '3px 8px', borderRadius: 6, background: 'var(--blue-bg)', color: 'var(--blue)', border: '0.5px solid var(--blue-border)' }}>
-                  <Filter size={11} />{tank.filter_flow_lph} L/h
-                </span>
-              )}
-              {tank.substrate && (
-                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11, fontWeight: 500, padding: '3px 8px', borderRadius: 6, background: 'var(--amber-bg)', color: 'var(--amber)', border: '0.5px solid var(--amber-border)' }}>
-                  <Layers size={11} />{tank.substrate}
-                </span>
-              )}
-              {tank.lighting && (
-                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11, fontWeight: 500, padding: '3px 8px', borderRadius: 6, background: 'var(--surface-2)', color: 'var(--text-2)', border: '0.5px solid var(--border)' }}>
-                  <Lightbulb size={11} />{tank.lighting}
                 </span>
               )}
             </div>
@@ -1079,41 +1263,208 @@ ${taskRows ? `<h2>Pending Maintenance</h2>
         </div>
       )}
 
-      <div style={{ display: 'flex', gap: 4, width: 'fit-content', margin: '0 auto 20px' }}>
-        {(['inhabitants', 'plants', 'parameters', 'schedule', 'daily', 'alerts', 'gallery', 'edit'] as Tab[]).map(t => {
-          const Icon = TAB_ICONS[t]
-          const label = t.charAt(0).toUpperCase() + t.slice(1)
-          return (
-            <button
-              key={t}
-              title={label}
-              onClick={() => setTab(t)}
-              style={{ ...tabStyle(tab === t), position: 'relative', display: 'flex', alignItems: 'center', gap: 5, justifyContent: 'center', padding: isMobile ? '7px 10px' : '6px 12px' }}
-            >
-              <Icon size={isMobile ? 16 : 13} />
-              {!isMobile && label}
-              {t === 'alerts' && unackAlerts.length > 0 && (
-                <span style={{
-                  position: 'absolute', top: 2, right: 2,
-                  background: '#e24b4a', color: '#fff', borderRadius: 10,
-                  fontSize: 9, padding: '1px 4px', lineHeight: 1.4,
-                }}>
-                  {unackAlerts.length}
-                </span>
-              )}
-              {t === 'schedule' && overdueTasks.length > 0 && (
-                <span style={{
-                  position: 'absolute', top: 2, right: 2,
-                  background: 'var(--red-border)', color: '#fff', borderRadius: 10,
-                  fontSize: 9, padding: '1px 4px', lineHeight: 1.4,
-                }}>
-                  {overdueTasks.length}
-                </span>
-              )}
-            </button>
-          )
-        })}
-      </div>
+      {isMobile ? (
+        <div style={{ position: 'relative', marginBottom: 20 }}>
+          <button
+            onClick={() => setTabMenuOpen(o => !o)}
+            style={{
+              display: 'flex', alignItems: 'center', width: '100%',
+              fontSize: 14, fontWeight: 500, padding: '10px 12px',
+              borderRadius: 10, border: '0.5px solid var(--border)',
+              background: 'var(--surface)', color: 'var(--text)', cursor: 'pointer',
+            }}
+          >
+            {(() => {
+              const Icon = TAB_ICONS[tab]
+              return <Icon size={16} style={{ flexShrink: 0 }} />
+            })()}
+            <span style={{ marginLeft: 8, flex: 1, textAlign: 'left' }}>{TAB_LABELS[tab]}</span>
+            <ChevronDown size={16} style={{ flexShrink: 0, transform: tabMenuOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s' }} />
+          </button>
+
+          {tabMenuOpen && (
+            <>
+              <div onClick={() => setTabMenuOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 90 }} />
+              <div style={{
+                position: 'absolute', top: 'calc(100% + 4px)', left: 0, right: 0, zIndex: 100,
+                background: 'var(--surface)', border: '0.5px solid var(--border)', borderRadius: 10,
+                boxShadow: '0 8px 24px rgba(0,0,0,0.16)', overflow: 'hidden',
+              }}>
+                {(['home', 'inhabitants', 'plants', 'parameters', 'daily', 'weekly', 'alerts', 'gallery', 'edit'] as Tab[]).map(t => {
+                  const Icon = TAB_ICONS[t]
+                  const label = TAB_LABELS[t]
+                  const badge =
+                    t === 'alerts' && unackAlerts.length > 0 ? `${unackAlerts.length}` :
+                    t === 'weekly' && overdueTasks.length > 0 ? `${overdueTasks.length}` :
+                    null
+                  return (
+                    <button
+                      key={t}
+                      onClick={() => { setTab(t); setTabMenuOpen(false) }}
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: 8, width: '100%',
+                        padding: '10px 12px', fontSize: 14, textAlign: 'left', cursor: 'pointer',
+                        border: 'none', borderBottom: '0.5px solid var(--border-sub)',
+                        background: tab === t ? 'var(--blue-bg)' : 'transparent',
+                        color: tab === t ? 'var(--blue)' : 'var(--text)',
+                        fontWeight: tab === t ? 500 : 400,
+                      }}
+                    >
+                      <Icon size={16} style={{ flexShrink: 0 }} />
+                      <span style={{ flex: 1 }}>{label}</span>
+                      {badge && (
+                        <span style={{
+                          background: t === 'alerts' ? '#e24b4a' : 'var(--red-border)', color: '#fff', borderRadius: 10,
+                          fontSize: 10, padding: '1px 6px', lineHeight: 1.4,
+                        }}>
+                          {badge}
+                        </span>
+                      )}
+                    </button>
+                  )
+                })}
+              </div>
+            </>
+          )}
+        </div>
+      ) : (
+        <div style={{ display: 'flex', gap: isCompactTabs ? 2 : 4, width: 'fit-content', margin: '0 auto 20px' }}>
+          {(['home', 'inhabitants', 'plants', 'parameters', 'daily', 'weekly', 'alerts', 'gallery', 'edit'] as Tab[]).map(t => {
+            const Icon = TAB_ICONS[t]
+            const label = TAB_LABELS[t]
+            return (
+              <button
+                key={t}
+                title={label}
+                onClick={() => setTab(t)}
+                style={{
+                  ...tabStyle(tab === t), position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  gap: isCompactTabs ? 3 : 5, padding: isCompactTabs ? '6px 7px' : '6px 12px', fontSize: isCompactTabs ? 12 : 13,
+                }}
+              >
+                <Icon size={isCompactTabs ? 12 : 13} />
+                {label}
+                {t === 'alerts' && unackAlerts.length > 0 && (
+                  <span style={{
+                    position: 'absolute', top: 2, right: 2,
+                    background: '#e24b4a', color: '#fff', borderRadius: 10,
+                    fontSize: 9, padding: '1px 4px', lineHeight: 1.4,
+                  }}>
+                    {unackAlerts.length}
+                  </span>
+                )}
+                {t === 'weekly' && overdueTasks.length > 0 && (
+                  <span style={{
+                    position: 'absolute', top: 2, right: 2,
+                    background: 'var(--red-border)', color: '#fff', borderRadius: 10,
+                    fontSize: 9, padding: '1px 4px', lineHeight: 1.4,
+                  }}>
+                    {overdueTasks.length}
+                  </span>
+                )}
+              </button>
+            )
+          })}
+        </div>
+      )}
+
+      {/* HOME TAB */}
+      {tab === 'home' && (
+        <Card style={{ display: 'grid', gap: 16 }}>
+          <h2 style={{ margin: 0, fontSize: 24, fontWeight: 600, color: 'var(--text)', textAlign: 'center' }}>{tank.name}</h2>
+          <TankDimensionWireframe tank={tank} unitSystem={unitSystem} />
+          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fit, minmax(140px, 1fr))', gap: 12 }}>
+            {[
+              { label: 'Fish', count: inhabitantCounts.fish },
+              { label: 'Invertebrates', count: inhabitantCounts.invertebrate },
+              { label: 'Amphibians', count: inhabitantCounts.amphibian },
+            ].map(({ label, count }) => (
+              <Card key={label} style={{ textAlign: 'center', padding: '14px 12px' }}>
+                <p style={{ margin: 0, fontSize: 11, color: 'var(--text-2)' }}>{label}</p>
+                <p style={{ margin: '4px 0 0', fontSize: 24, fontWeight: 600, color: 'var(--text)' }}>{count}</p>
+              </Card>
+            ))}
+          </div>
+
+          {(() => {
+            const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0)
+            const dueTodayTasks = pendingTasks.filter(t => {
+              const d = new Date(t.due_at); d.setHours(0, 0, 0, 0)
+              return d.getTime() === todayStart.getTime()
+            })
+            if (dueTodayTasks.length === 0) return null
+            return (
+              <div>
+                <p style={{ margin: '0 0 8px', fontSize: 11, fontWeight: 600, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                  Weekly Tasks Due Today
+                </p>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {dueTodayTasks.map(t => (
+                    <div key={t.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, padding: '8px 10px', borderRadius: 8, background: 'var(--amber-bg)', border: '0.5px solid var(--amber-border)' }}>
+                      <div style={{ minWidth: 0 }}>
+                        <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--text)' }}>{t.task_type}</span>
+                        {t.description && <span style={{ fontSize: 12, color: 'var(--text-2)', marginLeft: 6 }}>{t.description}</span>}
+                      </div>
+                      <button
+                        onClick={() => completeTask(t.id)}
+                        style={{ flexShrink: 0, fontSize: 11, padding: '3px 10px', borderRadius: 6, border: '0.5px solid var(--green-border)', background: 'var(--green-bg)', color: 'var(--green)', cursor: 'pointer' }}
+                      >
+                        Done
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )
+          })()}
+
+          {(() => {
+            const latest = params.data?.[0]
+            if (!latest) return null
+            const fmt = (n: number) => (Number.isInteger(n) ? String(n) : n.toFixed(2).replace(/0+$/, '').replace(/\.$/, ''))
+            const readings = [
+              { key: 'ph', label: 'pH', value: latest.ph },
+              { key: 'temperature_c', label: 'Temp (°C)', value: latest.temperature_c },
+              { key: 'ammonia_ppm', label: 'Ammonia (ppm)', value: latest.ammonia_ppm },
+              { key: 'nitrite_ppm', label: 'Nitrite (ppm)', value: latest.nitrite_ppm },
+              { key: 'nitrate_ppm', label: 'Nitrate (ppm)', value: latest.nitrate_ppm },
+              { key: 'gh_dgh', label: 'GH (dGH)', value: latest.gh_dgh },
+              { key: 'kh_dkh', label: tank.water_type === 'freshwater' ? 'KH (dKH)' : 'KH / Alk', value: latest.kh_dkh },
+              ...(tank.water_type !== 'freshwater' ? [
+                { key: 'salinity_ppt', label: 'Salinity (ppt)', value: latest.salinity_ppt },
+                { key: 'specific_gravity', label: 'Specific Gravity', value: latest.specific_gravity },
+              ] : []),
+            ].filter(r => r.value != null) as { key: string; label: string; value: number }[]
+            if (readings.length === 0) return null
+            return (
+              <div>
+                <p style={{ margin: '0 0 8px', fontSize: 11, fontWeight: 600, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                  Latest Parameters · {formatDate(latest.recorded_at, dateFormat)}
+                </p>
+                <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fit, minmax(100px, 1fr))', gap: 12 }}>
+                  {readings.map(({ key, label, value }) => {
+                    const status = getParamStatus(key, value, tank.water_type)
+                    const sc = status ? PARAM_STATUS_COLORS[status] : null
+                    return (
+                      <Card
+                        key={label}
+                        style={{
+                          textAlign: 'center', padding: '14px 12px',
+                          background: sc?.bg ?? 'var(--surface)',
+                          border: `0.5px solid ${sc?.border ?? 'var(--border)'}`,
+                        }}
+                      >
+                        <p style={{ margin: 0, fontSize: 11, color: sc?.color ?? 'var(--text-2)', opacity: sc ? 0.85 : 1 }}>{label}</p>
+                        <p style={{ margin: '4px 0 0', fontSize: 20, fontWeight: 600, color: sc?.color ?? 'var(--text)' }}>{fmt(value)}</p>
+                      </Card>
+                    )
+                  })}
+                </div>
+              </div>
+            )
+          })()}
+        </Card>
+      )}
 
       {/* INHABITANTS TAB */}
       {tab === 'inhabitants' && (
@@ -1127,9 +1478,10 @@ ${taskRows ? `<h2>Pending Maintenance</h2>
               { type: 'invertebrate', label: 'Invertebrates' },
               { type: 'amphibian', label: 'Amphibians' },
             ]
-            return ORGANISM_SECTIONS.map(({ type: oType, label: oLabel }) => {
-              const ofType = (fish.data ?? []).filter(f => f.organism_type === oType)
-              if (ofType.length === 0) return null
+            const visibleSections = ORGANISM_SECTIONS
+              .map(({ type: oType, label: oLabel }) => ({ oType, oLabel, ofType: (fish.data ?? []).filter(f => f.organism_type === oType) }))
+              .filter(s => s.ofType.length > 0)
+            return visibleSections.map(({ oType, oLabel, ofType }, sectionIndex) => {
               const grouped = new Map<string, FishEntry[]>()
               for (const f of ofType) {
                 const key = f.species_slug
@@ -1137,7 +1489,7 @@ ${taskRows ? `<h2>Pending Maintenance</h2>
                 grouped.get(key)!.push(f)
               }
               return (
-                <div key={oType} style={{ marginBottom: 16 }}>
+                <div key={oType} style={{ marginBottom: 16, paddingTop: sectionIndex > 0 ? 16 : 0, borderTop: sectionIndex > 0 ? '0.5px solid var(--border-sub)' : 'none' }}>
                   <p style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.06em', margin: '0 0 8px' }}>{oLabel}</p>
                   {[...grouped.entries()].map(([, entries]) => {
                     const first = entries[0]
@@ -1145,7 +1497,7 @@ ${taskRows ? `<h2>Pending Maintenance</h2>
                     const statusTotals = new Map<string, number>()
                     entries.forEach(entry => statusTotals.set(entry.fish_status, (statusTotals.get(entry.fish_status) ?? 0) + entry.quantity))
                     return (
-                      <div key={first.species_slug} style={{ borderBottom: '0.5px solid var(--border-sub)', padding: '10px 0' }}>
+                      <div key={first.species_slug} style={{ padding: '10px 0' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 0, flexWrap: 'wrap', minWidth: 0 }}>
                             <span style={{ fontSize: 13, color: 'var(--text)', fontWeight: 500 }}>{first.common_name ?? first.species_slug}</span>
@@ -1178,7 +1530,7 @@ ${taskRows ? `<h2>Pending Maintenance</h2>
           <div style={{ marginTop: 14 }}>
             <button
               onClick={() => setShowAddFish(true)}
-              style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 13, padding: '7px 16px', borderRadius: 8, fontWeight: 500, cursor: 'pointer', border: '0.5px solid var(--blue-border)', background: 'var(--blue-bg)', color: 'var(--blue)' }}
+              style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6, fontSize: 13, padding: '7px 16px', borderRadius: 8, fontWeight: 500, cursor: 'pointer', border: '0.5px solid var(--blue-border)', background: 'var(--blue-bg)', color: 'var(--blue)', width: isMobile ? '100%' : undefined, boxSizing: 'border-box' }}
             >
               <Plus size={13} />Add Inhabitant
             </button>
@@ -1196,8 +1548,8 @@ ${taskRows ? `<h2>Pending Maintenance</h2>
             const isEditing = editingPlantId === p.id
             return (
               <div key={p.id} style={{ borderBottom: '0.5px solid var(--border-sub)' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 0' }}>
-                  <div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap', padding: '10px 0' }}>
+                  <div style={{ minWidth: 0 }}>
                     <span style={{ fontSize: 13, color: 'var(--text)', fontWeight: 500 }}>
                       {p.common_name ?? p.species_slug}
                     </span>
@@ -1209,7 +1561,7 @@ ${taskRows ? `<h2>Pending Maintenance</h2>
                       <p style={{ margin: '2px 0 0', fontSize: 11, color: 'var(--text-2)' }}>{p.notes}</p>
                     )}
                   </div>
-                  <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexShrink: 0 }}>
+                  <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
                     <Tag bg={sc.bg} color={sc.color}>{cap(p.plant_status)}</Tag>
                     <button
                       onClick={() => {
@@ -1273,7 +1625,7 @@ ${taskRows ? `<h2>Pending Maintenance</h2>
           <div style={{ marginTop: 16, borderTop: '0.5px solid var(--border-sub)', paddingTop: 14 }}>
             <button
               onClick={() => setShowAddPlant(true)}
-              style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 13, padding: '7px 16px', borderRadius: 8, fontWeight: 500, cursor: 'pointer', border: '0.5px solid var(--green-border)', background: 'var(--green-bg)', color: 'var(--green)' }}
+              style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6, fontSize: 13, padding: '7px 16px', borderRadius: 8, fontWeight: 500, cursor: 'pointer', border: '0.5px solid var(--green-border)', background: 'var(--green-bg)', color: 'var(--green)', width: isMobile ? '100%' : undefined, boxSizing: 'border-box' }}
             >
               <Plus size={13} />Add Plant
             </button>
@@ -1286,7 +1638,7 @@ ${taskRows ? `<h2>Pending Maintenance</h2>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           <Card>
             <SectionTitle>Log Parameters</SectionTitle>
-            <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(auto-fill, minmax(110px, 1fr))', gap: 10 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fill, minmax(110px, 1fr))', gap: 10 }}>
               {([
                 ['pH', ph, setPh],
                 ['Temp (°C)', temp, setTemp],
@@ -1320,6 +1672,7 @@ ${taskRows ? `<h2>Pending Maintenance</h2>
                 marginTop: 12, padding: '7px 18px', borderRadius: 8, fontSize: 13, fontWeight: 500, cursor: 'pointer',
                 border: '0.5px solid var(--blue-border)', background: 'var(--blue-bg)', color: 'var(--blue)',
                 transition: 'background 0.15s, color 0.15s',
+                width: isMobile ? '100%' : undefined, boxSizing: 'border-box',
               }}
               onMouseEnter={e => { e.currentTarget.style.background = 'var(--blue)'; e.currentTarget.style.color = '#fff' }}
               onMouseLeave={e => { e.currentTarget.style.background = 'var(--blue-bg)'; e.currentTarget.style.color = 'var(--blue)' }}
@@ -1378,322 +1731,14 @@ ${taskRows ? `<h2>Pending Maintenance</h2>
       )}
 
       {/* SCHEDULE TAB */}
-      {tab === 'schedule' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-          <Card>
-            <SectionTitle>Add Task</SectionTitle>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
-              <div>
-                <FieldLabel>Task Type</FieldLabel>
-                <select value={taskType} onChange={e => setTaskType(e.target.value)} style={{ width: '100%', boxSizing: 'border-box' }}>
-                  {TASK_TYPES.map(t => <option key={t}>{t}</option>)}
-                </select>
-              </div>
-              <div>
-                <FieldLabel>{isRecurring ? 'First Due Date' : 'Due Date'}</FieldLabel>
-                <input type="date" value={taskDue} onChange={e => setTaskDue(e.target.value)} style={{ width: '100%', boxSizing: 'border-box' }} />
-              </div>
-            </div>
-
-            <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: 'var(--text-label)', marginBottom: 12 }}>
-              <input type="checkbox" checked={isRecurring} onChange={e => setIsRecurring(e.target.checked)} />
-              Repeat this task
-            </label>
-
-            {isRecurring && (
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 12, background: 'var(--surface-2)', borderRadius: 8, padding: '10px 12px' }}>
-                <div>
-                  <FieldLabel>Every</FieldLabel>
-                  <select value={recurWeeks} onChange={e => setRecurWeeks(e.target.value)} style={{ width: '100%', boxSizing: 'border-box' }}>
-                    {[1, 2, 3, 4, 6, 8, 12].map(w => (
-                      <option key={w} value={w}>{w === 1 ? 'week' : `${w} weeks`}</option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <FieldLabel>On</FieldLabel>
-                  <select value={recurDay} onChange={e => setRecurDay(e.target.value)} style={{ width: '100%', boxSizing: 'border-box' }}>
-                    {DAY_NAMES.map((d, i) => <option key={d} value={i}>{d}</option>)}
-                  </select>
-                </div>
-              </div>
-            )}
-
-            <div style={{ marginBottom: 12 }}>
-              <FieldLabel>Notes (Optional)</FieldLabel>
-              <input value={taskDesc} onChange={e => setTaskDesc(e.target.value)} placeholder="e.g. 30% water change" style={{ width: '100%', boxSizing: 'border-box' }} />
-            </div>
-            <button onClick={addTask}>Add Task</button>
-          </Card>
-
-          {pendingTasks.length > 0 && (
-            <Card>
-              <SectionTitle>Upcoming</SectionTitle>
-              {pendingTasks.map(t => {
-                const today = new Date(); today.setHours(0, 0, 0, 0)
-                const due = new Date(t.due_at); due.setHours(0, 0, 0, 0)
-                const overdue = due < today
-                const dueToday = due.getTime() === today.getTime()
-                const skipping = skipTaskId === t.id
-                return (
-                  <div key={t.id} style={{ padding: '10px 0', borderBottom: '0.5px solid var(--border-sub)' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                          <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--text)' }}>{t.task_type}</span>
-                          {overdue && <Tag compact bg="var(--red-bg)" color="var(--red)">Overdue</Tag>}
-                          {dueToday && <Tag compact bg="var(--amber-bg)" color="var(--amber)">Due today</Tag>}
-                          {t.is_recurring && (
-                            <Tag compact bg="var(--blue-bg)" color="var(--blue)">
-                              ↻ every {t.recur_every_weeks === 1 ? 'week' : `${t.recur_every_weeks} weeks`} on {DAY_NAMES[t.recur_day_of_week]}
-                            </Tag>
-                          )}
-                        </div>
-                        {t.description && <p style={{ margin: '2px 0 0', fontSize: 12, color: 'var(--text-2)' }}>{t.description}</p>}
-                        <p style={{ margin: '2px 0 0', fontSize: 11, color: overdue ? 'var(--red)' : dueToday ? 'var(--amber)' : 'var(--text-3)' }}>
-                          Due {formatDate(t.due_at, dateFormat)}
-                        </p>
-                      </div>
-                      <div style={{ display: 'flex', gap: 8 }}>
-                        <button onClick={() => completeTask(t.id)} style={{ fontSize: 11, padding: '3px 10px', borderRadius: 6, border: '0.5px solid var(--green-border)', background: 'var(--green-bg)', color: 'var(--green)', cursor: 'pointer' }}>Done</button>
-                        <button
-                          onClick={() => { setSkipTaskId(skipping ? null : t.id); setSkipTimes('1') }}
-                          style={{ fontSize: 11, padding: '3px 10px', borderRadius: 6, border: '0.5px solid var(--amber-border)', background: skipping ? 'var(--amber-bg)' : 'transparent', color: 'var(--amber)', cursor: 'pointer' }}
-                        >Skip</button>
-                        <button onClick={() => deleteTask(t.id)} style={{ fontSize: 11, padding: '3px 10px', borderRadius: 6, border: '0.5px solid var(--btn-border)', background: 'transparent', color: 'var(--text-2)', cursor: 'pointer' }}>Remove</button>
-                      </div>
-                    </div>
-                    {skipping && (
-                      <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', borderRadius: 8, background: 'var(--amber-bg)', border: '0.5px solid var(--amber-border)' }}>
-                        <span style={{ fontSize: 12, color: 'var(--amber)', whiteSpace: 'nowrap' }}>
-                          {t.is_recurring ? 'Skip next' : 'Skip for'}
-                        </span>
-                        <input
-                          type="number" min="1" value={skipTimes}
-                          onChange={e => setSkipTimes(e.target.value)}
-                          style={{ width: 52, fontSize: 12, padding: '2px 6px', borderRadius: 6, border: '0.5px solid var(--amber-border)', background: 'var(--surface)', color: 'var(--text)', textAlign: 'center' }}
-                        />
-                        <span style={{ fontSize: 12, color: 'var(--amber)', whiteSpace: 'nowrap' }}>
-                          {t.is_recurring ? `occurrence${Number(skipTimes) === 1 ? '' : 's'}` : `day${Number(skipTimes) === 1 ? '' : 's'}`}
-                        </span>
-                        <button onClick={() => skipTask(t.id)} style={{ fontSize: 11, padding: '3px 10px', borderRadius: 6, border: '0.5px solid var(--amber-border)', background: 'var(--amber)', color: '#fff', cursor: 'pointer', fontWeight: 500 }}>Confirm</button>
-                        <button onClick={() => setSkipTaskId(null)} style={{ fontSize: 11, padding: '3px 8px', borderRadius: 6, border: '0.5px solid var(--btn-border)', background: 'transparent', color: 'var(--text-2)', cursor: 'pointer' }}>Cancel</button>
-                      </div>
-                    )}
-                  </div>
-                )
-              })}
-            </Card>
-          )}
-
-          {doneTasks.length > 0 && (
-            <Card>
-              <SectionTitle muted>Completed</SectionTitle>
-              {doneTasks.map(t => (
-                <div key={t.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, padding: '8px 0', borderBottom: '0.5px solid var(--border-sub)', opacity: 0.6 }}>
-                  <div>
-                    <span style={{ fontSize: 13, color: 'var(--text)', textDecoration: 'line-through' }}>{t.task_type}</span>
-                    {t.description && <span style={{ fontSize: 12, color: 'var(--text-2)', marginLeft: 8 }}>{t.description}</span>}
-                    {editingCompletedTaskId === t.id ? (
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 5 }}>
-                        <input
-                          type="date"
-                          value={editingCompletedDate}
-                          onChange={e => setEditingCompletedDate(e.target.value)}
-                          style={{ fontSize: 11, padding: '2px 5px', borderRadius: 5, border: '0.5px solid var(--btn-border)', background: 'var(--surface)', color: 'var(--text)' }}
-                        />
-                        <button onClick={() => saveCompletedDate(t.id)} style={{ fontSize: 11, padding: '3px 8px', borderRadius: 5, border: '0.5px solid var(--green-border)', background: 'var(--green-bg)', color: 'var(--green)', cursor: 'pointer' }}>Save</button>
-                        <button onClick={() => setEditingCompletedTaskId(null)} style={{ fontSize: 11, padding: '3px 8px', borderRadius: 5, border: '0.5px solid var(--btn-border)', background: 'transparent', color: 'var(--text-2)', cursor: 'pointer' }}>Cancel</button>
-                      </div>
-                    ) : (
-                      <p style={{ margin: '2px 0 0', fontSize: 11, color: 'var(--text-3)' }}>Completed {formatDate(t.completed_at, dateFormat)}</p>
-                    )}
-                  </div>
-                  <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
-                    {editingCompletedTaskId !== t.id && <button onClick={() => startEditCompletedDate(t)} style={{ fontSize: 11, color: 'var(--text-2)', background: 'none', border: 'none', cursor: 'pointer' }}>Edit date</button>}
-                    <button onClick={() => deleteTask(t.id)} style={{ fontSize: 11, color: 'var(--text-2)', background: 'none', border: 'none', cursor: 'pointer' }}>Remove</button>
-                  </div>
-                </div>
-              ))}
-            </Card>
-          )}
-
-          {tasks.length === 0 && <p style={{ fontSize: 13, color: 'var(--text-2)' }}>No tasks scheduled yet.</p>}
-        </div>
+      {tab === 'weekly' && (
+        <div />
       )}
 
       {/* DAILY TAB */}
-      {tab === 'daily' && (() => {
-        const todayTasks = dailyTasks
-          .filter((t: any) => t.days.split(',').map(Number).includes(todayColIndex))
-          .sort((a: any, b: any) => a.hour !== b.hour ? a.hour - b.hour : a.minute - b.minute)
-
-        // Derive feeding entries from added inhabitants — one entry per unique species
-        const feedingEntries = (() => {
-          const seen = new Set<string>()
-          const entries: { name: string; times: number; food: string | null }[] = []
-          for (const f of (fish.data ?? [])) {
-            if (f.fish_status !== 'added' || !f.feeding_times_per_day) continue
-            if (seen.has(f.species_slug)) continue
-            seen.add(f.species_slug)
-            entries.push({ name: f.common_name ?? f.species_slug, times: f.feeding_times_per_day, food: f.food_types ?? null })
-          }
-          return entries
-        })()
-
-        return (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-
-            {/* Today's tasks */}
-            <Card>
-              <SectionTitle>Today's Tasks</SectionTitle>
-              {feedingEntries.map(entry => (
-                <div key={entry.name} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 0', borderBottom: '0.5px solid var(--border-sub)' }}>
-                  <Utensils size={12} style={{ color: 'var(--text-3)', flexShrink: 0 }} />
-                  <span style={{ fontSize: 13, color: 'var(--text)', flex: 1 }}>
-                    Feed {entry.name}
-                    {entry.food && <span style={{ fontSize: 11, color: 'var(--text-3)', marginLeft: 5 }}>({entry.food})</span>}
-                  </span>
-                  <span style={{ fontSize: 11, fontWeight: 500, color: 'var(--blue)', background: 'var(--blue-bg)', border: '0.5px solid var(--blue-border)', borderRadius: 5, padding: '1px 6px', flexShrink: 0 }}>
-                    ×{entry.times} daily
-                  </span>
-                </div>
-              ))}
-              {todayTasks.length === 0 && feedingEntries.length === 0 && (
-                <p style={{ fontSize: 13, color: 'var(--text-2)', margin: 0 }}>No tasks scheduled for today.</p>
-              )}
-              {todayTasks.map((task: any) => {
-                const c = task.color ?? '#1e88e5'
-                return (
-                  <div key={task.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 0', borderBottom: '0.5px solid var(--border-sub)' }}>
-                    <span style={{ width: 6, height: 6, borderRadius: '50%', background: c, flexShrink: 0 }} />
-                    <span style={{ fontSize: 12, color: 'var(--text-3)', fontVariantNumeric: 'tabular-nums', flexShrink: 0, minWidth: 36 }}>
-                      {String(task.hour).padStart(2, '0')}:{String(task.minute).padStart(2, '0')}
-                    </span>
-                    <span style={{ fontSize: 13, color: 'var(--text)', flex: 1 }}>{task.name}</span>
-                    <span style={{ fontSize: 11, color: 'var(--text-3)', flexShrink: 0 }}>
-                      {task.days.split(',').map((d: string) => DAY_ABBR[Number(d)]).join(', ')}
-                    </span>
-                    <button onClick={() => removeDailyTask(task.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-3)', lineHeight: 0, padding: 2, flexShrink: 0 }}>
-                      <X size={13} />
-                    </button>
-                  </div>
-                )
-              })}
-            </Card>
-
-            {/* All scheduled tasks */}
-            {dailyTasks.filter((t: any) => !t.days.split(',').map(Number).includes(todayColIndex)).length > 0 && (
-              <Card>
-                <SectionTitle>Other Scheduled Tasks</SectionTitle>
-                {dailyTasks
-                  .filter((t: any) => !t.days.split(',').map(Number).includes(todayColIndex))
-                  .sort((a: any, b: any) => a.hour !== b.hour ? a.hour - b.hour : a.minute - b.minute)
-                  .map((task: any) => {
-                    const c = task.color ?? '#1e88e5'
-                    return (
-                      <div key={task.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 0', borderBottom: '0.5px solid var(--border-sub)' }}>
-                        <span style={{ width: 6, height: 6, borderRadius: '50%', background: c, flexShrink: 0 }} />
-                        <span style={{ fontSize: 12, color: 'var(--text-3)', fontVariantNumeric: 'tabular-nums', flexShrink: 0, minWidth: 36 }}>
-                          {String(task.hour).padStart(2, '0')}:{String(task.minute).padStart(2, '0')}
-                        </span>
-                        <span style={{ fontSize: 13, color: 'var(--text)', flex: 1 }}>{task.name}</span>
-                        <span style={{ fontSize: 11, color: 'var(--text-3)', flexShrink: 0 }}>
-                          {task.days.split(',').map((d: string) => DAY_ABBR[Number(d)]).join(', ')}
-                        </span>
-                        <button onClick={() => removeDailyTask(task.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-3)', lineHeight: 0, padding: 2, flexShrink: 0 }}>
-                          <X size={13} />
-                        </button>
-                      </div>
-                    )
-                  })}
-              </Card>
-            )}
-
-            {/* Add task form */}
-            <Card>
-              <SectionTitle>Add Routine Task</SectionTitle>
-              <div style={{ display: 'flex', gap: 10, marginBottom: 12, flexWrap: 'wrap' }}>
-                <div style={{ flex: 1, minWidth: 160 }}>
-                  <FieldLabel>Task Name</FieldLabel>
-                  <input
-                    value={dtName} onChange={e => setDtName(e.target.value)}
-                    placeholder="e.g. CO2 on, Lights on, Dose ferts"
-                    style={{ width: '100%', boxSizing: 'border-box' }}
-                    onKeyDown={e => e.key === 'Enter' && addDailyTask()}
-                  />
-                </div>
-                <div>
-                  <FieldLabel>Hour</FieldLabel>
-                  <select value={dtHour} onChange={e => setDtHour(e.target.value)} style={{ width: 80 }}>
-                    {Array.from({ length: 24 }, (_, h) => (
-                      <option key={h} value={h}>{String(h).padStart(2, '0')}:00</option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <FieldLabel>Minute</FieldLabel>
-                  <select value={dtMinute} onChange={e => setDtMinute(e.target.value)} style={{ width: 70 }}>
-                    {[0, 15, 30, 45].map(m => (
-                      <option key={m} value={m}>{String(m).padStart(2, '0')}</option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              <div style={{ marginBottom: 12 }}>
-                <FieldLabel>Days</FieldLabel>
-                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
-                  {DAY_ABBR.map((d, i) => {
-                    const on = dtDays.includes(i)
-                    return (
-                      <button key={d} onClick={() => setDtDays(prev => on ? prev.filter(x => x !== i) : [...prev, i].sort())}
-                        style={{
-                          padding: '4px 10px', borderRadius: 6, fontSize: 12, cursor: 'pointer',
-                          border: on ? '0.5px solid var(--blue-border)' : '0.5px solid var(--btn-border)',
-                          background: on ? 'var(--blue-bg)' : 'transparent',
-                          color: on ? 'var(--blue)' : 'var(--text-2)',
-                          fontWeight: on ? 500 : 400,
-                        }}
-                      >{d}</button>
-                    )
-                  })}
-                  <button onClick={() => setDtDays(dtDays.length === 7 ? [] : [0, 1, 2, 3, 4, 5, 6])}
-                    style={{ padding: '4px 10px', borderRadius: 6, fontSize: 11, cursor: 'pointer', border: '0.5px solid var(--btn-border)', background: 'transparent', color: 'var(--text-3)' }}>
-                    {dtDays.length === 7 ? 'None' : 'Every day'}
-                  </button>
-                </div>
-              </div>
-
-              <div style={{ marginBottom: 14 }}>
-                <FieldLabel>Colour</FieldLabel>
-                <div style={{ display: 'flex', gap: 6 }}>
-                  {DAILY_COLORS.map(c => (
-                    <button key={c} onClick={() => setDtColor(c)} style={{
-                      width: 24, height: 24, borderRadius: 6, background: c, cursor: 'pointer',
-                      border: dtColor === c ? `2.5px solid var(--text)` : '2px solid transparent',
-                      padding: 0, flexShrink: 0,
-                    }} />
-                  ))}
-                </div>
-              </div>
-
-              <button
-                onClick={addDailyTask}
-                disabled={!dtName.trim() || dtDays.length === 0}
-                style={{
-                  display: 'flex', alignItems: 'center', gap: 6,
-                  padding: '7px 18px', borderRadius: 8, fontSize: 13, fontWeight: 500, cursor: 'pointer',
-                  border: '0.5px solid var(--blue-border)', background: 'var(--blue-bg)', color: 'var(--blue)',
-                  opacity: dtName.trim() && dtDays.length > 0 ? 1 : 0.45,
-                }}
-              >
-                <Plus size={13} />Add to schedule
-              </button>
-            </Card>
-          </div>
-        )
-      })()}
+      {tab === 'daily' && (
+        <div />
+      )}
 
       {/* GALLERY TAB */}
       {tab === 'gallery' && (
@@ -1745,7 +1790,7 @@ ${taskRows ? `<h2>Pending Maintenance</h2>
           {galleryImages.length === 0 ? (
             <p style={{ fontSize: 13, color: 'var(--text-2)' }}>No photos yet. Upload some to start the gallery.</p>
           ) : (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 8 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(auto-fill, minmax(160px, 1fr))', gap: 8 }}>
               {galleryImages.map((img, idx) => (
                 <div
                   key={img.filename}
@@ -1794,7 +1839,7 @@ ${taskRows ? `<h2>Pending Maintenance</h2>
             <div style={{ display: 'grid', gridTemplateColumns: editFishStatus === 'added' ? '80px 1fr 1fr' : '80px 1fr', gap: 10, marginBottom: 12 }}>
               <div>
                 <FieldLabel>Quantity</FieldLabel>
-                <input type="number" min="1" value={editQty} onChange={e => setEditQty(e.target.value)} style={{ width: '100%', boxSizing: 'border-box' }} />
+                <input type="number" min="1" max="10" value={editQty} onChange={e => setEditQty(String(Math.min(10, Number(e.target.value) || 1)))} style={{ width: '100%', boxSizing: 'border-box' }} />
               </div>
               <div>
                 <FieldLabel>Status</FieldLabel>
@@ -1874,7 +1919,7 @@ ${taskRows ? `<h2>Pending Maintenance</h2>
             <div style={{ display: 'grid', gridTemplateColumns: '80px 1fr', gap: 10, marginBottom: 12 }}>
               <div>
                 <FieldLabel>Quantity</FieldLabel>
-                <input type="number" value={fishQty} onChange={e => setFishQty(e.target.value)} min="1" style={{ width: '100%', boxSizing: 'border-box' }} />
+                <input type="number" value={fishQty} onChange={e => setFishQty(String(Math.min(10, Number(e.target.value) || 1)))} min="1" max="10" style={{ width: '100%', boxSizing: 'border-box' }} />
               </div>
               <div>
                 <FieldLabel>Status</FieldLabel>
