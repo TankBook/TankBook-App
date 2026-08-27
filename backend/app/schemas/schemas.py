@@ -133,6 +133,10 @@ class MaintenanceTaskSkip(BaseModel):
     times: int
 
 
+class MaintenanceTaskCompletionUpdate(BaseModel):
+    completed_at: datetime
+
+
 # --- Alerts ---
 
 class AlertOut(BaseModel):

@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react'
 import { BrowserRouter, Routes, Route, Link, useLocation } from 'react-router-dom'
-import { LayoutDashboard, BookOpen, Cog, NotebookPen, ShieldCheck, Calculator, Receipt, Menu, X, Plus, Fish, Droplets, ChevronLeft, Package, type LucideIcon } from 'lucide-react'
+import { LayoutDashboard, BookOpen, Cog, NotebookPen, ShieldCheck, Calculator, Receipt, Menu, X, Plus, Fish, Droplets, ChevronLeft, Package, Building, type LucideIcon } from 'lucide-react'
 import { api } from './api/client'
+import RoomLayout from './pages/RoomLayout'
 
 function GitHubIcon({ size = 14 }: { size?: number }) {
   return (
@@ -320,6 +321,7 @@ function QuickAdd() {
 
 const NAV_LINKS: [string, string, LucideIcon][] = [
   ['/', 'Dashboard', LayoutDashboard],
+  ['/rooms', 'Rooms', Building],
   ['/species', 'Species', BookOpen],
   ['/compatibility', 'Compatibility', ShieldCheck],
   ['/journal', 'Tank Journal', NotebookPen],
@@ -468,6 +470,7 @@ export default function App() {
           <div style={{ flex: 1, maxWidth: 960, width: '100%', margin: '0 auto', padding: '32px 24px' }}>
             <Routes>
               <Route path="/" element={<Dashboard />} />
+              <Route path="/rooms" element={<RoomLayout />} />
               <Route path="/tanks/:id" element={<TankDetail />} />
               <Route path="/species" element={<SpeciesBrowser />} />
               <Route path="/compatibility" element={<CompatibilityChecker />} />

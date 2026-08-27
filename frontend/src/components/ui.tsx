@@ -79,9 +79,9 @@ export function RichTextarea({ value, onChange, rows = 4, placeholder }: {
   )
 }
 
-export function Card({ children, style }: { children: ReactNode; style?: CSSProperties }) {
+export function Card({ children, style, ...rest }: { children: ReactNode; style?: CSSProperties } & React.HTMLAttributes<HTMLDivElement>) {
   return (
-    <div style={{ background: 'var(--surface)', border: '0.5px solid var(--border)', borderRadius: 12, padding: '1.25rem', ...style }}>
+    <div {...rest} style={{ background: 'var(--surface)', border: '0.5px solid var(--border)', borderRadius: 12, padding: '1.25rem', ...style }}>
       {children}
     </div>
   )

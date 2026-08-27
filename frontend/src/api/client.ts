@@ -250,6 +250,8 @@ export const api = {
       post<MaintenanceTask>(`/tanks/${tankId}/maintenance`, body),
     complete: (tankId: string, taskId: string) =>
       patch<MaintenanceTask>(`/tanks/${tankId}/maintenance/${taskId}/complete`),
+    updateCompletedDate: (tankId: string, taskId: string, completedAt: string) =>
+      patch<MaintenanceTask>(`/tanks/${tankId}/maintenance/${taskId}/completed-date`, { completed_at: completedAt }),
     skip: (tankId: string, taskId: string, times: number) =>
       patch<MaintenanceTask>(`/tanks/${tankId}/maintenance/${taskId}/skip`, { times }),
     delete: (tankId: string, taskId: string) => del(`/tanks/${tankId}/maintenance/${taskId}`),

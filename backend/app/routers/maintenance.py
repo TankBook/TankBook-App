@@ -3,7 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models.models import MaintenanceTask
-from app.schemas.schemas import MaintenanceTaskCreate, MaintenanceTaskOut, MaintenanceTaskSkip
+from app.schemas.schemas import MaintenanceTaskCreate, MaintenanceTaskOut, MaintenanceTaskSkip, MaintenanceTaskCompletionUpdate
 
 router = APIRouter()
 
@@ -31,13 +31,6 @@ def list_tasks(tank_id: str, db: Session = Depends(get_db)):
 @router.post("/{tank_id}/maintenance", response_model=MaintenanceTaskOut, status_code=201)
 def create_task(tank_id: str, body: MaintenanceTaskCreate, db: Session = Depends(get_db)):
     data = body.model_dump()
-    # If recurring, calculate first due date based on day_of_week
-    if data.get('is_recurring') and data.get('recur_day_of_week') is not None:
-        data['due_at'] = next_occurrence(
-            datetime.utcnow(),
-            data['recur_day_of_week'],
-            data.get('recur_every_weeks') or 1
-        )
     task = MaintenanceTask(tank_id=tank_id, **data)
     db.add(task); db.commit(); db.refresh(task)
     return task
@@ -70,6 +63,18 @@ def complete_task(tank_id: str, task_id: str, db: Session = Depends(get_db)):
         )
         db.add(next_task)
 
+    db.commit(); db.refresh(task)
+    return task
+
+
+@router.patch("/{tank_id}/maintenance/{task_id}/completed-date", response_model=MaintenanceTaskOut)
+def update_completed_date(tank_id: str, task_id: str, body: MaintenanceTaskCompletionUpdate, db: Session = Depends(get_db)):
+    task = db.query(MaintenanceTask).filter_by(id=task_id, tank_id=tank_id).first()
+    if not task:
+        raise HTTPException(404, "Task not found")
+    if task.status != "done":
+        raise HTTPException(422, "Only completed tasks can have their date edited")
+    task.completed_at = body.completed_at
     db.commit(); db.refresh(task)
     return task
 
