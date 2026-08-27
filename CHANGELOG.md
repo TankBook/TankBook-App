@@ -4,6 +4,23 @@ All notable changes to TankBook are documented here.
 
 ---
 
+## [0.7.0] — 2026-08-27
+
+### Features
+- **Room layouts** — Create rooms, assign tanks, configure room dimensions, and position tanks on a persistent 2D top-down map.
+- **Recurring task start dates** — Choose the first due date for a recurring maintenance task while retaining its recurrence schedule.
+- **Completed task date editing** — Correct the completion date for finished maintenance tasks from the tank detail schedule.
+
+### Fixed
+- Inhabitant records for the same species are merged when they share a status, including when a group changes status.
+- Rooms are now available from the main navigation at `/rooms`.
+
+### Improvements
+- Settings are presented in one large, single-column card.
+- Inhabitants with mixed statuses show one combined species row with status totals.
+
+---
+
 ## [0.6.1] — 2026-06-28
 
 ### Fixed

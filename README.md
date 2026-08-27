@@ -23,6 +23,11 @@
 
 ## Screenshots
 
+<p align="center">
+  <img src="docs/screenshot-split.png" alt="TankBook — light and dark mode" width="100%" />
+</p>
+<p align="center"><em>Light &amp; dark mode</em></p>
+
 <table>
   <tr>
     <td align="center">

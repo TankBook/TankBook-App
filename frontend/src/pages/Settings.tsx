@@ -4,7 +4,7 @@ import { useSettings, formatDate, DateFormat, UnitSystem } from '../context/Sett
 import { Card } from '../components/ui'
 import { api, Tank } from '../api/client'
 
-const APP_VERSION = '0.6.1'
+const APP_VERSION = '0.7.0'
 const GITHUB_REPO = 'TankBook/TankBook-App'
 
 function semverNewer(current: string, latest: string): boolean {
@@ -118,11 +118,11 @@ export default function Settings() {
         App-wide settings for TankBook. There are no user accounts, so these apply to everyone using this instance.
       </p>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(380px, 1fr))', gap: 16 }}>
+      <Card style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 28, padding: 24 }}>
 
         {/* Left column — display preferences */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16, justifyContent: 'space-between', alignSelf: 'stretch' }}>
-        <Card>
+        <section style={{ paddingBottom: 20, borderBottom: '0.5px solid var(--border-sub)' }}>
           <p style={{ fontWeight: 500, fontSize: 14, margin: '0 0 4px', color: 'var(--text)', display: 'flex', alignItems: 'center', gap: 6 }}><CalendarDays size={14} color="var(--text-2)" />Date Format</p>
           <p style={{ fontSize: 12, color: 'var(--text-2)', margin: '0 0 14px' }}>
             Controls how dates are displayed across tanks, parameters, and the maintenance schedule.
@@ -153,9 +153,9 @@ export default function Settings() {
               </label>
             ))}
           </div>
-        </Card>
+        </section>
 
-        <Card>
+        <section style={{ paddingBottom: 20, borderBottom: '0.5px solid var(--border-sub)' }}>
           <p style={{ fontWeight: 500, fontSize: 14, margin: '0 0 4px', color: 'var(--text)', display: 'flex', alignItems: 'center', gap: 6 }}><Ruler size={14} color="var(--text-2)" />Dimension Units</p>
           <p style={{ fontSize: 12, color: 'var(--text-2)', margin: '0 0 14px' }}>
             Controls how tank dimensions (width, height, depth) are displayed and entered. Changing this converts existing values automatically.
@@ -184,9 +184,9 @@ export default function Settings() {
               </label>
             ))}
           </div>
-        </Card>
+        </section>
 
-        <Card>
+        <section style={{ paddingBottom: 20, borderBottom: '0.5px solid var(--border-sub)' }}>
           <p style={{ fontWeight: 500, fontSize: 14, margin: '0 0 4px', color: 'var(--text)', display: 'flex', alignItems: 'center', gap: 6 }}><Bell size={14} color="var(--text-2)" />Alert Retention</p>
           <p style={{ fontSize: 12, color: 'var(--text-2)', margin: '0 0 14px' }}>
             Alerts older than this are automatically deleted when you view a tank's alert tab. Set to indefinite to keep alerts until manually deleted.
@@ -203,9 +203,9 @@ export default function Settings() {
             <option value="90">90 days</option>
             <option value="365">1 year</option>
           </select>
-        </Card>
+        </section>
 
-        <Card>
+        <section style={{ paddingBottom: 20 }}>
           <p style={{ fontWeight: 500, fontSize: 14, margin: '0 0 4px', color: 'var(--text)', display: 'flex', alignItems: 'center', gap: 6 }}><Globe size={14} color="var(--text-2)" />App URL</p>
           <p style={{ fontSize: 12, color: 'var(--text-2)', margin: '0 0 14px' }}>
             The URL this instance is reachable at. Used when sharing species YAML links with other TankBook instances. Leave blank to use the browser's current origin.
@@ -217,12 +217,12 @@ export default function Settings() {
             placeholder={`e.g. http://192.168.1.100:3000`}
             style={{ width: '100%', boxSizing: 'border-box' }}
           />
-        </Card>
+        </section>
         </div>{/* end left column */}
 
         {/* Right column — data & info */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16, justifyContent: 'space-between', alignSelf: 'stretch' }}>
-        <Card>
+        <section style={{ paddingBottom: 20, borderBottom: '0.5px solid var(--border-sub)' }}>
           <p style={{ fontWeight: 500, fontSize: 14, margin: '0 0 4px', color: 'var(--text)', display: 'flex', alignItems: 'center', gap: 6 }}><Droplets size={14} color="var(--text-2)" />Default Tank</p>
           <p style={{ fontSize: 12, color: 'var(--text-2)', margin: '0 0 14px' }}>
             Pre-selects this tank on pages with a tank dropdown, like the Livestock Journal.
@@ -237,9 +237,9 @@ export default function Settings() {
               <option key={t.id} value={t.id}>{t.name}</option>
             ))}
           </select>
-        </Card>
+        </section>
 
-        <Card>
+        <section style={{ paddingBottom: 20, borderBottom: '0.5px solid var(--border-sub)' }}>
           <p style={{ fontWeight: 500, fontSize: 14, margin: '0 0 4px', color: 'var(--text)', display: 'flex', alignItems: 'center', gap: 6 }}>
             <Download size={14} color="var(--text-2)" />Data Backup
           </p>
@@ -359,9 +359,9 @@ export default function Settings() {
               </div>
             )}
           </div>
-        </Card>
+        </section>
 
-        <Card>
+        <section>
           <p style={{ fontWeight: 500, fontSize: 14, margin: '0 0 12px', color: 'var(--text)', display: 'flex', alignItems: 'center', gap: 6 }}>
             <Info size={14} color="var(--text-2)" />About
           </p>
@@ -431,10 +431,10 @@ export default function Settings() {
             files under <code style={{ fontSize: 11, background: 'var(--tag-bg)', padding: '1px 5px', borderRadius: 4, color: 'var(--text)' }}>species-data/</code>,
             while tank and parameter data is stored in SQLite.
           </p>
-        </Card>
+        </section>
         </div>{/* end right column */}
 
-      </div>
+      </Card>
     </div>
   )
 }

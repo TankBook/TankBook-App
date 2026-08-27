@@ -28,6 +28,11 @@ const TAB_ICONS: Record<string, LucideIcon> = {
 
 const DAY_ABBR = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1)
+const dateInputValue = (value: string) => {
+  const date = new Date(value)
+  const pad = (part: number) => String(part).padStart(2, '0')
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`
+}
 const DAILY_COLORS = ['#1e88e5', '#43a047', '#26c6da', '#fb8c00', '#e63946', '#8b5cf6']
 const HEALTH_COLORS: Record<string, { bg: string; color: string }> = {
   healthy:    { bg: 'var(--green-bg)',  color: 'var(--green)'  },
@@ -696,6 +701,8 @@ export default function TankDetail() {
   const [recurDay, setRecurDay] = useState('0')
   const [skipTaskId, setSkipTaskId] = useState<string | null>(null)
   const [skipTimes, setSkipTimes] = useState('1')
+  const [editingCompletedTaskId, setEditingCompletedTaskId] = useState<string | null>(null)
+  const [editingCompletedDate, setEditingCompletedDate] = useState('')
 
   useEffect(() => {
     if (tab === 'schedule') loadTasks()
@@ -759,16 +766,14 @@ export default function TankDetail() {
   }
 
   async function addTask() {
-    if (!isRecurring && !taskDue) return
+    if (!taskDue) return
     const body: any = { task_type: taskType, description: taskDesc || null }
     if (isRecurring) {
       body.is_recurring = true
       body.recur_every_weeks = Number(recurWeeks)
       body.recur_day_of_week = Number(recurDay)
-      body.due_at = new Date().toISOString()
-    } else {
-      body.due_at = new Date(taskDue).toISOString()
     }
+    body.due_at = new Date(taskDue).toISOString()
     await fetch(`/api/tanks/${id}/maintenance`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -793,6 +798,19 @@ export default function TankDetail() {
     await api.maintenance.skip(id!, taskId, times)
     setSkipTaskId(null)
     setSkipTimes('1')
+    loadTasks()
+  }
+
+  function startEditCompletedDate(task: any) {
+    setEditingCompletedTaskId(task.id)
+    setEditingCompletedDate(dateInputValue(task.completed_at))
+  }
+
+  async function saveCompletedDate(taskId: string) {
+    if (!editingCompletedDate) return
+    await api.maintenance.updateCompletedDate(id!, taskId, new Date(`${editingCompletedDate}T12:00:00`).toISOString())
+    setEditingCompletedTaskId(null)
+    setEditingCompletedDate('')
     loadTasks()
   }
 
@@ -1114,42 +1132,42 @@ ${taskRows ? `<h2>Pending Maintenance</h2>
               if (ofType.length === 0) return null
               const grouped = new Map<string, FishEntry[]>()
               for (const f of ofType) {
-                if (!grouped.has(f.species_slug)) grouped.set(f.species_slug, [])
-                grouped.get(f.species_slug)!.push(f)
+                const key = f.species_slug
+                if (!grouped.has(key)) grouped.set(key, [])
+                grouped.get(key)!.push(f)
               }
               return (
                 <div key={oType} style={{ marginBottom: 16 }}>
                   <p style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.06em', margin: '0 0 8px' }}>{oLabel}</p>
-                  {[...grouped.entries()].map(([slug, entries]) => {
+                  {[...grouped.entries()].map(([, entries]) => {
                     const first = entries[0]
+                    const totalQuantity = entries.reduce((sum, entry) => sum + entry.quantity, 0)
+                    const statusTotals = new Map<string, number>()
+                    entries.forEach(entry => statusTotals.set(entry.fish_status, (statusTotals.get(entry.fish_status) ?? 0) + entry.quantity))
                     return (
-                      <div key={slug} style={{ borderBottom: '0.5px solid var(--border-sub)', padding: '10px 0' }}>
-                        <div style={{ marginBottom: entries.length > 1 ? 6 : 0 }}>
-                          <span style={{ fontSize: 13, color: 'var(--text)', fontWeight: 500 }}>{first.common_name ?? slug}</span>
-                          {first.latin_name && <span style={{ fontSize: 11, color: 'var(--text-3)', fontStyle: 'italic', marginLeft: 8 }}>{first.latin_name}</span>}
+                      <div key={first.species_slug} style={{ borderBottom: '0.5px solid var(--border-sub)', padding: '10px 0' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 0, flexWrap: 'wrap', minWidth: 0 }}>
+                            <span style={{ fontSize: 13, color: 'var(--text)', fontWeight: 500 }}>{first.common_name ?? first.species_slug}</span>
+                            <span style={{ fontSize: 12, color: 'var(--text-2)', marginLeft: 8 }}>×{totalQuantity}</span>
+                            {first.latin_name && <span style={{ fontSize: 11, color: 'var(--text-3)', fontStyle: 'italic', marginLeft: 8 }}>{first.latin_name}</span>}
+                          </div>
+                          <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', justifyContent: 'flex-end', alignItems: 'center' }}>
+                            {[...statusTotals.entries()].map(([status, quantity]) => {
+                              const sc = FISH_STATUS_COLORS[status] ?? FISH_STATUS_COLORS.added
+                              return <Tag key={status} compact bg={sc.bg} color={sc.color}>{cap(status)} ×{quantity}</Tag>
+                            })}
+                            {entries.map(f => (
+                              <button key={f.id} onClick={() => startEditFish(f)} style={{ fontSize: 11, color: 'var(--text-2)', background: 'none', border: '0.5px solid var(--btn-border)', borderRadius: 6, padding: '2px 8px', cursor: 'pointer' }}>Edit {cap(f.fish_status)}</button>
+                            ))}
+                            {entries.map(f => (
+                              <button key={`remove-${f.id}`} aria-label={`Remove ${f.quantity} ${f.common_name ?? f.species_slug}`} onClick={async () => { await api.fish.remove(id!, f.id); fish.reload() }} style={{ display: 'flex', alignItems: 'center', gap: 3, fontSize: 11, color: 'var(--red)', background: 'none', border: 'none', cursor: 'pointer' }}>
+                                <Trash2 size={11} />
+                              </button>
+                            ))}
+                          </div>
                         </div>
-                        {entries.map(f => {
-                          const sc = FISH_STATUS_COLORS[f.fish_status] ?? FISH_STATUS_COLORS.added
-                          const hc = HEALTH_COLORS[f.health_status] ?? HEALTH_COLORS.healthy
-                          return (
-                            <div key={f.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingLeft: entries.length > 1 ? 12 : 0, marginTop: entries.length > 1 ? 4 : 0 }}>
-                              <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-                                <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                                  <span style={{ fontSize: 12, color: 'var(--text-2)', minWidth: 28 }}>×{f.quantity}</span>
-                                  <Tag bg={sc.bg} color={sc.color}>{cap(f.fish_status)}</Tag>
-                                  {f.fish_status === 'added' && <Tag bg={hc.bg} color={hc.color}>{cap(f.health_status)}</Tag>}
-                                  {f.notes && <span style={{ fontSize: 11, color: 'var(--text-2)' }}>{f.notes}</span>}
-                                </div>
-                              </div>
-                              <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexShrink: 0 }}>
-                                <button onClick={() => startEditFish(f)} style={{ fontSize: 11, color: 'var(--text-2)', background: 'none', border: '0.5px solid var(--btn-border)', borderRadius: 6, padding: '2px 8px', cursor: 'pointer' }}>Edit</button>
-                                <button onClick={async () => { await api.fish.remove(id!, f.id); fish.reload() }} style={{ display: 'flex', alignItems: 'center', gap: 3, fontSize: 11, color: 'var(--red)', background: 'none', border: 'none', cursor: 'pointer' }}>
-                                  <Trash2 size={11} />Remove
-                                </button>
-                              </div>
-                            </div>
-                          )
-                        })}
+                        {[...new Set(entries.map(entry => entry.notes).filter(Boolean))].join(' · ') && <p style={{ margin: '6px 0 0', fontSize: 11, color: 'var(--text-3)' }}>{[...new Set(entries.map(entry => entry.notes).filter(Boolean))].join(' · ')}</p>}
                       </div>
                     )
                   })}
@@ -1371,12 +1389,10 @@ ${taskRows ? `<h2>Pending Maintenance</h2>
                   {TASK_TYPES.map(t => <option key={t}>{t}</option>)}
                 </select>
               </div>
-              {!isRecurring && (
-                <div>
-                  <FieldLabel>Due Date</FieldLabel>
-                  <input type="date" value={taskDue} onChange={e => setTaskDue(e.target.value)} style={{ width: '100%', boxSizing: 'border-box' }} />
-                </div>
-              )}
+              <div>
+                <FieldLabel>{isRecurring ? 'First Due Date' : 'Due Date'}</FieldLabel>
+                <input type="date" value={taskDue} onChange={e => setTaskDue(e.target.value)} style={{ width: '100%', boxSizing: 'border-box' }} />
+              </div>
             </div>
 
             <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: 'var(--text-label)', marginBottom: 12 }}>
@@ -1474,13 +1490,29 @@ ${taskRows ? `<h2>Pending Maintenance</h2>
             <Card>
               <SectionTitle muted>Completed</SectionTitle>
               {doneTasks.map(t => (
-                <div key={t.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '0.5px solid var(--border-sub)', opacity: 0.6 }}>
+                <div key={t.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, padding: '8px 0', borderBottom: '0.5px solid var(--border-sub)', opacity: 0.6 }}>
                   <div>
                     <span style={{ fontSize: 13, color: 'var(--text)', textDecoration: 'line-through' }}>{t.task_type}</span>
                     {t.description && <span style={{ fontSize: 12, color: 'var(--text-2)', marginLeft: 8 }}>{t.description}</span>}
-                    <p style={{ margin: '2px 0 0', fontSize: 11, color: 'var(--text-3)' }}>Completed {formatDate(t.completed_at, dateFormat)}</p>
+                    {editingCompletedTaskId === t.id ? (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 5 }}>
+                        <input
+                          type="date"
+                          value={editingCompletedDate}
+                          onChange={e => setEditingCompletedDate(e.target.value)}
+                          style={{ fontSize: 11, padding: '2px 5px', borderRadius: 5, border: '0.5px solid var(--btn-border)', background: 'var(--surface)', color: 'var(--text)' }}
+                        />
+                        <button onClick={() => saveCompletedDate(t.id)} style={{ fontSize: 11, padding: '3px 8px', borderRadius: 5, border: '0.5px solid var(--green-border)', background: 'var(--green-bg)', color: 'var(--green)', cursor: 'pointer' }}>Save</button>
+                        <button onClick={() => setEditingCompletedTaskId(null)} style={{ fontSize: 11, padding: '3px 8px', borderRadius: 5, border: '0.5px solid var(--btn-border)', background: 'transparent', color: 'var(--text-2)', cursor: 'pointer' }}>Cancel</button>
+                      </div>
+                    ) : (
+                      <p style={{ margin: '2px 0 0', fontSize: 11, color: 'var(--text-3)' }}>Completed {formatDate(t.completed_at, dateFormat)}</p>
+                    )}
                   </div>
-                  <button onClick={() => deleteTask(t.id)} style={{ fontSize: 11, color: 'var(--text-2)', background: 'none', border: 'none', cursor: 'pointer' }}>Remove</button>
+                  <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
+                    {editingCompletedTaskId !== t.id && <button onClick={() => startEditCompletedDate(t)} style={{ fontSize: 11, color: 'var(--text-2)', background: 'none', border: 'none', cursor: 'pointer' }}>Edit date</button>}
+                    <button onClick={() => deleteTask(t.id)} style={{ fontSize: 11, color: 'var(--text-2)', background: 'none', border: 'none', cursor: 'pointer' }}>Remove</button>
+                  </div>
                 </div>
               ))}
             </Card>
@@ -1759,7 +1791,7 @@ ${taskRows ? `<h2>Pending Maintenance</h2>
               <p style={{ margin: 0, fontWeight: 600, fontSize: 15, color: 'var(--text)' }}>Edit Inhabitant</p>
               <button onClick={() => setEditingFishId(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-2)', lineHeight: 0 }}><X size={18} /></button>
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '80px 1fr 1fr', gap: 10, marginBottom: 12 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: editFishStatus === 'added' ? '80px 1fr 1fr' : '80px 1fr', gap: 10, marginBottom: 12 }}>
               <div>
                 <FieldLabel>Quantity</FieldLabel>
                 <input type="number" min="1" value={editQty} onChange={e => setEditQty(e.target.value)} style={{ width: '100%', boxSizing: 'border-box' }} />
@@ -1770,12 +1802,14 @@ ${taskRows ? `<h2>Pending Maintenance</h2>
                   {FISH_STATUSES.map(s => <option key={s} value={s}>{cap(s)}</option>)}
                 </select>
               </div>
-              <div>
-                <FieldLabel>Health Status</FieldLabel>
-                <select value={editHealth} onChange={e => setEditHealth(e.target.value)} style={{ width: '100%', boxSizing: 'border-box' }} disabled={editFishStatus !== 'added'}>
-                  {HEALTH_STATUSES.map(s => <option key={s} value={s}>{cap(s)}</option>)}
-                </select>
-              </div>
+              {editFishStatus === 'added' && (
+                <div>
+                  <FieldLabel>Health Status</FieldLabel>
+                  <select value={editHealth} onChange={e => setEditHealth(e.target.value)} style={{ width: '100%', boxSizing: 'border-box' }}>
+                    {HEALTH_STATUSES.map(s => <option key={s} value={s}>{cap(s)}</option>)}
+                  </select>
+                </div>
+              )}
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 120px', gap: 10, marginBottom: 12 }}>
               <div>
