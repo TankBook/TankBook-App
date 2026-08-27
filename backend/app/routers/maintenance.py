@@ -2,8 +2,8 @@ from datetime import datetime, timedelta
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from app.database import get_db
-from app.models.models import MaintenanceTask
 from app.schemas.schemas import MaintenanceTaskCreate, MaintenanceTaskOut, MaintenanceTaskSkip, MaintenanceTaskCompletionUpdate
+from app.models.models import MaintenanceTask
 
 router = APIRouter()
 
