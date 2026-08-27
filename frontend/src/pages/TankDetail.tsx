@@ -1732,7 +1732,223 @@ ${taskRows ? `<h2>Pending Maintenance</h2>
 
       {/* SCHEDULE TAB */}
       {tab === 'weekly' && (
-        <div />
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <Card>
+            <SectionTitle>Add Weekly Task</SectionTitle>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
+              <div>
+                <FieldLabel>Task Type</FieldLabel>
+                <select value={taskType} onChange={e => setTaskType(e.target.value)} style={{ width: '100%', boxSizing: 'border-box' }}>
+                  {TASK_TYPES.map(t => <option key={t}>{t}</option>)}
+                </select>
+              </div>
+              <div>
+                <FieldLabel>{isRecurring ? 'First Due Date' : 'Due Date'}</FieldLabel>
+                <DatePickerField value={taskDue} onChange={setTaskDue} isMobile={isMobile} />
+              </div>
+            </div>
+
+            <div style={{ marginBottom: 12 }}>
+              <FieldLabel>Notes (Optional)</FieldLabel>
+              <input value={taskDesc} onChange={e => setTaskDesc(e.target.value)} placeholder="e.g. 30% water change" style={{ width: '100%', boxSizing: 'border-box' }} />
+            </div>
+
+            <div style={{ display: 'flex', gap: 6, marginBottom: 12 }}>
+              {(['oneoff', 'repeating'] as const).map(mode => {
+                const active = (mode === 'repeating') === isRecurring
+                const activeBorder = mode === 'repeating' ? 'var(--red-border)' : 'var(--blue-border)'
+                const activeBg = mode === 'repeating' ? 'var(--red-bg)' : 'var(--blue-bg)'
+                const activeColor = mode === 'repeating' ? 'var(--red)' : 'var(--blue)'
+                return (
+                  <button
+                    key={mode}
+                    type="button"
+                    onClick={() => setIsRecurring(mode === 'repeating')}
+                    style={{
+                      flex: 1, padding: '7px 10px', borderRadius: 8, fontSize: 13, fontWeight: 500, cursor: 'pointer',
+                      border: `0.5px solid ${active ? activeBorder : 'var(--btn-border)'}`,
+                      background: active ? activeBg : 'transparent',
+                      color: active ? activeColor : 'var(--text-2)',
+                    }}
+                  >
+                    {mode === 'oneoff' ? 'One-off' : 'Repeating'}
+                  </button>
+                )
+              })}
+            </div>
+
+            {isRecurring && (
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 12, background: 'var(--surface-2)', borderRadius: 8, padding: '10px 12px' }}>
+                <div>
+                  <FieldLabel>Every</FieldLabel>
+                  <select value={recurWeeks} onChange={e => setRecurWeeks(e.target.value)} style={{ width: '100%', boxSizing: 'border-box' }}>
+                    {[1, 2, 3, 4, 6, 8, 12].map(w => (
+                      <option key={w} value={w}>{w === 1 ? 'week' : `${w} weeks`}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <FieldLabel>On</FieldLabel>
+                  <select value={recurDay} onChange={e => setRecurDay(e.target.value)} style={{ width: '100%', boxSizing: 'border-box' }}>
+                    {DAY_NAMES.map((d, i) => <option key={d} value={i}>{d}</option>)}
+                  </select>
+                </div>
+              </div>
+            )}
+
+            <button
+              onClick={addTask}
+              disabled={!taskDue}
+              style={{
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                padding: '7px 18px', borderRadius: 8, fontSize: 13, fontWeight: 500, cursor: taskDue ? 'pointer' : 'default',
+                border: '0.5px solid var(--green-border)', background: 'var(--green-bg)', color: 'var(--green)',
+                opacity: taskDue ? 1 : 0.45,
+                width: '100%', boxSizing: 'border-box',
+              }}
+            >
+              <Plus size={13} />Add Weekly Task
+            </button>
+          </Card>
+
+          {pendingTasks.length > 0 && (
+            <Card>
+              <SectionTitle>Upcoming</SectionTitle>
+              {pendingTasks.map((t, i) => {
+                const today = new Date(); today.setHours(0, 0, 0, 0)
+                const due = new Date(t.due_at); due.setHours(0, 0, 0, 0)
+                const overdue = due < today
+                const dueToday = due.getTime() === today.getTime()
+                const skipping = skipTaskId === t.id
+                const isLast = i === pendingTasks.length - 1
+                return (
+                  <div key={t.id} style={{ padding: '10px 0', borderBottom: (!isLast || skipping) ? '0.5px solid var(--border-sub)' : 'none' }}>
+                    {isMobile ? (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 6 }}>
+                          <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--text)' }}>{t.task_type}</span>
+                          {overdue && <Tag compact bg="var(--red-bg)" color="var(--red)">Overdue</Tag>}
+                          {dueToday && <Tag compact bg="var(--amber-bg)" color="var(--amber)">Due today</Tag>}
+                          {t.is_recurring && (
+                            <Tag compact bg="var(--blue-bg)" color="var(--blue)">
+                              ↻ every {t.recur_every_weeks === 1 ? 'week' : `${t.recur_every_weeks} weeks`} on {DAY_NAMES[t.recur_day_of_week]}
+                            </Tag>
+                          )}
+                        </div>
+                        {t.description && <p style={{ margin: 0, fontSize: 12, color: 'var(--text-2)' }}>{t.description}</p>}
+                        <p style={{ margin: 0, fontSize: 11, color: overdue ? 'var(--red)' : dueToday ? 'var(--amber)' : 'var(--text-3)' }}>
+                          Due {formatDate(t.due_at, dateFormat)}
+                        </p>
+                        <div style={{ display: 'flex', gap: 6 }}>
+                          <button onClick={() => completeTask(t.id)} style={{ flex: 1, fontSize: 12, padding: '5px 8px', borderRadius: 6, border: '0.5px solid var(--green-border)', background: 'var(--green-bg)', color: 'var(--green)', cursor: 'pointer' }}>Done</button>
+                          <button
+                            onClick={() => { setSkipTaskId(skipping ? null : t.id); setSkipTimes('1') }}
+                            style={{ flex: 1, fontSize: 12, padding: '5px 8px', borderRadius: 6, border: '0.5px solid var(--amber-border)', background: skipping ? 'var(--amber-bg)' : 'transparent', color: 'var(--amber)', cursor: 'pointer' }}
+                          >Skip</button>
+                          <button onClick={() => deleteTask(t.id)} style={{ flex: 1, fontSize: 12, padding: '5px 8px', borderRadius: 6, border: '0.5px solid var(--btn-border)', background: 'transparent', color: 'var(--text-2)', cursor: 'pointer' }}>Remove</button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--text)' }}>{t.task_type}</span>
+                            {overdue && <Tag compact bg="var(--red-bg)" color="var(--red)">Overdue</Tag>}
+                            {dueToday && <Tag compact bg="var(--amber-bg)" color="var(--amber)">Due today</Tag>}
+                            {t.is_recurring && (
+                              <Tag compact bg="var(--blue-bg)" color="var(--blue)">
+                                ↻ every {t.recur_every_weeks === 1 ? 'week' : `${t.recur_every_weeks} weeks`} on {DAY_NAMES[t.recur_day_of_week]}
+                              </Tag>
+                            )}
+                          </div>
+                          {t.description && <p style={{ margin: '2px 0 0', fontSize: 12, color: 'var(--text-2)' }}>{t.description}</p>}
+                          <p style={{ margin: '2px 0 0', fontSize: 11, color: overdue ? 'var(--red)' : dueToday ? 'var(--amber)' : 'var(--text-3)' }}>
+                            Due {formatDate(t.due_at, dateFormat)}
+                          </p>
+                        </div>
+                        <div style={{ display: 'flex', gap: 8 }}>
+                          <button onClick={() => completeTask(t.id)} style={{ fontSize: 11, padding: '3px 10px', borderRadius: 6, border: '0.5px solid var(--green-border)', background: 'var(--green-bg)', color: 'var(--green)', cursor: 'pointer' }}>Done</button>
+                          <button
+                            onClick={() => { setSkipTaskId(skipping ? null : t.id); setSkipTimes('1') }}
+                            style={{ fontSize: 11, padding: '3px 10px', borderRadius: 6, border: '0.5px solid var(--amber-border)', background: skipping ? 'var(--amber-bg)' : 'transparent', color: 'var(--amber)', cursor: 'pointer' }}
+                          >Skip</button>
+                          <button onClick={() => deleteTask(t.id)} style={{ fontSize: 11, padding: '3px 10px', borderRadius: 6, border: '0.5px solid var(--btn-border)', background: 'transparent', color: 'var(--text-2)', cursor: 'pointer' }}>Remove</button>
+                        </div>
+                      </div>
+                    )}
+                    {skipping && (
+                      <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', borderRadius: 8, background: 'var(--amber-bg)', border: '0.5px solid var(--amber-border)' }}>
+                        <span style={{ fontSize: 12, color: 'var(--amber)', whiteSpace: 'nowrap' }}>
+                          {t.is_recurring ? 'Skip next' : 'Skip for'}
+                        </span>
+                        <input
+                          type="number" min="1" value={skipTimes}
+                          onChange={e => setSkipTimes(e.target.value)}
+                          style={{ width: 52, fontSize: 12, padding: '2px 6px', borderRadius: 6, border: '0.5px solid var(--amber-border)', background: 'var(--surface)', color: 'var(--text)', textAlign: 'center' }}
+                        />
+                        <span style={{ fontSize: 12, color: 'var(--amber)', whiteSpace: 'nowrap' }}>
+                          {t.is_recurring ? `occurrence${Number(skipTimes) === 1 ? '' : 's'}` : `day${Number(skipTimes) === 1 ? '' : 's'}`}
+                        </span>
+                        <button onClick={() => skipTask(t.id)} style={{ fontSize: 11, padding: '3px 10px', borderRadius: 6, border: '0.5px solid var(--amber-border)', background: 'var(--amber)', color: '#fff', cursor: 'pointer', fontWeight: 500 }}>Confirm</button>
+                        <button onClick={() => setSkipTaskId(null)} style={{ fontSize: 11, padding: '3px 8px', borderRadius: 6, border: '0.5px solid var(--btn-border)', background: 'transparent', color: 'var(--text-2)', cursor: 'pointer' }}>Cancel</button>
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
+            </Card>
+          )}
+
+          {doneTasks.length > 0 && (
+            <Card>
+              <button
+                type="button"
+                onClick={() => setCompletedExpanded(e => !e)}
+                style={{
+                  display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%',
+                  background: 'none', border: 'none', cursor: 'pointer', padding: 0,
+                  marginBottom: completedExpanded ? 12 : 0,
+                }}
+              >
+                <span style={{ fontWeight: 500, fontSize: 14, color: 'var(--text-2)' }}>Completed</span>
+                <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span style={{ fontSize: 11, fontWeight: 500, color: 'var(--text-2)', background: 'var(--surface-2)', border: '0.5px solid var(--border)', borderRadius: 10, padding: '1px 8px' }}>
+                    {doneTasks.length}
+                  </span>
+                  <ChevronDown size={14} style={{ color: 'var(--text-3)', transform: completedExpanded ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s' }} />
+                </span>
+              </button>
+              {completedExpanded && doneTasks.map((t, i) => (
+                <div key={t.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, padding: '8px 0', borderBottom: i === doneTasks.length - 1 ? 'none' : '0.5px solid var(--border-sub)', opacity: 0.6 }}>
+                  <div>
+                    <span style={{ fontSize: 13, color: 'var(--text)', textDecoration: 'line-through' }}>{t.task_type}</span>
+                    {t.description && <span style={{ fontSize: 12, color: 'var(--text-2)', marginLeft: 8 }}>{t.description}</span>}
+                    {editingCompletedTaskId === t.id ? (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 5 }}>
+                        <input
+                          type="date"
+                          value={editingCompletedDate}
+                          onChange={e => setEditingCompletedDate(e.target.value)}
+                          style={{ fontSize: 11, padding: '2px 5px', borderRadius: 5, border: '0.5px solid var(--btn-border)', background: 'var(--surface)', color: 'var(--text)' }}
+                        />
+                        <button onClick={() => saveCompletedDate(t.id)} style={{ fontSize: 11, padding: '3px 8px', borderRadius: 5, border: '0.5px solid var(--green-border)', background: 'var(--green-bg)', color: 'var(--green)', cursor: 'pointer' }}>Save</button>
+                        <button onClick={() => setEditingCompletedTaskId(null)} style={{ fontSize: 11, padding: '3px 8px', borderRadius: 5, border: '0.5px solid var(--btn-border)', background: 'transparent', color: 'var(--text-2)', cursor: 'pointer' }}>Cancel</button>
+                      </div>
+                    ) : (
+                      <p style={{ margin: '2px 0 0', fontSize: 11, color: 'var(--text-3)' }}>Completed {formatDate(t.completed_at, dateFormat)}</p>
+                    )}
+                  </div>
+                  <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
+                    {editingCompletedTaskId !== t.id && <button onClick={() => startEditCompletedDate(t)} style={{ fontSize: 11, color: 'var(--text-2)', background: 'none', border: 'none', cursor: 'pointer' }}>Edit date</button>}
+                    <button onClick={() => deleteTask(t.id)} style={{ fontSize: 11, color: 'var(--text-2)', background: 'none', border: 'none', cursor: 'pointer' }}>Remove</button>
+                  </div>
+                </div>
+              ))}
+            </Card>
+          )}
+
+          {tasks.length === 0 && <p style={{ fontSize: 13, color: 'var(--text-2)' }}>No tasks scheduled yet.</p>}
+        </div>
       )}
 
       {/* DAILY TAB */}
