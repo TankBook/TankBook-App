@@ -332,12 +332,12 @@ export default function SpendingTracker() {
         <div style={{ flex: 1, minWidth: 0 }}>
           {/* Filters */}
           <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
-            <select value={filterTank} onChange={e => setFilterTank(e.target.value)} style={{ fontSize: 13, borderRadius: 8, border: '0.5px solid var(--border)', padding: '5px 10px', background: 'var(--surface)', color: 'var(--text)', cursor: 'pointer' }}>
+            <select value={filterTank} onChange={e => setFilterTank(e.target.value)} style={{ flex: 1, boxSizing: 'border-box' }}>
               <option value="all">All Tanks</option>
               <option value="none">General</option>
               {tanks?.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
             </select>
-            <select value={filterCat} onChange={e => setFilterCat(e.target.value)} style={{ fontSize: 13, borderRadius: 8, border: '0.5px solid var(--border)', padding: '5px 10px', background: 'var(--surface)', color: 'var(--text)', cursor: 'pointer' }}>
+            <select value={filterCat} onChange={e => setFilterCat(e.target.value)} style={{ flex: 1, boxSizing: 'border-box' }}>
               <option value="all">All Categories</option>
               {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
             </select>
