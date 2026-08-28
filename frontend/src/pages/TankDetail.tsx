@@ -1511,27 +1511,6 @@ ${taskRows ? `<h2>Pending Maintenance</h2>
             </button>
           </div>
         </div>
-        <div style={{ marginTop: 8 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
-            {tank.water_type && tank.water_type !== 'freshwater' && (() => {
-              const styles: Record<string, { bg: string; color: string; label: string }> = {
-                saltwater: { bg: 'var(--blue-bg)',  color: 'var(--blue)',  label: 'Saltwater' },
-                brackish:  { bg: 'var(--green-bg)', color: 'var(--green)', label: 'Brackish'  },
-              }
-              const s = styles[tank.water_type]
-              return s ? <Tag bg={s.bg} color={s.color}>{s.label}</Tag> : null
-            })()}
-          </div>
-          {tank.co2_injection && (
-            <div style={{ display: 'flex', gap: 6, marginTop: 8, flexWrap: 'wrap' }}>
-              {tank.co2_injection && (
-                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11, fontWeight: 500, padding: '3px 8px', borderRadius: 6, background: 'var(--green-bg)', color: 'var(--green)', border: '0.5px solid var(--green-border)' }}>
-                  <FlaskConical size={11} />CO₂
-                </span>
-              )}
-            </div>
-          )}
-        </div>
       </div>
 
       <div style={{ marginBottom: 20 }}>
