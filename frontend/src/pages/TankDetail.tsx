@@ -1771,22 +1771,26 @@ ${taskRows ? `<h2>Pending Maintenance</h2>
               .map(({ type: oType, label: oLabel }) => ({ oType, oLabel, ofType: (fish.data ?? []).filter(f => f.organism_type === oType) }))
               .filter(s => s.ofType.length > 0)
             return visibleSections.map(({ oType, oLabel, ofType }, sectionIndex) => {
-              const grouped = new Map<string, FishEntry[]>()
+              // Group by species, then by status within each species — so a species
+              // with entries in more than one status (e.g. Added and Planned) shows
+              // as separate lines, but collapses back to one line once every entry
+              // for that species shares the same status again.
+              const grouped = new Map<string, Map<string, FishEntry[]>>()
               for (const f of ofType) {
-                const key = f.species_slug
-                if (!grouped.has(key)) grouped.set(key, [])
-                grouped.get(key)!.push(f)
+                if (!grouped.has(f.species_slug)) grouped.set(f.species_slug, new Map())
+                const byStatus = grouped.get(f.species_slug)!
+                if (!byStatus.has(f.fish_status)) byStatus.set(f.fish_status, [])
+                byStatus.get(f.fish_status)!.push(f)
               }
               return (
                 <div key={oType} style={{ marginBottom: 16, paddingTop: sectionIndex > 0 ? 16 : 0, borderTop: sectionIndex > 0 ? '0.5px solid var(--border-sub)' : 'none' }}>
                   <p style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.06em', margin: '0 0 8px' }}>{oLabel}</p>
-                  {[...grouped.entries()].map(([, entries]) => {
+                  {[...grouped.entries()].map(([slug, byStatus]) => [...byStatus.entries()].map(([status, entries]) => {
                     const first = entries[0]
                     const totalQuantity = entries.reduce((sum, entry) => sum + entry.quantity, 0)
-                    const statusTotals = new Map<string, number>()
-                    entries.forEach(entry => statusTotals.set(entry.fish_status, (statusTotals.get(entry.fish_status) ?? 0) + entry.quantity))
+                    const sc = FISH_STATUS_COLORS[status] ?? FISH_STATUS_COLORS.added
                     return (
-                      <div key={first.species_slug} style={{ padding: '10px 0' }}>
+                      <div key={`${slug}-${status}`} style={{ padding: '10px 0' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 0, flexWrap: 'wrap', minWidth: 0 }}>
                             <span style={{ fontSize: 13, color: 'var(--text)', fontWeight: 500 }}>{first.common_name ?? first.species_slug}</span>
@@ -1794,13 +1798,10 @@ ${taskRows ? `<h2>Pending Maintenance</h2>
                             {first.latin_name && <span style={{ fontSize: 11, color: 'var(--text-3)', fontStyle: 'italic', marginLeft: 8 }}>{first.latin_name}</span>}
                           </div>
                           <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', justifyContent: 'flex-end', alignItems: 'center' }}>
-                            {[...statusTotals.entries()].map(([status, quantity]) => {
-                              const sc = FISH_STATUS_COLORS[status] ?? FISH_STATUS_COLORS.added
-                              return <Tag key={status} compact bg={sc.bg} color={sc.color}>{cap(status)} ×{quantity}</Tag>
-                            })}
-                            {speciesList.some(sp => sp.slug === first.species_slug) && (
+                            <Tag compact bg={sc.bg} color={sc.color}>{cap(status)} ×{totalQuantity}</Tag>
+                            {speciesList.some(sp => sp.slug === slug) && (
                               <button
-                                onClick={() => setSpeciesInfoTarget(speciesList.find(sp => sp.slug === first.species_slug) ?? null)}
+                                onClick={() => setSpeciesInfoTarget(speciesList.find(sp => sp.slug === slug) ?? null)}
                                 title="View species info"
                                 style={{ display: 'flex', alignItems: 'center', color: 'var(--text-2)', background: 'none', border: '0.5px solid var(--btn-border)', borderRadius: 6, padding: '3px', cursor: 'pointer' }}
                               >
@@ -1808,7 +1809,7 @@ ${taskRows ? `<h2>Pending Maintenance</h2>
                               </button>
                             )}
                             {entries.map(f => (
-                              <button key={f.id} onClick={() => startEditFish(f)} style={{ fontSize: 11, color: 'var(--text-2)', background: 'none', border: '0.5px solid var(--btn-border)', borderRadius: 6, padding: '2px 8px', cursor: 'pointer' }}>Edit {cap(f.fish_status)}</button>
+                              <button key={f.id} onClick={() => startEditFish(f)} style={{ fontSize: 11, color: 'var(--text-2)', background: 'none', border: '0.5px solid var(--btn-border)', borderRadius: 6, padding: '2px 8px', cursor: 'pointer' }}>Edit</button>
                             ))}
                             {entries.map(f => (
                               <button key={`remove-${f.id}`} aria-label={`Remove ${f.quantity} ${f.common_name ?? f.species_slug}`} onClick={async () => { await api.fish.remove(id!, f.id); fish.reload() }} style={{ display: 'flex', alignItems: 'center', gap: 3, fontSize: 11, color: 'var(--red)', background: 'none', border: 'none', cursor: 'pointer' }}>
@@ -1820,7 +1821,7 @@ ${taskRows ? `<h2>Pending Maintenance</h2>
                         {[...new Set(entries.map(entry => entry.notes).filter(Boolean))].join(' · ') && <p style={{ margin: '6px 0 0', fontSize: 11, color: 'var(--text-3)' }}>{[...new Set(entries.map(entry => entry.notes).filter(Boolean))].join(' · ')}</p>}
                       </div>
                     )
-                  })}
+                  }))}
                 </div>
               )
             })
