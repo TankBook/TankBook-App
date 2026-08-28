@@ -485,16 +485,28 @@ function EditTankPanel({ tank, onSave }: { tank: any; onSave: () => void }) {
   return (
     <Card>
       <SectionTitle>Edit Tank</SectionTitle>
-      {[
-        ['Tank Name', name, setName],
-        ['Volume (Litres)', volume, setVolume],
-        ['Substrate', substrate, setSubstrate],
-      ].map(([lbl, val, set]) => (
-        <div key={lbl as string} style={{ marginBottom: 12 }}>
-          <FieldLabel>{lbl as string}</FieldLabel>
-          <input value={val as string} onChange={e => (set as any)(e.target.value)} style={{ width: '100%', boxSizing: 'border-box' }} />
+      <div style={{ marginBottom: 12 }}>
+        <FieldLabel>Tank Name</FieldLabel>
+        <input value={name} onChange={e => setName(e.target.value)} style={{ width: '100%', boxSizing: 'border-box' }} />
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(4, minmax(0, 1fr))', gap: 10, marginBottom: 12 }}>
+        {([['Width', width, setWidth], ['Height', height, setHeight], ['Depth', depth, setDepth]] as [string, string, (v: string) => void][]).map(([lbl, val, set]) => (
+          <div key={lbl}>
+            <FieldLabel>{lbl} ({unitSystem})</FieldLabel>
+            <input type="number" min="0" step={dp.step} placeholder={dp.placeholder}
+              value={val} onChange={e => set(e.target.value)} style={{ width: '100%', boxSizing: 'border-box' }} />
+          </div>
+        ))}
+        <div>
+          <FieldLabel>Volume (Litres)</FieldLabel>
+          <input type="number" min="0"
+            value={volume} onChange={e => setVolume(e.target.value)} style={{ width: '100%', boxSizing: 'border-box' }} />
         </div>
-      ))}
+      </div>
+      <div style={{ marginBottom: 12 }}>
+        <FieldLabel>Substrate</FieldLabel>
+        <input value={substrate} onChange={e => setSubstrate(e.target.value)} style={{ width: '100%', boxSizing: 'border-box' }} />
+      </div>
       <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(4, minmax(0, 1fr))', gap: 10, marginBottom: 12 }}>
         <button
           type="button"
@@ -591,15 +603,6 @@ function EditTankPanel({ tank, onSave }: { tank: any; onSave: () => void }) {
           <option value="saltwater">Saltwater / Marine</option>
           <option value="brackish">Brackish</option>
         </select>
-      </div>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10, marginBottom: 12 }}>
-        {([['Width', width, setWidth], ['Height', height, setHeight], ['Depth', depth, setDepth]] as [string, string, (v: string) => void][]).map(([lbl, val, set]) => (
-          <div key={lbl}>
-            <FieldLabel>{lbl} ({unitSystem})</FieldLabel>
-            <input type="number" min="0" step={dp.step} placeholder={dp.placeholder}
-              value={val} onChange={e => set(e.target.value)} style={{ width: '100%', boxSizing: 'border-box' }} />
-          </div>
-        ))}
       </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
         <button onClick={save} style={{ padding: '7px 16px', borderRadius: 8, border: '0.5px solid var(--blue-border)', background: 'var(--blue-bg)', color: 'var(--blue)', fontSize: 13, fontWeight: 500, cursor: 'pointer', width: isMobile ? '100%' : undefined, boxSizing: 'border-box' }}>Save changes</button>
