@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Layers, Fish, Leaf, Bug, Waves, Bell, Clock, Plus, AlertTriangle, Timer, Thermometer, FlaskConical, GripVertical, Filter } from 'lucide-react'
+import { Layers, Fish, Leaf, Bug, Waves, Bell, Clock, Plus, AlertTriangle, Timer, Thermometer, FlaskConical, GripVertical, Filter, Droplets, X } from 'lucide-react'
 import { useTanks } from '../hooks'
-import { api } from '../api/client'
+import { api, type TapWaterTest } from '../api/client'
 import { useSettings, formatDate, toMM, dimInputProps } from '../context/SettingsContext'
 import { Card, FieldLabel, StatCard, Tag } from '../components/ui'
 
@@ -47,6 +47,15 @@ const PARAMS = [
   { key: 'latest_ammonia', label: 'NH₃',  color: 'var(--red)',               fmt: (v: number) => v.toFixed(2) },
   { key: 'latest_nitrite', label: 'NO₂',  color: 'var(--amber)',             fmt: (v: number) => v.toFixed(2) },
   { key: 'latest_nitrate', label: 'NO₃',  color: 'var(--green)',             fmt: (v: number) => v.toFixed(0) },
+] as const
+
+const TAP_WATER_PARAMS = [
+  { key: 'ph',           label: 'pH',       color: 'var(--blue)',               fmt: (v: number) => v.toFixed(1) },
+  { key: 'gh_dgh',       label: 'GH',       color: 'var(--cyan)',               fmt: (v: number) => v.toFixed(0) },
+  { key: 'kh_dkh',       label: 'KH',       color: 'var(--teal, #00897b)',      fmt: (v: number) => v.toFixed(0) },
+  { key: 'chlorine_ppm', label: 'Chlorine', color: 'var(--amber)',              fmt: (v: number) => v.toFixed(2) },
+  { key: 'nitrate_ppm',  label: 'NO₃',      color: 'var(--green)',              fmt: (v: number) => v.toFixed(0) },
+  { key: 'tds_ppm',      label: 'TDS',      color: 'var(--violet, #7c4dff)',    fmt: (v: number) => v.toFixed(0) },
 ] as const
 
 type DragProps = {
@@ -236,12 +245,41 @@ export default function Dashboard() {
   const [height, setHeight] = useState('')
   const [depth, setDepth] = useState('')
 
+  const [tapWaterTests, setTapWaterTests] = useState<TapWaterTest[]>([])
+  const [showTapWaterModal, setShowTapWaterModal] = useState(false)
+  const [twPh, setTwPh] = useState('')
+  const [twGh, setTwGh] = useState('')
+  const [twKh, setTwKh] = useState('')
+  const [twChlorine, setTwChlorine] = useState('')
+  const [twNitrate, setTwNitrate] = useState('')
+  const [twTds, setTwTds] = useState('')
+  const [twNotes, setTwNotes] = useState('')
+
   async function loadStats() {
     const r = await fetch('/api/dashboard')
     setStats(await r.json())
   }
 
-  useEffect(() => { loadStats() }, [])
+  async function loadTapWaterTests() {
+    setTapWaterTests(await api.tapWater.list(1))
+  }
+
+  useEffect(() => { loadStats(); loadTapWaterTests() }, [])
+
+  async function logTapWaterTest() {
+    await api.tapWater.log({
+      ph: twPh ? Number(twPh) : null,
+      gh_dgh: twGh ? Number(twGh) : null,
+      kh_dkh: twKh ? Number(twKh) : null,
+      chlorine_ppm: twChlorine ? Number(twChlorine) : null,
+      nitrate_ppm: twNitrate ? Number(twNitrate) : null,
+      tds_ppm: twTds ? Number(twTds) : null,
+      notes: twNotes || null,
+    })
+    setTwPh(''); setTwGh(''); setTwKh(''); setTwChlorine(''); setTwNitrate(''); setTwTds(''); setTwNotes('')
+    setShowTapWaterModal(false)
+    loadTapWaterTests()
+  }
 
   useEffect(() => {
     if (!stats) return
@@ -298,6 +336,9 @@ export default function Dashboard() {
   }
 
   if (loading || !stats) return <p style={{ color: 'var(--text-2)' }}>Loading dashboard…</p>
+
+  const hasAnyTwValue = [twPh, twGh, twKh, twChlorine, twNitrate, twTds].some(v => v.trim() !== '')
+  const latestTapWater = tapWaterTests[0]
 
   const statsRow = (
     <div style={{ display: 'grid', gridTemplateColumns: `repeat(${isMobile ? 2 : isTabletWidth ? 3 : 6}, 1fr)`, gap: 10, marginBottom: 24 }}>
@@ -449,6 +490,103 @@ export default function Dashboard() {
           {upcomingTasks}
         </div>
       </div>
+
+      <div style={{ marginTop: 24 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+          <p style={{ fontWeight: 500, fontSize: 15, margin: 0, color: 'var(--text)' }}>Tap Water</p>
+          <button
+            onClick={() => setShowTapWaterModal(true)}
+            style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 12, padding: '5px 12px', borderRadius: 8, border: '0.5px solid var(--blue-border)', background: 'var(--blue-bg)', color: 'var(--blue)', cursor: 'pointer', fontWeight: 500 }}
+          >
+            <Plus size={13} />Log Test
+          </button>
+        </div>
+        <Card>
+          {!latestTapWater ? (
+            <p style={{ fontSize: 13, color: 'var(--text-2)', margin: 0 }}>No tap water tests logged yet.</p>
+          ) : (
+            <>
+              <div style={{ display: 'grid', gridTemplateColumns: `repeat(${isMobile ? 3 : 6}, 1fr)`, gap: 8 }}>
+                {TAP_WATER_PARAMS.map(({ key, label, color, fmt }) => {
+                  const val = latestTapWater[key]
+                  return (
+                    <div key={key} style={{ textAlign: 'center', background: 'var(--surface-2)', borderRadius: 8, padding: '8px 2px', border: '0.5px solid var(--border-sub)' }}>
+                      <p style={{ fontSize: 9, fontWeight: 600, color: 'var(--text-3)', margin: '0 0 5px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                        {label}
+                      </p>
+                      <p style={{ fontSize: 14, fontWeight: 500, margin: 0, color: val != null ? color : 'var(--text-4)' }}>
+                        {val != null ? fmt(val) : '—'}
+                      </p>
+                    </div>
+                  )
+                })}
+              </div>
+              <p style={{ fontSize: 11, color: 'var(--text-3)', margin: '10px 0 0' }}>
+                Last tested {formatDate(latestTapWater.recorded_at, dateFormat)}
+                {latestTapWater.notes && ` · ${latestTapWater.notes}`}
+              </p>
+            </>
+          )}
+        </Card>
+      </div>
+
+      {showTapWaterModal && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}
+          onClick={e => { if (e.target === e.currentTarget) setShowTapWaterModal(false) }}>
+          <div style={{ background: 'var(--surface)', borderRadius: 12, border: '0.5px solid var(--border)', width: '100%', maxWidth: 420, maxHeight: '90vh', display: 'flex', flexDirection: 'column' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 20px', borderBottom: '0.5px solid var(--border)' }}>
+              <span style={{ fontWeight: 600, fontSize: 15, color: 'var(--text)' }}>Log Tap Water Test</span>
+              <button onClick={() => setShowTapWaterModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-2)', lineHeight: 0 }}><X size={18} /></button>
+            </div>
+            <div style={{ padding: '16px 20px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
+                <div>
+                  <FieldLabel>pH</FieldLabel>
+                  <input type="number" step="0.01" value={twPh} onChange={e => setTwPh(e.target.value)} style={{ width: '100%', boxSizing: 'border-box' }} />
+                </div>
+                <div>
+                  <FieldLabel>GH (dGH)</FieldLabel>
+                  <input type="number" step="0.1" value={twGh} onChange={e => setTwGh(e.target.value)} style={{ width: '100%', boxSizing: 'border-box' }} />
+                </div>
+                <div>
+                  <FieldLabel>KH (dKH)</FieldLabel>
+                  <input type="number" step="0.1" value={twKh} onChange={e => setTwKh(e.target.value)} style={{ width: '100%', boxSizing: 'border-box' }} />
+                </div>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
+                <div>
+                  <FieldLabel>Chlorine (ppm)</FieldLabel>
+                  <input type="number" step="0.01" value={twChlorine} onChange={e => setTwChlorine(e.target.value)} style={{ width: '100%', boxSizing: 'border-box' }} />
+                </div>
+                <div>
+                  <FieldLabel>Nitrate (ppm)</FieldLabel>
+                  <input type="number" step="1" value={twNitrate} onChange={e => setTwNitrate(e.target.value)} style={{ width: '100%', boxSizing: 'border-box' }} />
+                </div>
+                <div>
+                  <FieldLabel>TDS (ppm)</FieldLabel>
+                  <input type="number" step="1" value={twTds} onChange={e => setTwTds(e.target.value)} style={{ width: '100%', boxSizing: 'border-box' }} />
+                </div>
+              </div>
+              <div>
+                <FieldLabel>Notes</FieldLabel>
+                <input value={twNotes} onChange={e => setTwNotes(e.target.value)} placeholder="Optional notes…" style={{ width: '100%', boxSizing: 'border-box' }} />
+              </div>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, padding: '12px 20px', borderTop: '0.5px solid var(--border)' }}>
+              <button onClick={() => setShowTapWaterModal(false)} style={{ fontSize: 13, padding: '7px 16px', borderRadius: 8, border: '0.5px solid var(--border)', background: 'transparent', cursor: 'pointer', color: 'var(--text-2)' }}>
+                Cancel
+              </button>
+              <button
+                onClick={logTapWaterTest}
+                disabled={!hasAnyTwValue}
+                style={{ fontSize: 13, padding: '7px 18px', borderRadius: 8, border: '0.5px solid var(--blue-border)', background: hasAnyTwValue ? 'var(--blue-bg)' : 'var(--surface-2)', cursor: hasAnyTwValue ? 'pointer' : 'default', color: hasAnyTwValue ? 'var(--blue)' : 'var(--text-3)', fontWeight: 500 }}
+              >
+                Save
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {showForm && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}

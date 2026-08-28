@@ -95,6 +95,21 @@ class WaterParameter(Base):
     alerts: Mapped[list["Alert"]] = relationship(back_populates="parameter_log")
 
 
+class TapWaterTest(Base):
+    """Readings for the household tap water source, not tied to any one tank."""
+    __tablename__ = "tap_water_tests"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=new_uuid)
+    ph: Mapped[float | None] = mapped_column(Float)
+    gh_dgh: Mapped[float | None] = mapped_column(Float)
+    kh_dkh: Mapped[float | None] = mapped_column(Float)
+    chlorine_ppm: Mapped[float | None] = mapped_column(Float)
+    nitrate_ppm: Mapped[float | None] = mapped_column(Float)
+    tds_ppm: Mapped[float | None] = mapped_column(Float)
+    recorded_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    notes: Mapped[str | None] = mapped_column(Text)
+
+
 class MaintenanceTask(Base):
     __tablename__ = "maintenance_tasks"
 

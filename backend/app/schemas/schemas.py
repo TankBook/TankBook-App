@@ -111,6 +111,24 @@ class WaterParameterOut(WaterParameterCreate):
     model_config = {"from_attributes": True}
 
 
+# --- Tap water tests ---
+
+class TapWaterTestCreate(BaseModel):
+    ph: float | None = None
+    gh_dgh: float | None = None
+    kh_dkh: float | None = None
+    chlorine_ppm: float | None = None
+    nitrate_ppm: float | None = None
+    tds_ppm: float | None = None
+    notes: str | None = None
+
+
+class TapWaterTestOut(TapWaterTestCreate):
+    id: str
+    recorded_at: datetime
+    model_config = {"from_attributes": True}
+
+
 # --- Maintenance tasks ---
 
 class MaintenanceTaskCreate(BaseModel):
