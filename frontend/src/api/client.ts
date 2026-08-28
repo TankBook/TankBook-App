@@ -282,6 +282,8 @@ export const api = {
     list: (tankId: string) => get<DailyTask[]>(`/tanks/${tankId}/daily`),
     create: (tankId: string, body: Omit<DailyTask, 'id' | 'tank_id'>) =>
       post<DailyTask>(`/tanks/${tankId}/daily`, body),
+    update: (tankId: string, taskId: string, body: Partial<Omit<DailyTask, 'id' | 'tank_id'>>) =>
+      patch<DailyTask>(`/tanks/${tankId}/daily/${taskId}`, body),
     delete: (tankId: string, taskId: string) => del(`/tanks/${tankId}/daily/${taskId}`),
   },
   backup: {

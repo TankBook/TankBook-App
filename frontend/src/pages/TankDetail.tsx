@@ -918,6 +918,146 @@ function TankGraphic({ fishCount, plantCount, co2 }: { fishCount: number; plantC
   )
 }
 
+function DailyTaskFormFields({
+  name, setName, hour, setHour, minute, setMinute, days, setDays, color, setColor,
+  timePickerOpen, setTimePickerOpen, isMobile, onNameEnter,
+}: {
+  name: string; setName: (v: string) => void
+  hour: string; setHour: (v: string) => void
+  minute: string; setMinute: (v: string) => void
+  days: number[]; setDays: React.Dispatch<React.SetStateAction<number[]>>
+  color: string; setColor: (v: string) => void
+  timePickerOpen: boolean; setTimePickerOpen: React.Dispatch<React.SetStateAction<boolean>>
+  isMobile: boolean
+  onNameEnter?: () => void
+}) {
+  const hour24 = Number(hour)
+  const h12 = (hour24 % 12) || 12
+  const ampm = hour24 < 12 ? 'AM' : 'PM'
+  const setHourFrom12 = (newH12: number) => {
+    const newHour24 = ampm === 'AM' ? newH12 % 12 : (newH12 % 12) + 12
+    setHour(String(newHour24))
+  }
+  const setAmPm = (period: 'AM' | 'PM') => {
+    const newHour24 = period === 'AM' ? h12 % 12 : (h12 % 12) + 12
+    setHour(String(newHour24))
+  }
+  const pillStyle = (on: boolean): React.CSSProperties => ({
+    padding: '6px 0', borderRadius: 6, fontSize: 12, cursor: 'pointer',
+    border: on ? '0.5px solid var(--blue-border)' : '0.5px solid var(--btn-border)',
+    background: on ? 'var(--blue-bg)' : 'transparent',
+    color: on ? 'var(--blue)' : 'var(--text-2)',
+    fontWeight: on ? 500 : 400,
+  })
+  return (
+    <>
+      <div style={{ display: 'flex', gap: 10, marginBottom: 12, flexWrap: 'wrap' }}>
+        <div style={{ flex: 1, minWidth: 160 }}>
+          <FieldLabel>Task Name</FieldLabel>
+          <input
+            value={name} onChange={e => setName(e.target.value)}
+            placeholder="e.g. CO2 on, Lights on, Dose ferts"
+            style={{ width: '100%', boxSizing: 'border-box' }}
+            onKeyDown={e => e.key === 'Enter' && onNameEnter?.()}
+          />
+        </div>
+        <div style={{ position: 'relative', width: isMobile ? '100%' : undefined }}>
+          <FieldLabel>Time</FieldLabel>
+          <button
+            type="button"
+            onClick={() => setTimePickerOpen(o => !o)}
+            style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10,
+              width: isMobile ? '100%' : 120, boxSizing: 'border-box',
+              padding: '6px 10px', borderRadius: 8, border: '0.5px solid var(--btn-border)',
+              background: 'var(--surface)', color: 'var(--text)', fontSize: 13, cursor: 'pointer',
+            }}
+          >
+            <span>{h12}:{String(Number(minute)).padStart(2, '0')} {ampm}</span>
+            <Clock size={14} style={{ color: 'var(--text-3)', flexShrink: 0 }} />
+          </button>
+
+          {timePickerOpen && (
+            <>
+              <div onClick={() => setTimePickerOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 90 }} />
+              <div style={{
+                position: 'absolute', top: 'calc(100% + 4px)', left: 0, right: isMobile ? 0 : 'auto', zIndex: 100,
+                width: isMobile ? '100%' : 250,
+                background: 'var(--surface)', border: '0.5px solid var(--border)', borderRadius: 10,
+                boxShadow: '0 8px 24px rgba(0,0,0,0.16)', padding: 12,
+              }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 4, marginBottom: 10 }}>
+                  {Array.from({ length: 12 }, (_, i) => i + 1).map(h => (
+                    <button key={h} type="button" onClick={() => setHourFrom12(h)} style={pillStyle(h === h12)}>{h}</button>
+                  ))}
+                </div>
+                <div style={{ display: 'flex', gap: 4, marginBottom: 10 }}>
+                  {[0, 15, 30, 45].map(m => (
+                    <button key={m} type="button" onClick={() => setMinute(String(m))} style={{ ...pillStyle(m === Number(minute)), flex: 1 }}>
+                      {String(m).padStart(2, '0')}
+                    </button>
+                  ))}
+                </div>
+                <div style={{ display: 'flex', gap: 4 }}>
+                  {(['AM', 'PM'] as const).map(period => (
+                    <button key={period} type="button" onClick={() => setAmPm(period)} style={{ ...pillStyle(period === ampm), flex: 1 }}>
+                      {period}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+
+      <div style={{ marginBottom: 12 }}>
+        <FieldLabel>Days</FieldLabel>
+        <div style={{ display: 'flex', gap: isMobile ? 3 : 6, width: '100%' }}>
+          {DAY_NAMES.map((dayName, i) => {
+            const on = days.includes(i)
+            return (
+              <button key={dayName} onClick={() => setDays(prev => on ? prev.filter(x => x !== i) : [...prev, i].sort())}
+                style={{
+                  flex: 1, minWidth: 0, padding: isMobile ? '7px 1px' : '4px 6px', borderRadius: 6,
+                  fontSize: 12, cursor: 'pointer',
+                  border: on ? '0.5px solid var(--blue-border)' : '0.5px solid var(--btn-border)',
+                  background: on ? 'var(--blue-bg)' : 'transparent',
+                  color: on ? 'var(--blue)' : 'var(--text-2)',
+                  fontWeight: on ? 500 : 400,
+                  whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'clip',
+                }}
+              >{isMobile ? dayName[0] : dayName}</button>
+            )
+          })}
+          <button onClick={() => setDays(prev => prev.length === 7 ? [] : [0, 1, 2, 3, 4, 5, 6])}
+            style={{
+              flex: isMobile ? 1.4 : 1.2, minWidth: 0, padding: isMobile ? '7px 1px' : '4px 6px', borderRadius: 6,
+              fontSize: 11, cursor: 'pointer', border: '0.5px solid var(--btn-border)',
+              background: 'transparent', color: 'var(--text-3)',
+              whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'clip',
+            }}>
+            {days.length === 7 ? 'None' : (isMobile ? 'All' : 'Every day')}
+          </button>
+        </div>
+      </div>
+
+      <div style={{ marginBottom: 14 }}>
+        <FieldLabel>Colour</FieldLabel>
+        <div style={{ display: 'flex', gap: isMobile ? 3 : 6, width: '100%' }}>
+          {DAILY_COLORS.map(c => (
+            <button key={c} onClick={() => setColor(c)} style={{
+              flex: 1, minWidth: 0, height: 32, borderRadius: 6, background: c, cursor: 'pointer',
+              border: color === c ? `2.5px solid var(--text)` : '2px solid transparent',
+              padding: 0,
+            }} />
+          ))}
+        </div>
+      </div>
+    </>
+  )
+}
+
 export default function TankDetail() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
@@ -994,6 +1134,13 @@ export default function TankDetail() {
   const [dtDays, setDtDays] = useState<number[]>([0, 1, 2, 3, 4, 5, 6])
   const [dtTimePickerOpen, setDtTimePickerOpen] = useState(false)
   const [dtColor, setDtColor] = useState(DAILY_COLORS[0])
+  const [editingDailyTaskId, setEditingDailyTaskId] = useState<string | null>(null)
+  const [editDtName, setEditDtName] = useState('')
+  const [editDtHour, setEditDtHour] = useState('8')
+  const [editDtMinute, setEditDtMinute] = useState('0')
+  const [editDtDays, setEditDtDays] = useState<number[]>([])
+  const [editDtTimePickerOpen, setEditDtTimePickerOpen] = useState(false)
+  const [editDtColor, setEditDtColor] = useState(DAILY_COLORS[0])
 
   const [isMobile, setIsMobile] = useState(() => window.matchMedia('(max-width: 768px)').matches)
   const [isCompactTabs, setIsCompactTabs] = useState(() => window.matchMedia('(max-width: 900px)').matches)
@@ -1085,6 +1232,28 @@ export default function TankDetail() {
 
   async function removeDailyTask(taskId: string) {
     await api.dailyTasks.delete(id!, taskId)
+    loadDailyTasks()
+  }
+
+  function startEditDailyTask(task: { id: string; name: string; hour: number; minute: number; days: string; color: string | null }) {
+    setEditingDailyTaskId(task.id)
+    setEditDtName(task.name)
+    setEditDtHour(String(task.hour))
+    setEditDtMinute(String(task.minute))
+    setEditDtDays(task.days.split(',').map(Number))
+    setEditDtColor(task.color ?? DAILY_COLORS[0])
+  }
+
+  async function saveEditDailyTask() {
+    if (!editingDailyTaskId || !editDtName.trim() || editDtDays.length === 0) return
+    await api.dailyTasks.update(id!, editingDailyTaskId, {
+      name: editDtName.trim(),
+      hour: Number(editDtHour),
+      minute: Number(editDtMinute),
+      days: editDtDays.join(','),
+      color: editDtColor,
+    })
+    setEditingDailyTaskId(null)
     loadDailyTasks()
   }
 
@@ -2147,131 +2316,16 @@ ${taskRows ? `<h2>Pending Maintenance</h2>
             {/* Add task form */}
             <Card>
               <SectionTitle>Add Daily Task</SectionTitle>
-              <div style={{ display: 'flex', gap: 10, marginBottom: 12, flexWrap: 'wrap' }}>
-                <div style={{ flex: 1, minWidth: 160 }}>
-                  <FieldLabel>Task Name</FieldLabel>
-                  <input
-                    value={dtName} onChange={e => setDtName(e.target.value)}
-                    placeholder="e.g. CO2 on, Lights on, Dose ferts"
-                    style={{ width: '100%', boxSizing: 'border-box' }}
-                    onKeyDown={e => e.key === 'Enter' && addDailyTask()}
-                  />
-                </div>
-                {(() => {
-                  const hour24 = Number(dtHour)
-                  const h12 = (hour24 % 12) || 12
-                  const ampm = hour24 < 12 ? 'AM' : 'PM'
-                  const setHourFrom12 = (newH12: number) => {
-                    const newHour24 = ampm === 'AM' ? newH12 % 12 : (newH12 % 12) + 12
-                    setDtHour(String(newHour24))
-                  }
-                  const setAmPm = (period: 'AM' | 'PM') => {
-                    const newHour24 = period === 'AM' ? h12 % 12 : (h12 % 12) + 12
-                    setDtHour(String(newHour24))
-                  }
-                  const pillStyle = (on: boolean): React.CSSProperties => ({
-                    padding: '6px 0', borderRadius: 6, fontSize: 12, cursor: 'pointer',
-                    border: on ? '0.5px solid var(--blue-border)' : '0.5px solid var(--btn-border)',
-                    background: on ? 'var(--blue-bg)' : 'transparent',
-                    color: on ? 'var(--blue)' : 'var(--text-2)',
-                    fontWeight: on ? 500 : 400,
-                  })
-                  return (
-                    <div style={{ position: 'relative', width: isMobile ? '100%' : undefined }}>
-                      <FieldLabel>Time</FieldLabel>
-                      <button
-                        type="button"
-                        onClick={() => setDtTimePickerOpen(o => !o)}
-                        style={{
-                          display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10,
-                          width: isMobile ? '100%' : 120, boxSizing: 'border-box',
-                          padding: '6px 10px', borderRadius: 8, border: '0.5px solid var(--btn-border)',
-                          background: 'var(--surface)', color: 'var(--text)', fontSize: 13, cursor: 'pointer',
-                        }}
-                      >
-                        <span>{h12}:{String(Number(dtMinute)).padStart(2, '0')} {ampm}</span>
-                        <Clock size={14} style={{ color: 'var(--text-3)', flexShrink: 0 }} />
-                      </button>
-
-                      {dtTimePickerOpen && (
-                        <>
-                          <div onClick={() => setDtTimePickerOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 90 }} />
-                          <div style={{
-                            position: 'absolute', top: 'calc(100% + 4px)', left: 0, right: isMobile ? 0 : 'auto', zIndex: 100,
-                            width: isMobile ? '100%' : 250,
-                            background: 'var(--surface)', border: '0.5px solid var(--border)', borderRadius: 10,
-                            boxShadow: '0 8px 24px rgba(0,0,0,0.16)', padding: 12,
-                          }}>
-                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 4, marginBottom: 10 }}>
-                              {Array.from({ length: 12 }, (_, i) => i + 1).map(h => (
-                                <button key={h} type="button" onClick={() => setHourFrom12(h)} style={pillStyle(h === h12)}>{h}</button>
-                              ))}
-                            </div>
-                            <div style={{ display: 'flex', gap: 4, marginBottom: 10 }}>
-                              {[0, 15, 30, 45].map(m => (
-                                <button key={m} type="button" onClick={() => setDtMinute(String(m))} style={{ ...pillStyle(m === Number(dtMinute)), flex: 1 }}>
-                                  {String(m).padStart(2, '0')}
-                                </button>
-                              ))}
-                            </div>
-                            <div style={{ display: 'flex', gap: 4 }}>
-                              {(['AM', 'PM'] as const).map(period => (
-                                <button key={period} type="button" onClick={() => setAmPm(period)} style={{ ...pillStyle(period === ampm), flex: 1 }}>
-                                  {period}
-                                </button>
-                              ))}
-                            </div>
-                          </div>
-                        </>
-                      )}
-                    </div>
-                  )
-                })()}
-              </div>
-
-              <div style={{ marginBottom: 12 }}>
-                <FieldLabel>Days</FieldLabel>
-                <div style={{ display: 'flex', gap: isMobile ? 3 : 6, width: '100%' }}>
-                  {DAY_NAMES.map((name, i) => {
-                    const on = dtDays.includes(i)
-                    return (
-                      <button key={name} onClick={() => setDtDays(prev => on ? prev.filter(x => x !== i) : [...prev, i].sort())}
-                        style={{
-                          flex: 1, minWidth: 0, padding: isMobile ? '7px 1px' : '4px 6px', borderRadius: 6,
-                          fontSize: isMobile ? 12 : 12, cursor: 'pointer',
-                          border: on ? '0.5px solid var(--blue-border)' : '0.5px solid var(--btn-border)',
-                          background: on ? 'var(--blue-bg)' : 'transparent',
-                          color: on ? 'var(--blue)' : 'var(--text-2)',
-                          fontWeight: on ? 500 : 400,
-                          whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'clip',
-                        }}
-                      >{isMobile ? name[0] : name}</button>
-                    )
-                  })}
-                  <button onClick={() => setDtDays(dtDays.length === 7 ? [] : [0, 1, 2, 3, 4, 5, 6])}
-                    style={{
-                      flex: isMobile ? 1.4 : 1.2, minWidth: 0, padding: isMobile ? '7px 1px' : '4px 6px', borderRadius: 6,
-                      fontSize: isMobile ? 11 : 11, cursor: 'pointer', border: '0.5px solid var(--btn-border)',
-                      background: 'transparent', color: 'var(--text-3)',
-                      whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'clip',
-                    }}>
-                    {dtDays.length === 7 ? 'None' : (isMobile ? 'All' : 'Every day')}
-                  </button>
-                </div>
-              </div>
-
-              <div style={{ marginBottom: 14 }}>
-                <FieldLabel>Colour</FieldLabel>
-                <div style={{ display: 'flex', gap: isMobile ? 3 : 6, width: '100%' }}>
-                  {DAILY_COLORS.map(c => (
-                    <button key={c} onClick={() => setDtColor(c)} style={{
-                      flex: 1, minWidth: 0, height: 32, borderRadius: 6, background: c, cursor: 'pointer',
-                      border: dtColor === c ? `2.5px solid var(--text)` : '2px solid transparent',
-                      padding: 0,
-                    }} />
-                  ))}
-                </div>
-              </div>
+              <DailyTaskFormFields
+                name={dtName} setName={setDtName}
+                hour={dtHour} setHour={setDtHour}
+                minute={dtMinute} setMinute={setDtMinute}
+                days={dtDays} setDays={setDtDays}
+                color={dtColor} setColor={setDtColor}
+                timePickerOpen={dtTimePickerOpen} setTimePickerOpen={setDtTimePickerOpen}
+                isMobile={isMobile}
+                onNameEnter={addDailyTask}
+              />
 
               <button
                 onClick={addDailyTask}
@@ -2327,6 +2381,9 @@ ${taskRows ? `<h2>Pending Maintenance</h2>
                     <span style={{ fontSize: 11, color: 'var(--text-3)', flexShrink: 0 }}>
                       {task.days.split(',').map((d: string) => DAY_ABBR[Number(d)]).join(', ')}
                     </span>
+                    <button onClick={() => startEditDailyTask(task)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-3)', lineHeight: 0, padding: 2, flexShrink: 0 }}>
+                      <Pencil size={12} />
+                    </button>
                     <button onClick={() => removeDailyTask(task.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-3)', lineHeight: 0, padding: 2, flexShrink: 0 }}>
                       <X size={13} />
                     </button>
@@ -2355,6 +2412,9 @@ ${taskRows ? `<h2>Pending Maintenance</h2>
                         <span style={{ fontSize: 11, color: 'var(--text-3)', flexShrink: 0 }}>
                           {task.days.split(',').map((d: string) => DAY_ABBR[Number(d)]).join(', ')}
                         </span>
+                        <button onClick={() => startEditDailyTask(task)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-3)', lineHeight: 0, padding: 2, flexShrink: 0 }}>
+                          <Pencil size={12} />
+                        </button>
                         <button onClick={() => removeDailyTask(task.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-3)', lineHeight: 0, padding: 2, flexShrink: 0 }}>
                           <X size={13} />
                         </button>
@@ -2566,6 +2626,49 @@ ${taskRows ? `<h2>Pending Maintenance</h2>
                   plants.reload()
                 }}
                 style={{ padding: '7px 16px', borderRadius: 8, fontSize: 13, fontWeight: 500, cursor: 'pointer', border: '0.5px solid var(--green-border)', background: 'var(--green-bg)', color: 'var(--green)' }}
+              >
+                Save
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* EDIT DAILY TASK MODAL */}
+      {editingDailyTaskId && (
+        <div
+          onMouseDown={() => setEditingDailyTaskId(null)}
+          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', zIndex: 300, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}
+        >
+          <div
+            onMouseDown={e => e.stopPropagation()}
+            style={{ background: 'var(--surface)', border: '0.5px solid var(--border)', borderRadius: 14, padding: '1.5rem', width: 420, maxWidth: '100%', boxShadow: '0 12px 40px rgba(0,0,0,0.22)' }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+              <p style={{ margin: 0, fontWeight: 600, fontSize: 15, color: 'var(--text)' }}>Edit Daily Task</p>
+              <button onClick={() => setEditingDailyTaskId(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-2)', lineHeight: 0 }}><X size={18} /></button>
+            </div>
+            <DailyTaskFormFields
+              name={editDtName} setName={setEditDtName}
+              hour={editDtHour} setHour={setEditDtHour}
+              minute={editDtMinute} setMinute={setEditDtMinute}
+              days={editDtDays} setDays={setEditDtDays}
+              color={editDtColor} setColor={setEditDtColor}
+              timePickerOpen={editDtTimePickerOpen} setTimePickerOpen={setEditDtTimePickerOpen}
+              isMobile={isMobile}
+              onNameEnter={saveEditDailyTask}
+            />
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+              <button onClick={() => setEditingDailyTaskId(null)} style={{ padding: '7px 16px', borderRadius: 8, fontSize: 13, cursor: 'pointer', border: '0.5px solid var(--btn-border)', background: 'transparent', color: 'var(--text)' }}>Cancel</button>
+              <button
+                disabled={!editDtName.trim() || editDtDays.length === 0}
+                onClick={saveEditDailyTask}
+                style={{
+                  padding: '7px 16px', borderRadius: 8, fontSize: 13, fontWeight: 500,
+                  cursor: editDtName.trim() && editDtDays.length > 0 ? 'pointer' : 'not-allowed',
+                  border: '0.5px solid var(--green-border)', background: 'var(--green-bg)', color: 'var(--green)',
+                  opacity: editDtName.trim() && editDtDays.length > 0 ? 1 : 0.45,
+                }}
               >
                 Save
               </button>

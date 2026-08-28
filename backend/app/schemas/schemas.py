@@ -168,6 +168,14 @@ class DailyTaskCreate(BaseModel):
     color: str | None = None
 
 
+class DailyTaskUpdate(BaseModel):
+    name: str | None = None
+    hour: int | None = None
+    minute: int | None = None
+    days: str | None = None
+    color: str | None = None
+
+
 class DailyTaskOut(DailyTaskCreate):
     id: str
     tank_id: str
