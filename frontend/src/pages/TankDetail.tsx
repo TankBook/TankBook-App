@@ -1863,20 +1863,18 @@ ${taskRows ? `<h2>Pending Maintenance</h2>
                           <p style={{ margin: '2px 0 0', fontSize: 11, color: 'var(--text-2)' }}>{p.notes}</p>
                         )}
                       </div>
-                      <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexShrink: 0 }}>
-                        {speciesList.some(sp => sp.slug === p.species_slug) && (
-                          <button
-                            onClick={() => setSpeciesInfoTarget(speciesList.find(sp => sp.slug === p.species_slug) ?? null)}
-                            title="View species info"
-                            style={{ display: 'flex', alignItems: 'center', color: 'var(--text-2)', background: 'none', border: '0.5px solid var(--btn-border)', borderRadius: 6, padding: '3px', cursor: 'pointer' }}
-                          >
-                            <Info size={12} />
-                          </button>
-                        )}
-                        <Tag bg={sc.bg} color={sc.color}>{cap(p.plant_status)}</Tag>
-                      </div>
+                      <Tag bg={sc.bg} color={sc.color} style={{ flexShrink: 0 }}>{cap(p.plant_status)}</Tag>
                     </div>
                     <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
+                      {speciesList.some(sp => sp.slug === p.species_slug) && (
+                        <button
+                          onClick={() => setSpeciesInfoTarget(speciesList.find(sp => sp.slug === p.species_slug) ?? null)}
+                          title="View species info"
+                          style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-2)', background: 'none', border: '0.5px solid var(--btn-border)', borderRadius: 6, padding: '6px 8px', cursor: 'pointer' }}
+                        >
+                          <Info size={13} />
+                        </button>
+                      )}
                       <button
                         onClick={() => {
                           setEditingPlantId(p.id)
