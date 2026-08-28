@@ -43,6 +43,14 @@ export default function Settings() {
   const [savingSettings, setSavingSettings] = useState(false)
   const [settingsSaved, setSettingsSaved] = useState(false)
   const [newPreset, setNewPreset] = useState('')
+  const [isMobile, setIsMobile] = useState(() => window.matchMedia('(max-width: 768px)').matches)
+
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 768px)')
+    const handler = (e: MediaQueryListEvent) => setIsMobile(e.matches)
+    mq.addEventListener('change', handler)
+    return () => mq.removeEventListener('change', handler)
+  }, [])
 
   useEffect(() => {
     if (!loading) {
@@ -356,10 +364,11 @@ export default function Settings() {
               onClick={handleExport}
               disabled={exporting}
               style={{
-                display: 'inline-flex', alignItems: 'center', gap: 6,
+                display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6,
                 fontSize: 13, padding: '7px 16px', borderRadius: 8, fontWeight: 500,
                 border: '0.5px solid var(--blue-border)', background: 'var(--blue-bg)', color: 'var(--blue)',
                 cursor: exporting ? 'not-allowed' : 'pointer', opacity: exporting ? 0.5 : 1,
+                width: isMobile ? '100%' : undefined, boxSizing: 'border-box',
               }}
             >
               <Download size={13} />{exporting ? 'Exporting…' : 'Download Backup'}
