@@ -319,9 +319,9 @@ function QuickAdd() {
       <button
         onClick={() => setOpen(true)}
         title="Quick add"
-        style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 30, height: 30, border: '0.5px solid var(--border)', borderRadius: 8, background: 'transparent', color: 'var(--text-2)', cursor: 'pointer', marginRight: 6 }}
+        style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 30, height: 30, border: '0.5px solid var(--blue-border)', borderRadius: 8, background: 'var(--blue-bg)', color: 'var(--blue)', cursor: 'pointer', marginRight: 6 }}
       >
-        <Plus size={15} />
+        <Plus size={17} strokeWidth={2.5} />
       </button>
 
       {open && (
