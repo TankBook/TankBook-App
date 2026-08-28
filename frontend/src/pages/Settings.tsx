@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
-import { CalendarDays, Ruler, Info, Download, Upload, Droplets, RefreshCw, Bell, Globe } from 'lucide-react'
+import { CalendarDays, Ruler, Info, Download, Upload, Droplets, RefreshCw, Bell, Globe, Utensils, X } from 'lucide-react'
 import { useSettings, formatDate, DateFormat, UnitSystem } from '../context/SettingsContext'
 import { Card } from '../components/ui'
 import { api, Tank } from '../api/client'
@@ -31,8 +31,16 @@ const UNIT_OPTIONS: { value: UnitSystem; label: string; example: string }[] = [
 ]
 
 export default function Settings() {
-  const { dateFormat, setDateFormat, unitSystem, setUnitSystem, defaultTank, setDefaultTank, alertRetentionDays, setAlertRetentionDays, appUrl, setAppUrl, loading } = useSettings()
+  const { dateFormat, setDateFormat, unitSystem, setUnitSystem, defaultTank, setDefaultTank, alertRetentionDays, setAlertRetentionDays, appUrl, setAppUrl, feedingAmountPresets, setFeedingAmountPresets, loading } = useSettings()
   const [tanks, setTanks] = useState<Tank[]>([])
+  const [newPreset, setNewPreset] = useState('')
+
+  function addPreset() {
+    const value = newPreset.trim()
+    if (!value || feedingAmountPresets.includes(value)) return
+    setFeedingAmountPresets([...feedingAmountPresets, value])
+    setNewPreset('')
+  }
 
   useEffect(() => {
     api.tanks.list().then(setTanks)
@@ -205,7 +213,7 @@ export default function Settings() {
           </select>
         </section>
 
-        <section style={{ paddingBottom: 20 }}>
+        <section style={{ paddingBottom: 20, borderBottom: '0.5px solid var(--border-sub)' }}>
           <p style={{ fontWeight: 500, fontSize: 14, margin: '0 0 4px', color: 'var(--text)', display: 'flex', alignItems: 'center', gap: 6 }}><Globe size={14} color="var(--text-2)" />App URL</p>
           <p style={{ fontSize: 12, color: 'var(--text-2)', margin: '0 0 14px' }}>
             The URL this instance is reachable at. Used when sharing species YAML links with other TankBook instances. Leave blank to use the browser's current origin.
@@ -217,6 +225,53 @@ export default function Settings() {
             placeholder={`e.g. http://192.168.1.100:3000`}
             style={{ width: '100%', boxSizing: 'border-box' }}
           />
+        </section>
+
+        <section style={{ paddingBottom: 20 }}>
+          <p style={{ fontWeight: 500, fontSize: 14, margin: '0 0 4px', color: 'var(--text)', display: 'flex', alignItems: 'center', gap: 6 }}><Utensils size={14} color="var(--text-2)" />Feeding Amounts</p>
+          <p style={{ fontSize: 12, color: 'var(--text-2)', margin: '0 0 14px' }}>
+            Presets for how much to feed. These become selectable when editing an inhabitant's feeding info.
+          </p>
+          {feedingAmountPresets.length > 0 && (
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 10 }}>
+              {feedingAmountPresets.map(preset => (
+                <span
+                  key={preset}
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 12, padding: '4px 6px 4px 10px', borderRadius: 999, background: 'var(--surface-2)', border: '0.5px solid var(--border)', color: 'var(--text)' }}
+                >
+                  {preset}
+                  <button
+                    onClick={() => setFeedingAmountPresets(feedingAmountPresets.filter(p => p !== preset))}
+                    style={{ display: 'flex', alignItems: 'center', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-3)', padding: 2, lineHeight: 0 }}
+                  >
+                    <X size={12} />
+                  </button>
+                </span>
+              ))}
+            </div>
+          )}
+          <div style={{ display: 'flex', gap: 8 }}>
+            <input
+              value={newPreset}
+              onChange={e => setNewPreset(e.target.value)}
+              placeholder="e.g. 1 pinch, 2 cubes"
+              onKeyDown={e => e.key === 'Enter' && addPreset()}
+              style={{ flex: 1, boxSizing: 'border-box' }}
+            />
+            <button
+              onClick={addPreset}
+              disabled={!newPreset.trim()}
+              style={{
+                padding: '7px 14px', borderRadius: 8, fontSize: 13, fontWeight: 500,
+                cursor: newPreset.trim() ? 'pointer' : 'default',
+                border: '0.5px solid var(--blue-border)',
+                background: newPreset.trim() ? 'var(--blue-bg)' : 'var(--surface-2)',
+                color: newPreset.trim() ? 'var(--blue)' : 'var(--text-3)',
+              }}
+            >
+              Add
+            </button>
+          </div>
         </section>
         </div>{/* end left column */}
 
