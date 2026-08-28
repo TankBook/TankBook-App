@@ -11,13 +11,20 @@ class TankCreate(BaseModel):
     water_type: str = "freshwater"
     substrate: str | None = None
     lighting: str | None = None
+    has_filter: bool = False
     filter_flow_lph: int | None = None
     width_mm: int | None = None
     height_mm: int | None = None
     depth_mm: int | None = None
     co2_injection: bool = False
+    co2_source: str | None = None
+    co2_method: str | None = None
     has_heater: bool = False
     heater_watts: int | None = None
+    has_lighting: bool = False
+    light_intensity: str | None = None
+    light_watts: int | None = None
+    light_technology: str | None = None
     setup_date: datetime | None = None
 
 
@@ -158,6 +165,14 @@ class DailyTaskCreate(BaseModel):
     hour: int
     minute: int = 0
     days: str  # comma-separated integers 0=Mon … 6=Sun, e.g. "0,1,2,3,4,5,6"
+    color: str | None = None
+
+
+class DailyTaskUpdate(BaseModel):
+    name: str | None = None
+    hour: int | None = None
+    minute: int | None = None
+    days: str | None = None
     color: str | None = None
 
 
