@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
-import { CalendarDays, Ruler, Info, Download, Upload, Droplets, RefreshCw, Bell, Globe } from 'lucide-react'
+import { CalendarDays, Ruler, Info, Download, Upload, Droplets, RefreshCw, Bell, Globe, Utensils, X } from 'lucide-react'
 import { useSettings, formatDate, DateFormat, UnitSystem } from '../context/SettingsContext'
 import { Card } from '../components/ui'
 import { api, Tank } from '../api/client'
@@ -32,15 +32,17 @@ const UNIT_OPTIONS: { value: UnitSystem; label: string; example: string }[] = [
 ]
 
 export default function Settings() {
-  const { dateFormat, setDateFormat, unitSystem, setUnitSystem, defaultTank, setDefaultTank, alertRetentionDays, setAlertRetentionDays, appUrl, setAppUrl, loading } = useSettings()
+  const { dateFormat, setDateFormat, unitSystem, setUnitSystem, defaultTank, setDefaultTank, alertRetentionDays, setAlertRetentionDays, appUrl, setAppUrl, feedingAmountPresets, setFeedingAmountPresets, loading } = useSettings()
   const [tanks, setTanks] = useState<Tank[]>([])
   const [draftDateFormat, setDraftDateFormat] = useState<DateFormat>(dateFormat)
   const [draftUnitSystem, setDraftUnitSystem] = useState<UnitSystem>(unitSystem)
   const [draftDefaultTank, setDraftDefaultTank] = useState(defaultTank ?? '')
   const [draftAlertRetentionDays, setDraftAlertRetentionDays] = useState<number | null>(alertRetentionDays)
   const [draftAppUrl, setDraftAppUrl] = useState(appUrl ?? '')
+  const [draftFeedingAmountPresets, setDraftFeedingAmountPresets] = useState<string[]>(feedingAmountPresets)
   const [savingSettings, setSavingSettings] = useState(false)
   const [settingsSaved, setSettingsSaved] = useState(false)
+  const [newPreset, setNewPreset] = useState('')
 
   useEffect(() => {
     if (!loading) {
@@ -49,18 +51,29 @@ export default function Settings() {
       setDraftDefaultTank(defaultTank ?? '')
       setDraftAlertRetentionDays(alertRetentionDays)
       setDraftAppUrl(appUrl ?? '')
+      setDraftFeedingAmountPresets(feedingAmountPresets)
     }
   }, [loading])
+
+  function addPreset() {
+    const value = newPreset.trim()
+    if (!value || draftFeedingAmountPresets.includes(value)) return
+    setDraftFeedingAmountPresets([...draftFeedingAmountPresets, value])
+    setNewPreset('')
+  }
 
   useEffect(() => {
     api.tanks.list().then(setTanks)
   }, [])
+
+  const feedingAmountPresetsChanged = JSON.stringify(draftFeedingAmountPresets) !== JSON.stringify(feedingAmountPresets)
 
   const settingsChanged = draftDateFormat !== dateFormat
     || draftUnitSystem !== unitSystem
     || draftDefaultTank !== (defaultTank ?? '')
     || draftAlertRetentionDays !== alertRetentionDays
     || draftAppUrl !== (appUrl ?? '')
+    || feedingAmountPresetsChanged
 
   async function saveSettings() {
     setSavingSettings(true)
@@ -72,6 +85,7 @@ export default function Settings() {
         draftDefaultTank !== (defaultTank ?? '') && setDefaultTank(draftDefaultTank || null),
         draftAlertRetentionDays !== alertRetentionDays && setAlertRetentionDays(draftAlertRetentionDays),
         draftAppUrl !== (appUrl ?? '') && setAppUrl(draftAppUrl || null),
+        feedingAmountPresetsChanged && setFeedingAmountPresets(draftFeedingAmountPresets),
       ])
       setSettingsSaved(true)
     } finally {
@@ -275,6 +289,53 @@ export default function Settings() {
             placeholder={`e.g. http://192.168.1.100:3000`}
             style={{ width: '100%', boxSizing: 'border-box' }}
           />
+        </section>
+
+        <section style={{ paddingBottom: 20 }}>
+          <p style={{ fontWeight: 500, fontSize: 14, margin: '0 0 4px', color: 'var(--text)', display: 'flex', alignItems: 'center', gap: 6 }}><Utensils size={14} color="var(--text-2)" />Feeding Amounts</p>
+          <p style={{ fontSize: 12, color: 'var(--text-2)', margin: '0 0 14px' }}>
+            Presets for how much to feed. These become selectable when editing an inhabitant's feeding info.
+          </p>
+          {draftFeedingAmountPresets.length > 0 && (
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 10 }}>
+              {draftFeedingAmountPresets.map(preset => (
+                <span
+                  key={preset}
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 12, padding: '4px 6px 4px 10px', borderRadius: 999, background: 'var(--surface-2)', border: '0.5px solid var(--border)', color: 'var(--text)' }}
+                >
+                  {preset}
+                  <button
+                    onClick={() => setDraftFeedingAmountPresets(draftFeedingAmountPresets.filter(p => p !== preset))}
+                    style={{ display: 'flex', alignItems: 'center', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-3)', padding: 2, lineHeight: 0 }}
+                  >
+                    <X size={12} />
+                  </button>
+                </span>
+              ))}
+            </div>
+          )}
+          <div style={{ display: 'flex', gap: 8 }}>
+            <input
+              value={newPreset}
+              onChange={e => setNewPreset(e.target.value)}
+              placeholder="e.g. 1 pinch, 2 cubes"
+              onKeyDown={e => e.key === 'Enter' && addPreset()}
+              style={{ flex: 1, boxSizing: 'border-box' }}
+            />
+            <button
+              onClick={addPreset}
+              disabled={!newPreset.trim()}
+              style={{
+                padding: '7px 14px', borderRadius: 8, fontSize: 13, fontWeight: 500,
+                cursor: newPreset.trim() ? 'pointer' : 'default',
+                border: '0.5px solid var(--blue-border)',
+                background: newPreset.trim() ? 'var(--blue-bg)' : 'var(--surface-2)',
+                color: newPreset.trim() ? 'var(--blue)' : 'var(--text-3)',
+              }}
+            >
+              Add
+            </button>
+          </div>
         </section>
         </div>{/* end left column */}
 

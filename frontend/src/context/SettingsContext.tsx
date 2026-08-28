@@ -15,6 +15,8 @@ interface SettingsContextValue {
   setAlertRetentionDays: (days: number | null) => Promise<void>
   appUrl: string | null
   setAppUrl: (url: string | null) => Promise<void>
+  feedingAmountPresets: string[]
+  setFeedingAmountPresets: (presets: string[]) => Promise<void>
   theme: Theme
   toggleTheme: () => void
   loading: boolean
@@ -31,6 +33,8 @@ const SettingsContext = createContext<SettingsContextValue>({
   setAlertRetentionDays: async () => {},
   appUrl: null,
   setAppUrl: async () => {},
+  feedingAmountPresets: [],
+  setFeedingAmountPresets: async () => {},
   theme: 'light',
   toggleTheme: () => {},
   loading: true,
@@ -42,6 +46,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
   const [defaultTank, setDefaultTankState] = useState<string | null>(null)
   const [alertRetentionDays, setAlertRetentionDaysState] = useState<number | null>(null)
   const [appUrl, setAppUrlState] = useState<string | null>(null)
+  const [feedingAmountPresets, setFeedingAmountPresetsState] = useState<string[]>([])
   const [theme, setTheme] = useState<Theme>(
     () => (localStorage.getItem('theme') as Theme) ?? 'light'
   )
@@ -56,6 +61,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
         setDefaultTankState(d.default_tank_id ?? null)
         setAlertRetentionDaysState(d.alert_retention_days ?? null)
         setAppUrlState(d.app_url ?? null)
+        setFeedingAmountPresetsState(d.feeding_amount_presets ?? [])
       })
       .catch(() => {})
       .finally(() => setLoading(false))
@@ -111,12 +117,21 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     })
   }
 
+  async function setFeedingAmountPresets(presets: string[]) {
+    setFeedingAmountPresetsState(presets)
+    await fetch('/api/settings/', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ feeding_amount_presets: presets }),
+    })
+  }
+
   function toggleTheme() {
     setTheme(t => (t === 'light' ? 'dark' : 'light'))
   }
 
   return (
-    <SettingsContext.Provider value={{ dateFormat, setDateFormat, unitSystem, setUnitSystem, defaultTank, setDefaultTank, alertRetentionDays, setAlertRetentionDays, appUrl, setAppUrl, theme, toggleTheme, loading }}>
+    <SettingsContext.Provider value={{ dateFormat, setDateFormat, unitSystem, setUnitSystem, defaultTank, setDefaultTank, alertRetentionDays, setAlertRetentionDays, appUrl, setAppUrl, feedingAmountPresets, setFeedingAmountPresets, theme, toggleTheme, loading }}>
       {children}
     </SettingsContext.Provider>
   )

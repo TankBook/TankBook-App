@@ -626,7 +626,7 @@ export default function TankDetail() {
   const plants = usePlants(id!)
   const params = useParameters(id!, 100)
   const alerts = useAlerts(id!)
-  const { dateFormat, unitSystem } = useSettings()
+  const { dateFormat, unitSystem, feedingAmountPresets } = useSettings()
 
   const [showAddFish, setShowAddFish] = useState(false)
   const [showAddPlant, setShowAddPlant] = useState(false)
@@ -644,6 +644,7 @@ export default function TankDetail() {
   const [editHealth, setEditHealth] = useState('')
   const [editFoodTypes, setEditFoodTypes] = useState('')
   const [editFeedingTimes, setEditFeedingTimes] = useState('')
+  const [editFeedingAmount, setEditFeedingAmount] = useState('')
   const [editNotes, setEditNotes] = useState('')
 
 
@@ -814,7 +815,7 @@ export default function TankDetail() {
     loadTasks()
   }
 
-  function startEditFish(f: { id: string; quantity: number; organism_type: string; fish_status: string; health_status: string; food_types: string | null; feeding_times_per_day: number | null; notes: string | null }) {
+  function startEditFish(f: { id: string; quantity: number; organism_type: string; fish_status: string; health_status: string; food_types: string | null; feeding_times_per_day: number | null; feeding_amount: string | null; notes: string | null }) {
     setEditingFishId(f.id)
     setEditOrganismType(f.organism_type)
     setEditQty(String(f.quantity))
@@ -822,6 +823,7 @@ export default function TankDetail() {
     setEditHealth(f.health_status)
     setEditFoodTypes(f.food_types ?? '')
     setEditFeedingTimes(f.feeding_times_per_day ? String(f.feeding_times_per_day) : '')
+    setEditFeedingAmount(f.feeding_amount ?? '')
     setEditNotes(f.notes ?? '')
   }
 
@@ -834,6 +836,7 @@ export default function TankDetail() {
       health_status: editHealth,
       food_types: editFoodTypes || null,
       feeding_times_per_day: editFeedingTimes ? Number(editFeedingTimes) : null,
+      feeding_amount: editFeedingAmount || null,
       notes: editNotes || null,
     })
     setEditingFishId(null)
@@ -1531,12 +1534,12 @@ ${taskRows ? `<h2>Pending Maintenance</h2>
         // Derive feeding entries from added inhabitants — one entry per unique species
         const feedingEntries = (() => {
           const seen = new Set<string>()
-          const entries: { name: string; times: number; food: string | null }[] = []
+          const entries: { name: string; times: number; food: string | null; amount: string | null }[] = []
           for (const f of (fish.data ?? [])) {
             if (f.fish_status !== 'added' || !f.feeding_times_per_day) continue
             if (seen.has(f.species_slug)) continue
             seen.add(f.species_slug)
-            entries.push({ name: f.common_name ?? f.species_slug, times: f.feeding_times_per_day, food: f.food_types ?? null })
+            entries.push({ name: f.common_name ?? f.species_slug, times: f.feeding_times_per_day, food: f.food_types ?? null, amount: f.feeding_amount ?? null })
           }
           return entries
         })()
@@ -1552,6 +1555,7 @@ ${taskRows ? `<h2>Pending Maintenance</h2>
                   <Utensils size={12} style={{ color: 'var(--text-3)', flexShrink: 0 }} />
                   <span style={{ fontSize: 13, color: 'var(--text)', flex: 1 }}>
                     Feed {entry.name}
+                    {entry.amount && <span style={{ fontSize: 11, color: 'var(--text-3)', marginLeft: 5 }}>· {entry.amount}</span>}
                     {entry.food && <span style={{ fontSize: 11, color: 'var(--text-3)', marginLeft: 5 }}>({entry.food})</span>}
                   </span>
                   <span style={{ fontSize: 11, fontWeight: 500, color: 'var(--blue)', background: 'var(--blue-bg)', border: '0.5px solid var(--blue-border)', borderRadius: 5, padding: '1px 6px', flexShrink: 0 }}>
@@ -1823,6 +1827,18 @@ ${taskRows ? `<h2>Pending Maintenance</h2>
                   {[1,2,3,4,5,6].map(n => <option key={n} value={n}>{n}×</option>)}
                 </select>
               </div>
+            </div>
+            <div style={{ marginBottom: 12 }}>
+              <FieldLabel>Feeding Amount</FieldLabel>
+              <select value={editFeedingAmount} onChange={e => setEditFeedingAmount(e.target.value)} style={{ width: '100%', boxSizing: 'border-box' }}>
+                <option value="">—</option>
+                {feedingAmountPresets.map(preset => <option key={preset} value={preset}>{preset}</option>)}
+              </select>
+              {feedingAmountPresets.length === 0 && (
+                <p style={{ margin: '4px 0 0', fontSize: 11, color: 'var(--text-3)' }}>
+                  Add presets in Settings → Feeding Amounts to choose one here.
+                </p>
+              )}
             </div>
             <div style={{ marginBottom: 16 }}>
               <FieldLabel>Notes</FieldLabel>

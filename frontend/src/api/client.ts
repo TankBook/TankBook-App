@@ -51,6 +51,7 @@ export interface TankFish {
   health_status: string
   food_types: string | null
   feeding_times_per_day: number | null
+  feeding_amount: string | null
   added_at: string
   notes: string | null
   common_name: string | null
@@ -218,7 +219,7 @@ export const api = {
     list: (tankId: string) => get<TankFish[]>(`/fish/${tankId}/fish`),
     add: (tankId: string, body: Pick<TankFish, 'species_slug' | 'quantity' | 'organism_type' | 'fish_status' | 'notes'>) =>
       post<TankFish>(`/fish/${tankId}/fish`, body),
-    update: (tankId: string, fishId: string, body: { quantity?: number; organism_type?: string; fish_status?: string; health_status?: string; food_types?: string | null; feeding_times_per_day?: number | null; notes?: string | null }) =>
+    update: (tankId: string, fishId: string, body: { quantity?: number; organism_type?: string; fish_status?: string; health_status?: string; food_types?: string | null; feeding_times_per_day?: number | null; feeding_amount?: string | null; notes?: string | null }) =>
       patch<TankFish>(`/fish/${tankId}/fish/${fishId}`, body),
     remove: (tankId: string, fishId: string) => del(`/fish/${tankId}/fish/${fishId}`),
   },
