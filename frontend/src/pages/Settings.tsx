@@ -181,7 +181,7 @@ export default function Settings() {
         App-wide settings for TankBook. There are no user accounts, so these apply to everyone using this instance.
       </p>
 
-      <Card style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 28, padding: 24 }}>
+      <Card style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 16, padding: 24 }}>
 
         <section style={{ paddingBottom: 20, borderBottom: '0.5px solid var(--border-sub)' }}>
           <p style={{ fontWeight: 500, fontSize: 14, margin: '0 0 4px', color: 'var(--text)', display: 'flex', alignItems: 'center', gap: 6 }}><Droplets size={14} color="var(--text-2)" />Default Tank</p>
@@ -200,8 +200,6 @@ export default function Settings() {
           </select>
         </section>
 
-        {/* Left column — display preferences */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 16, justifyContent: 'space-between', alignSelf: 'stretch' }}>
         <section style={{ paddingBottom: 20, borderBottom: '0.5px solid var(--border-sub)' }}>
           <p style={{ fontWeight: 500, fontSize: 14, margin: '0 0 4px', color: 'var(--text)', display: 'flex', alignItems: 'center', gap: 6 }}><CalendarDays size={14} color="var(--text-2)" />Date Format</p>
           <p style={{ fontSize: 12, color: 'var(--text-2)', margin: '0 0 14px' }}>
@@ -214,8 +212,8 @@ export default function Settings() {
                 style={{
                   display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                   padding: '10px 12px', borderRadius: 8, cursor: 'pointer',
-                    border: draftDateFormat === opt.value ? '1px solid var(--blue-border)' : '0.5px solid var(--border)',
-                    background: draftDateFormat === opt.value ? 'var(--blue-bg)' : 'transparent',
+                  border: draftDateFormat === opt.value ? '1px solid var(--blue-border)' : '0.5px solid var(--border)',
+                  background: draftDateFormat === opt.value ? 'var(--blue-bg)' : 'transparent',
                 }}
               >
                 <span style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -299,7 +297,7 @@ export default function Settings() {
           />
         </section>
 
-        <section style={{ paddingBottom: 20 }}>
+        <section style={{ paddingBottom: 20, borderBottom: '0.5px solid var(--border-sub)' }}>
           <p style={{ fontWeight: 500, fontSize: 14, margin: '0 0 4px', color: 'var(--text)', display: 'flex', alignItems: 'center', gap: 6 }}><Utensils size={14} color="var(--text-2)" />Feeding Amounts</p>
           <p style={{ fontSize: 12, color: 'var(--text-2)', margin: '0 0 14px' }}>
             Presets for how much to feed. These become selectable when editing an inhabitant's feeding info.
@@ -345,10 +343,7 @@ export default function Settings() {
             </button>
           </div>
         </section>
-        </div>{/* end left column */}
 
-        {/* Right column — data & info */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 16, justifyContent: 'space-between', alignSelf: 'stretch' }}>
         <section style={{ paddingBottom: 20, borderBottom: '0.5px solid var(--border-sub)' }}>
           <p style={{ fontWeight: 500, fontSize: 14, margin: '0 0 4px', color: 'var(--text)', display: 'flex', alignItems: 'center', gap: 6 }}>
             <Download size={14} color="var(--text-2)" />Data Backup
@@ -543,9 +538,8 @@ export default function Settings() {
             while tank and parameter data is stored in SQLite.
           </p>
         </section>
-        </div>{/* end right column */}
 
-        <section style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 12, paddingTop: 20 }}>
+        <section style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 12 }}>
           {settingsSaved && <span style={{ fontSize: 12, color: 'var(--green)' }}>Settings saved</span>}
           <button
             onClick={saveSettings}
