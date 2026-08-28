@@ -4,6 +4,24 @@ All notable changes to TankBook are documented here.
 
 ---
 
+## [0.7.1] — 2026-08-28
+
+### Fixed
+- Restoring a backup containing a completed recurring maintenance task no longer crashes with a 500 error.
+- Backup export/import now includes feeding amount, plant status, and feeding amount presets — previously silently dropped on restore.
+- Dragging a tank within a room's map no longer lets it overlap the room's edges — the drag boundary now accounts for each tank's actual footprint.
+- Fixed several mobile layout issues: an orphaned stat card at iPad widths on the Dashboard, cramped Species page action buttons, an overflowing category filter on the Tank Journal, and broken/overlapping layouts on the Spending and Inventory pages.
+
+### Improvements
+- Room layouts moved from browser localStorage to the database, so they persist across devices and are included in backup/restore.
+- Fish Rooms reworked into a room list plus a per-room detail page, with a Create Room modal for setting name and size up front.
+- Tanks placed in a room now have a quick link to their tank detail page, which shows a "Back to room" button when opened this way.
+- Room dimensions now use "Width"/"Length" wording instead of "Width"/"Depth", matching how rooms — not aquariums — are normally described.
+- Settings page reorganised: backup export/import combined into one section with a confirmation step before restoring, Feeding Amounts presets reordered, and a new Reset to Defaults button.
+- New Local Storage section on Settings shows on-disk storage used, species catalogue size, and gallery image count.
+
+---
+
 ## [0.7.0] — 2026-08-27
 
 ### Features
