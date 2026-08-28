@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { NotebookPen, Trash2, Plus, Pencil, ChevronDown } from 'lucide-react'
+import { NotebookPen, Trash2, Plus, Pencil, ChevronDown, Layers } from 'lucide-react'
 import { Tag, Card, FieldLabel, Modal, RichTextarea, renderNotes } from '../components/ui'
 import { api, JournalEntry, Tank, TankFish } from '../api/client'
 import { useSettings, formatDate } from '../context/SettingsContext'
@@ -175,6 +175,7 @@ export default function LivestockJournal() {
   const [filterType, setFilterType] = useState<string>('all')
   const [loading, setLoading] = useState(false)
   const [isMobile, setIsMobile] = useState(() => window.matchMedia('(max-width: 768px)').matches)
+  const [tankMenuOpen, setTankMenuOpen] = useState(false)
 
   useEffect(() => {
     const mq = window.matchMedia('(max-width: 768px)')
@@ -314,14 +315,51 @@ export default function LivestockJournal() {
       {/* Tank selector */}
       <Card style={{ marginBottom: 20 }}>
         <FieldLabel>Select Tank</FieldLabel>
-        <select
-          value={selectedTank}
-          onChange={e => { setSelectedTank(e.target.value); setFilterType('all') }}
-          style={{ width: '100%' }}
-        >
-          <option value="">— choose a tank —</option>
-          {tanks.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
-        </select>
+        <div style={{ position: 'relative' }}>
+          <button
+            onClick={() => setTankMenuOpen(o => !o)}
+            style={{
+              display: 'flex', alignItems: 'center', width: '100%',
+              fontSize: 14, fontWeight: 500, padding: '10px 12px',
+              borderRadius: 10, border: '0.5px solid var(--border)',
+              background: 'var(--surface)', color: selectedTank ? 'var(--text)' : 'var(--text-3)', cursor: 'pointer',
+            }}
+          >
+            <Layers size={16} style={{ flexShrink: 0 }} />
+            <span style={{ marginLeft: 8, flex: 1, textAlign: 'left' }}>
+              {tanks.find(t => t.id === selectedTank)?.name ?? '— choose a tank —'}
+            </span>
+            <ChevronDown size={16} style={{ flexShrink: 0, transform: tankMenuOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s' }} />
+          </button>
+
+          {tankMenuOpen && (
+            <>
+              <div onClick={() => setTankMenuOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 90 }} />
+              <div style={{
+                position: 'absolute', top: 'calc(100% + 4px)', left: 0, right: 0, zIndex: 100,
+                background: 'var(--surface)', border: '0.5px solid var(--border)', borderRadius: 10,
+                boxShadow: '0 8px 24px rgba(0,0,0,0.16)', overflow: 'hidden', maxHeight: 280, overflowY: 'auto',
+              }}>
+                {tanks.map(t => (
+                  <button
+                    key={t.id}
+                    onClick={() => { setSelectedTank(t.id); setFilterType('all'); setTankMenuOpen(false) }}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: 8, width: '100%',
+                      padding: '10px 12px', fontSize: 14, textAlign: 'left', cursor: 'pointer',
+                      border: 'none', borderBottom: '0.5px solid var(--border-sub)',
+                      background: selectedTank === t.id ? 'var(--blue-bg)' : 'transparent',
+                      color: selectedTank === t.id ? 'var(--blue)' : 'var(--text)',
+                      fontWeight: selectedTank === t.id ? 500 : 400,
+                    }}
+                  >
+                    {t.name}
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
+        </div>
       </Card>
 
       {/* Filter bar — dropdown on mobile (the button grid overflows narrow screens), equal-width grid of buttons on desktop */}
