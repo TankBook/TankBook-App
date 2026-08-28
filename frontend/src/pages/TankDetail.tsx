@@ -1485,9 +1485,9 @@ ${taskRows ? `<h2>Pending Maintenance</h2>
   const pendingTasks = tasks.filter(t => t.status === 'pending')
   const doneTasks = tasks.filter(t => t.status === 'done')
   const inhabitantCounts = {
-    fish: (fish.data ?? []).filter(f => f.organism_type === 'fish').reduce((sum, f) => sum + f.quantity, 0),
-    invertebrate: (fish.data ?? []).filter(f => f.organism_type === 'invertebrate').reduce((sum, f) => sum + f.quantity, 0),
-    amphibian: (fish.data ?? []).filter(f => f.organism_type === 'amphibian').reduce((sum, f) => sum + f.quantity, 0),
+    fish: (fish.data ?? []).filter(f => f.organism_type === 'fish' && f.fish_status === 'added').reduce((sum, f) => sum + f.quantity, 0),
+    invertebrate: (fish.data ?? []).filter(f => f.organism_type === 'invertebrate' && f.fish_status === 'added').reduce((sum, f) => sum + f.quantity, 0),
+    amphibian: (fish.data ?? []).filter(f => f.organism_type === 'amphibian' && f.fish_status === 'added').reduce((sum, f) => sum + f.quantity, 0),
   }
   const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0)
   const overdueTasks = pendingTasks.filter(t => { const d = new Date(t.due_at); d.setHours(0, 0, 0, 0); return d < todayStart })
@@ -1522,8 +1522,8 @@ ${taskRows ? `<h2>Pending Maintenance</h2>
 
       <div style={{ marginBottom: 20 }}>
         <TankGraphic
-          fishCount={(fish.data ?? []).reduce((s, f) => s + f.quantity, 0)}
-          plantCount={(plants.data ?? []).reduce((s, p) => s + p.quantity, 0)}
+          fishCount={(fish.data ?? []).filter(f => f.fish_status === 'added').reduce((s, f) => s + f.quantity, 0)}
+          plantCount={(plants.data ?? []).filter(p => p.plant_status === 'planted').reduce((s, p) => s + p.quantity, 0)}
           co2={tank.co2_injection}
         />
       </div>
