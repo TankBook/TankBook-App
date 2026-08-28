@@ -174,6 +174,14 @@ export default function LivestockJournal() {
   const [fishList, setFishList] = useState<TankFish[]>([])
   const [filterType, setFilterType] = useState<string>('all')
   const [loading, setLoading] = useState(false)
+  const [isMobile, setIsMobile] = useState(() => window.matchMedia('(max-width: 768px)').matches)
+
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 768px)')
+    const handler = (e: MediaQueryListEvent) => setIsMobile(e.matches)
+    mq.addEventListener('change', handler)
+    return () => mq.removeEventListener('change', handler)
+  }, [])
 
   // Add modal
   const [showModal, setShowModal] = useState(false)
@@ -315,39 +323,56 @@ export default function LivestockJournal() {
         </select>
       </Card>
 
-      {/* Filter bar — equal-width grid, two rows, category colours */}
+      {/* Filter bar — dropdown on mobile (the button grid overflows narrow screens), equal-width grid of buttons on desktop */}
       {selectedTank && entries.length > 0 && (
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: `repeat(${cols}, 1fr)`,
-          gap: 4,
-          marginBottom: 16,
-        }}>
-          {allFilters.map(type => {
-            const active = filterType === type
-            const s = type === 'all' ? null : (EVENT_STYLE[type] ?? null)
-            return (
-              <button
-                key={type}
-                onClick={() => setFilterType(type)}
-                style={{
-                  fontSize: 11, padding: '5px 4px', borderRadius: 6, cursor: 'pointer',
-                  fontWeight: active ? 600 : 400,
-                  textAlign: 'center',
-                  border: active
-                    ? `1px solid ${s ? s.color : 'var(--blue)'}`
-                    : '0.5px solid var(--border)',
-                  background: active
-                    ? (s ? s.bg : 'var(--blue-bg)')
-                    : 'transparent',
-                  color: s ? s.color : (active ? 'var(--blue)' : 'var(--text-2)'),
-                }}
-              >
-                {type === 'all' ? 'All' : (EVENT_LABELS[type] ?? type)}
-              </button>
-            )
-          })}
-        </div>
+        isMobile ? (
+          <div style={{ marginBottom: 16 }}>
+            <FieldLabel>Filter by Category</FieldLabel>
+            <select
+              value={filterType}
+              onChange={e => setFilterType(e.target.value)}
+              style={{ width: '100%' }}
+            >
+              {allFilters.map(type => (
+                <option key={type} value={type}>
+                  {type === 'all' ? 'All' : (EVENT_LABELS[type] ?? type)}
+                </option>
+              ))}
+            </select>
+          </div>
+        ) : (
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: `repeat(${cols}, 1fr)`,
+            gap: 4,
+            marginBottom: 16,
+          }}>
+            {allFilters.map(type => {
+              const active = filterType === type
+              const s = type === 'all' ? null : (EVENT_STYLE[type] ?? null)
+              return (
+                <button
+                  key={type}
+                  onClick={() => setFilterType(type)}
+                  style={{
+                    fontSize: 11, padding: '5px 4px', borderRadius: 6, cursor: 'pointer',
+                    fontWeight: active ? 600 : 400,
+                    textAlign: 'center',
+                    border: active
+                      ? `1px solid ${s ? s.color : 'var(--blue)'}`
+                      : '0.5px solid var(--border)',
+                    background: active
+                      ? (s ? s.bg : 'var(--blue-bg)')
+                      : 'transparent',
+                    color: s ? s.color : (active ? 'var(--blue)' : 'var(--text-2)'),
+                  }}
+                >
+                  {type === 'all' ? 'All' : (EVENT_LABELS[type] ?? type)}
+                </button>
+              )
+            })}
+          </div>
+        )
       )}
 
       {/* Entry list */}
