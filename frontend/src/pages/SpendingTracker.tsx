@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react'
-import { Trash2, Plus, X, Pencil } from 'lucide-react'
+import { Trash2, Plus, X, Pencil, ChevronDown } from 'lucide-react'
 import { api, Expense } from '../api/client'
 import { useTanks } from '../hooks'
 import { useSettings, formatDate } from '../context/SettingsContext'
@@ -130,6 +130,59 @@ function monthKey(dateStr: string) {
 function monthLabel(key: string) {
   const [y, m] = key.split('-').map(Number)
   return new Date(y, m - 1, 1).toLocaleString('default', { month: 'long', year: 'numeric' })
+}
+
+function FilterDropdown({ value, onChange, options }: {
+  value: string
+  onChange: (v: string) => void
+  options: { value: string; label: string }[]
+}) {
+  const [open, setOpen] = useState(false)
+  const selectedLabel = options.find(o => o.value === value)?.label ?? ''
+
+  return (
+    <div style={{ position: 'relative', flex: 1 }}>
+      <button
+        onClick={() => setOpen(o => !o)}
+        style={{
+          display: 'flex', alignItems: 'center', width: '100%', boxSizing: 'border-box',
+          fontSize: 13, padding: '6px 10px', borderRadius: 8,
+          border: '0.5px solid var(--btn-border)', background: 'var(--surface)', color: 'var(--text)', cursor: 'pointer',
+        }}
+      >
+        <span style={{ flex: 1, textAlign: 'left', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{selectedLabel}</span>
+        <ChevronDown size={14} style={{ flexShrink: 0, marginLeft: 6, color: 'var(--text-3)', transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s' }} />
+      </button>
+
+      {open && (
+        <>
+          <div onClick={() => setOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 90 }} />
+          <div style={{
+            position: 'absolute', top: 'calc(100% + 4px)', left: 0, right: 0, zIndex: 100,
+            background: 'var(--surface)', border: '0.5px solid var(--border)', borderRadius: 10,
+            boxShadow: '0 8px 24px rgba(0,0,0,0.16)', overflow: 'hidden', maxHeight: 280, overflowY: 'auto',
+          }}>
+            {options.map(o => (
+              <button
+                key={o.value}
+                onClick={() => { onChange(o.value); setOpen(false) }}
+                style={{
+                  display: 'flex', alignItems: 'center', width: '100%',
+                  padding: '8px 10px', fontSize: 13, textAlign: 'left', cursor: 'pointer',
+                  border: 'none', borderBottom: '0.5px solid var(--border-sub)',
+                  background: value === o.value ? 'var(--blue-bg)' : 'transparent',
+                  color: value === o.value ? 'var(--blue)' : 'var(--text)',
+                  fontWeight: value === o.value ? 500 : 400,
+                }}
+              >
+                {o.label}
+              </button>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  )
 }
 
 export default function SpendingTracker() {
@@ -332,15 +385,23 @@ export default function SpendingTracker() {
         <div style={{ flex: 1, minWidth: 0 }}>
           {/* Filters */}
           <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
-            <select value={filterTank} onChange={e => setFilterTank(e.target.value)} style={{ flex: 1, boxSizing: 'border-box' }}>
-              <option value="all">All Tanks</option>
-              <option value="none">General</option>
-              {tanks?.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
-            </select>
-            <select value={filterCat} onChange={e => setFilterCat(e.target.value)} style={{ flex: 1, boxSizing: 'border-box' }}>
-              <option value="all">All Categories</option>
-              {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
-            </select>
+            <FilterDropdown
+              value={filterTank}
+              onChange={setFilterTank}
+              options={[
+                { value: 'all', label: 'All Tanks' },
+                { value: 'none', label: 'General' },
+                ...(tanks ?? []).map(t => ({ value: t.id, label: t.name })),
+              ]}
+            />
+            <FilterDropdown
+              value={filterCat}
+              onChange={setFilterCat}
+              options={[
+                { value: 'all', label: 'All Categories' },
+                ...CATEGORIES.map(c => ({ value: c, label: c })),
+              ]}
+            />
           </div>
 
           {filtered.length === 0 && (
