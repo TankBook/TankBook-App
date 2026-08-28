@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
 import { useParams, Link, useNavigate, useSearchParams } from 'react-router-dom'
-import { Fish, Leaf, Droplets, CalendarCheck, Bell, Pencil, Trash2, Plus, ChevronLeft, ChevronDown, ListChecks, Camera, X, Utensils, BookOpen, FlaskConical, Thermometer, Lightbulb, Home, Clock, Calendar, ChevronLeft as Prev, ChevronRight as Next, type LucideIcon } from 'lucide-react'
+import { Fish, Leaf, Droplets, CalendarCheck, Bell, Pencil, Trash2, Plus, ChevronLeft, ChevronDown, ListChecks, Camera, X, Utensils, BookOpen, FlaskConical, Thermometer, Lightbulb, Filter, Home, Clock, Calendar, ChevronLeft as Prev, ChevronRight as Next, type LucideIcon } from 'lucide-react'
 import {
   LineChart, Line, XAxis, YAxis, Tooltip,
   ResponsiveContainer,
@@ -440,6 +440,7 @@ function EditTankPanel({ tank, onSave }: { tank: any; onSave: () => void }) {
   const [lighting, setLighting] = useState(tank.lighting ?? '')
   const [hasLighting, setHasLighting] = useState(!!tank.lighting)
   const [filterFlow, setFilterFlow] = useState(tank.filter_flow_lph != null ? String(tank.filter_flow_lph) : '')
+  const [hasFilter, setHasFilter] = useState(!!tank.filter_flow_lph)
   const [width, setWidth] = useState(tank.width_mm != null ? String(fromMM(tank.width_mm, unitSystem)) : '')
   const [height, setHeight] = useState(tank.height_mm != null ? String(fromMM(tank.height_mm, unitSystem)) : '')
   const [depth, setDepth] = useState(tank.depth_mm != null ? String(fromMM(tank.depth_mm, unitSystem)) : '')
@@ -466,7 +467,7 @@ function EditTankPanel({ tank, onSave }: { tank: any; onSave: () => void }) {
         name, volume_litres: Number(volume),
         water_type: waterType,
         substrate: substrate || null, lighting: hasLighting && lighting ? lighting : null,
-        filter_flow_lph: filterFlow ? Number(filterFlow) : null,
+        filter_flow_lph: hasFilter && filterFlow ? Number(filterFlow) : null,
         width_mm: width ? toMM(Number(width), unitSystem) : null,
         height_mm: height ? toMM(Number(height), unitSystem) : null,
         depth_mm: depth ? toMM(Number(depth), unitSystem) : null,
@@ -494,7 +495,21 @@ function EditTankPanel({ tank, onSave }: { tank: any; onSave: () => void }) {
           <input value={val as string} onChange={e => (set as any)(e.target.value)} style={{ width: '100%', boxSizing: 'border-box' }} />
         </div>
       ))}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10, marginBottom: 12 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(4, minmax(0, 1fr))', gap: 10, marginBottom: 12 }}>
+        <button
+          type="button"
+          onClick={() => { const next = !hasFilter; setHasFilter(next); if (!next) setFilterFlow('') }}
+          style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '7px 10px', borderRadius: 8,
+            fontSize: 13, fontWeight: 500, cursor: 'pointer',
+            border: `0.5px solid ${hasFilter ? 'var(--blue-border)' : 'var(--btn-border)'}`,
+            background: hasFilter ? 'var(--blue-bg)' : 'transparent',
+            color: hasFilter ? 'var(--blue)' : 'var(--text-3)',
+            opacity: hasFilter ? 1 : 0.55,
+          }}
+        >
+          <Filter size={14} /> Filter
+        </button>
         <button
           type="button"
           onClick={() => setCo2((c: boolean) => !c)}
@@ -538,8 +553,18 @@ function EditTankPanel({ tank, onSave }: { tank: any; onSave: () => void }) {
           <Lightbulb size={14} /> Lighting
         </button>
       </div>
-      {(hasHeater || hasLighting) && (
+      {(hasFilter || hasHeater || hasLighting) && (
         <div style={{ display: 'flex', gap: 10, marginBottom: 12, flexWrap: 'wrap', alignItems: 'center' }}>
+          {hasFilter && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <input
+                type="number" min="1" placeholder="Flow rate"
+                value={filterFlow} onChange={e => setFilterFlow(e.target.value)}
+                style={{ width: 90 }}
+              />
+              <span style={{ fontSize: 13, color: 'var(--text-2)' }}>L/h</span>
+            </div>
+          )}
           {hasHeater && (
             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
               <input
@@ -559,10 +584,6 @@ function EditTankPanel({ tank, onSave }: { tank: any; onSave: () => void }) {
           )}
         </div>
       )}
-      <div style={{ marginBottom: 12 }}>
-        <FieldLabel>Filter Flow (L/h)</FieldLabel>
-        <input value={filterFlow} onChange={e => setFilterFlow(e.target.value)} style={{ width: '100%', boxSizing: 'border-box' }} />
-      </div>
       <div style={{ marginBottom: 12 }}>
         <FieldLabel>Water Type</FieldLabel>
         <select value={waterType} onChange={e => setWaterType(e.target.value)} style={{ width: '100%', boxSizing: 'border-box' }}>
