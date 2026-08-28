@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useRef } from 'react'
+import React, { useState, useMemo, useRef, useEffect } from 'react'
 import { Trash2, Plus, X, Pencil } from 'lucide-react'
 import { api, Expense } from '../api/client'
 import { useTanks } from '../hooks'
@@ -138,6 +138,14 @@ export default function SpendingTracker() {
 
   const [expenses, setExpenses] = useState<Expense[]>([])
   const [loaded, setLoaded] = useState(false)
+  const [isMobile, setIsMobile] = useState(() => window.matchMedia('(max-width: 768px)').matches)
+
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 768px)')
+    const handler = (e: MediaQueryListEvent) => setIsMobile(e.matches)
+    mq.addEventListener('change', handler)
+    return () => mq.removeEventListener('change', handler)
+  }, [])
 
   // Load once
   if (!loaded) {
@@ -306,7 +314,7 @@ export default function SpendingTracker() {
       </div>
 
       {/* Summary cards */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 12, marginBottom: 20 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, 1fr)', gap: 12, marginBottom: 20 }}>
         {[
           { label: 'All Time', value: totalAll },
           { label: `${now.toLocaleString('default', { month: 'long' })}`, value: totalMonth },
@@ -319,7 +327,7 @@ export default function SpendingTracker() {
         ))}
       </div>
 
-      <div style={{ display: 'flex', gap: 20, alignItems: 'flex-start', flexWrap: 'wrap' }}>
+      <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', gap: 20, alignItems: isMobile ? 'stretch' : 'flex-start' }}>
         {/* Main list */}
         <div style={{ flex: 1, minWidth: 0 }}>
           {/* Filters */}
@@ -349,8 +357,37 @@ export default function SpendingTracker() {
                 {items.map((e, i) => {
                   const cc = CAT_COLORS[e.category] ?? CAT_COLORS.Other
                   const tankName = tanks?.find(t => t.id === e.tank_id)?.name
+                  const rowBorder = i < items.length - 1 ? '0.5px solid var(--border-sub)' : 'none'
+
+                  if (isMobile) {
+                    return (
+                      <div key={e.id} style={{ padding: '10px 0', borderBottom: rowBorder }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
+                          <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--text)', minWidth: 0 }}>
+                            {e.description || e.category}
+                            {tankName && <span style={{ fontWeight: 400, color: 'var(--text-3)', marginLeft: 4 }}>({tankName})</span>}
+                          </span>
+                          <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)', flexShrink: 0 }}>{fmt(e.amount)}</span>
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 5, gap: 8 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+                            <Tag bg={cc.bg} color={cc.color}>{e.category}</Tag>
+                            <span style={{ fontSize: 11, color: 'var(--text-3)', flexShrink: 0 }}>{formatDate(e.purchase_date, dateFormat)}</span>
+                          </div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0 }}>
+                            <button onClick={() => openEdit(e)} style={{ lineHeight: 0, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-3)' }}><Pencil size={13} /></button>
+                            <button onClick={() => setConfirmDeleteId(e.id)} style={{ lineHeight: 0, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--red)' }}><Trash2 size={13} /></button>
+                          </div>
+                        </div>
+                        {e.notes && (
+                          <div style={{ marginTop: 6, fontSize: 11, color: 'var(--text-2)' }} dangerouslySetInnerHTML={{ __html: renderNotes(e.notes) }} />
+                        )}
+                      </div>
+                    )
+                  }
+
                   return (
-                    <div key={e.id} style={{ display: 'flex', alignItems: 'flex-start', gap: 16, padding: '10px 0', borderBottom: i < items.length - 1 ? '0.5px solid var(--border-sub)' : 'none' }}>
+                    <div key={e.id} style={{ display: 'flex', alignItems: 'flex-start', gap: 16, padding: '10px 0', borderBottom: rowBorder }}>
                       {/* Details */}
                       <div style={{ flexShrink: 0, minWidth: 160 }}>
                         <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--text)' }}>
@@ -366,7 +403,7 @@ export default function SpendingTracker() {
                       </div>
                       {/* Notes */}
                       {e.notes
-                        ? <div style={{ flex: 1, minWidth: 0, fontSize: 11, color: 'var(--text-2)', paddingTop: 1 }} dangerouslySetInnerHTML={{ __html: renderNotes(e.notes) }} />
+                        ? <div style={{ flex: 1, minWidth: 0, fontSize: 11, color: 'var(--text-2)', paddingTop: 1, overflowWrap: 'break-word' }} dangerouslySetInnerHTML={{ __html: renderNotes(e.notes) }} />
                         : <div style={{ flex: 1 }} />
                       }
                       {/* Amount + actions */}
@@ -385,7 +422,7 @@ export default function SpendingTracker() {
 
         {/* Sidebar: category breakdown */}
         {byCategory.length > 0 && (
-          <div style={{ width: 220, flexShrink: 0 }}>
+          <div style={{ width: isMobile ? '100%' : 220, flexShrink: 0 }}>
             <Card>
               <SectionTitle>By Category</SectionTitle>
               {byCategory.map(({ cat, total }) => {

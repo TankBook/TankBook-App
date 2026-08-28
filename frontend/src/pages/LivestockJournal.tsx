@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { NotebookPen, Trash2, Plus, Pencil } from 'lucide-react'
+import { NotebookPen, Trash2, Plus, Pencil, ChevronDown } from 'lucide-react'
 import { Tag, Card, FieldLabel, Modal, RichTextarea, renderNotes } from '../components/ui'
 import { api, JournalEntry, Tank, TankFish } from '../api/client'
 import { useSettings, formatDate } from '../context/SettingsContext'
@@ -174,6 +174,15 @@ export default function LivestockJournal() {
   const [fishList, setFishList] = useState<TankFish[]>([])
   const [filterType, setFilterType] = useState<string>('all')
   const [loading, setLoading] = useState(false)
+  const [isMobile, setIsMobile] = useState(() => window.matchMedia('(max-width: 768px)').matches)
+
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 768px)')
+    const handler = (e: MediaQueryListEvent) => setIsMobile(e.matches)
+    mq.addEventListener('change', handler)
+    return () => mq.removeEventListener('change', handler)
+  }, [])
+  const [filterMenuOpen, setFilterMenuOpen] = useState(false)
 
   // Add modal
   const [showModal, setShowModal] = useState(false)
@@ -315,39 +324,90 @@ export default function LivestockJournal() {
         </select>
       </Card>
 
-      {/* Filter bar — equal-width grid, two rows, category colours */}
+      {/* Filter bar — dropdown on mobile (the button grid overflows narrow screens), equal-width grid of buttons on desktop */}
       {selectedTank && entries.length > 0 && (
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: `repeat(${cols}, 1fr)`,
-          gap: 4,
-          marginBottom: 16,
-        }}>
-          {allFilters.map(type => {
-            const active = filterType === type
-            const s = type === 'all' ? null : (EVENT_STYLE[type] ?? null)
-            return (
-              <button
-                key={type}
-                onClick={() => setFilterType(type)}
-                style={{
-                  fontSize: 11, padding: '5px 4px', borderRadius: 6, cursor: 'pointer',
-                  fontWeight: active ? 600 : 400,
-                  textAlign: 'center',
-                  border: active
-                    ? `1px solid ${s ? s.color : 'var(--blue)'}`
-                    : '0.5px solid var(--border)',
-                  background: active
-                    ? (s ? s.bg : 'var(--blue-bg)')
-                    : 'transparent',
-                  color: s ? s.color : (active ? 'var(--blue)' : 'var(--text-2)'),
-                }}
-              >
-                {type === 'all' ? 'All' : (EVENT_LABELS[type] ?? type)}
-              </button>
-            )
-          })}
-        </div>
+        isMobile ? (
+          <div style={{ position: 'relative', marginBottom: 16 }}>
+            <button
+              onClick={() => setFilterMenuOpen(o => !o)}
+              style={{
+                display: 'flex', alignItems: 'center', width: '100%',
+                fontSize: 14, fontWeight: 500, padding: '10px 12px',
+                borderRadius: 10, border: '0.5px solid var(--border)',
+                background: 'var(--surface)', color: 'var(--text)', cursor: 'pointer',
+              }}
+            >
+              <span style={{ flex: 1, textAlign: 'left' }}>
+                Filter: {filterType === 'all' ? 'All' : (EVENT_LABELS[filterType] ?? filterType)}
+              </span>
+              <ChevronDown size={16} style={{ flexShrink: 0, transform: filterMenuOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s' }} />
+            </button>
+
+            {filterMenuOpen && (
+              <>
+                <div onClick={() => setFilterMenuOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 90 }} />
+                <div style={{
+                  position: 'absolute', top: 'calc(100% + 4px)', left: 0, right: 0, zIndex: 100,
+                  background: 'var(--surface)', border: '0.5px solid var(--border)', borderRadius: 10,
+                  boxShadow: '0 8px 24px rgba(0,0,0,0.16)', overflow: 'hidden', maxHeight: 320, overflowY: 'auto',
+                }}>
+                  {allFilters.map(type => {
+                    const active = filterType === type
+                    const s = type === 'all' ? null : (EVENT_STYLE[type] ?? null)
+                    return (
+                      <button
+                        key={type}
+                        onClick={() => { setFilterType(type); setFilterMenuOpen(false) }}
+                        style={{
+                          display: 'flex', alignItems: 'center', gap: 8, width: '100%',
+                          padding: '10px 12px', fontSize: 14, textAlign: 'left', cursor: 'pointer',
+                          border: 'none', borderBottom: '0.5px solid var(--border-sub)',
+                          background: active ? (s ? s.bg : 'var(--blue-bg)') : 'transparent',
+                          color: s ? s.color : (active ? 'var(--blue)' : 'var(--text)'),
+                          fontWeight: active ? 500 : 400,
+                        }}
+                      >
+                        {type === 'all' ? 'All' : (EVENT_LABELS[type] ?? type)}
+                      </button>
+                    )
+                  })}
+                </div>
+              </>
+            )}
+          </div>
+        ) : (
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: `repeat(${cols}, 1fr)`,
+            gap: 4,
+            marginBottom: 16,
+          }}>
+            {allFilters.map(type => {
+              const active = filterType === type
+              const s = type === 'all' ? null : (EVENT_STYLE[type] ?? null)
+              return (
+                <button
+                  key={type}
+                  onClick={() => setFilterType(type)}
+                  style={{
+                    fontSize: 11, padding: '5px 4px', borderRadius: 6, cursor: 'pointer',
+                    fontWeight: active ? 600 : 400,
+                    textAlign: 'center',
+                    border: active
+                      ? `1px solid ${s ? s.color : 'var(--blue)'}`
+                      : '0.5px solid var(--border)',
+                    background: active
+                      ? (s ? s.bg : 'var(--blue-bg)')
+                      : 'transparent',
+                    color: s ? s.color : (active ? 'var(--blue)' : 'var(--text-2)'),
+                  }}
+                >
+                  {type === 'all' ? 'All' : (EVENT_LABELS[type] ?? type)}
+                </button>
+              )
+            })}
+          </div>
+        )
       )}
 
       {/* Entry list */}

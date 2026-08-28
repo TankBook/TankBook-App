@@ -205,6 +205,7 @@ export default function Dashboard() {
   const [skipTaskId, setSkipTaskId] = useState<string | null>(null)
   const [skipTimes, setSkipTimes] = useState('1')
   const [isMobile, setIsMobile] = useState(() => window.matchMedia('(max-width: 768px)').matches)
+  const [isTabletWidth, setIsTabletWidth] = useState(() => window.matchMedia('(max-width: 960px)').matches)
 
   const [orderedTanks, setOrderedTanks] = useState<DashboardStats['tanks']>([])
   const [dragId, setDragId] = useState<string | null>(null)
@@ -213,6 +214,13 @@ export default function Dashboard() {
   useEffect(() => {
     const mq = window.matchMedia('(max-width: 768px)')
     const handler = (e: MediaQueryListEvent) => setIsMobile(e.matches)
+    mq.addEventListener('change', handler)
+    return () => mq.removeEventListener('change', handler)
+  }, [])
+
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 960px)')
+    const handler = (e: MediaQueryListEvent) => setIsTabletWidth(e.matches)
     mq.addEventListener('change', handler)
     return () => mq.removeEventListener('change', handler)
   }, [])
@@ -292,7 +300,7 @@ export default function Dashboard() {
   if (loading || !stats) return <p style={{ color: 'var(--text-2)' }}>Loading dashboard…</p>
 
   const statsRow = (
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: 10, marginBottom: 24 }}>
+    <div style={{ display: 'grid', gridTemplateColumns: `repeat(${isMobile ? 2 : isTabletWidth ? 3 : 6}, 1fr)`, gap: 10, marginBottom: 24 }}>
       <StatCard label="Tanks" value={stats.total_tanks} icon={Layers} />
       <StatCard label="Fish" value={stats.total_fish} icon={Fish} />
       <StatCard label="Fish species" value={stats.total_species} icon={Fish} />

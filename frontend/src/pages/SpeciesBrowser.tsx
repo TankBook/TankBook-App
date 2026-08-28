@@ -787,6 +787,14 @@ export default function SpeciesBrowser() {
   const [editTarget, setEditTarget] = useState<Species | null>(null)
   const [detailTarget, setDetailTarget] = useState<Species | null>(null)
 
+  const [isMobile, setIsMobile] = useState(() => window.matchMedia('(max-width: 768px)').matches)
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 768px)')
+    const handler = (e: MediaQueryListEvent) => setIsMobile(e.matches)
+    mq.addEventListener('change', handler)
+    return () => mq.removeEventListener('change', handler)
+  }, [])
+
   function loadSpecies() {
     setLoading(true)
     fetch('/api/species/')
@@ -857,38 +865,73 @@ export default function SpeciesBrowser() {
 
   return (
     <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20, gap: 8 }}>
-        <h1 style={{ margin: 0, fontSize: 22, fontWeight: 500, color: 'var(--text)' }}>Species</h1>
-        <div style={{ display: 'flex', gap: 8 }}>
-          <button
-            onClick={() => { setEditTarget(null); setModalMode('add') }}
-            style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 14, padding: '8px 16px', borderRadius: 8, border: '0.5px solid var(--blue-border)', background: 'var(--blue-bg)', color: 'var(--blue)', cursor: 'pointer', fontWeight: 500 }}
-          >
-            <Plus size={14} />Add Species
-          </button>
+      {isMobile ? (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 20 }}>
+          <h1 style={{ margin: 0, fontSize: 22, fontWeight: 500, color: 'var(--text)' }}>Species</h1>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button
+              onClick={() => { setEditTarget(null); setModalMode('add') }}
+              style={{ display: 'flex', flex: 1, alignItems: 'center', justifyContent: 'center', gap: 6, fontSize: 14, padding: '8px 12px', borderRadius: 8, border: '0.5px solid var(--blue-border)', background: 'var(--blue-bg)', color: 'var(--blue)', cursor: 'pointer', fontWeight: 500 }}
+            >
+              <Plus size={14} />Add Species
+            </button>
+            <button
+              onClick={() => fetchAllImages(visible)}
+              disabled={fetchAllProgress?.running || visible.length === 0}
+              style={{ display: 'flex', flex: 1, alignItems: 'center', justifyContent: 'center', gap: 6, fontSize: 14, padding: '8px 12px', borderRadius: 8, border: '0.5px solid var(--btn-border)', background: 'transparent', cursor: fetchAllProgress?.running || visible.length === 0 ? 'not-allowed' : 'pointer', color: 'var(--text)', opacity: fetchAllProgress?.running || visible.length === 0 ? 0.5 : 1 }}
+            >
+              {fetchAllProgress?.running
+                ? `Fetching ${fetchAllProgress.current} / ${fetchAllProgress.total}…`
+                : 'Fetch All Images'}
+            </button>
+            <button
+              onClick={() => { setShowUpload(true); setUploadResult(null); setUploadError(null) }}
+              style={{ display: 'flex', flex: 1, alignItems: 'center', justifyContent: 'center', gap: 6, fontSize: 14, padding: '8px 12px', borderRadius: 8, border: '0.5px solid var(--btn-border)', background: 'transparent', cursor: 'pointer', color: 'var(--text)' }}
+            >
+              <Upload size={14} />Upload YAML
+            </button>
+          </div>
           {fetchAllProgress && !fetchAllProgress.running && (
-            <span style={{ fontSize: 12, color: fetchAllProgress.failed < fetchAllProgress.total ? 'var(--green)' : 'var(--text-3)', alignSelf: 'center' }}>
+            <span style={{ fontSize: 12, textAlign: 'center', color: fetchAllProgress.failed < fetchAllProgress.total ? 'var(--green)' : 'var(--text-3)' }}>
               {fetchAllProgress.total - fetchAllProgress.failed} fetched
               {fetchAllProgress.failed > 0 && `, ${fetchAllProgress.failed} not found`}
             </span>
           )}
-          <button
-            onClick={() => fetchAllImages(visible)}
-            disabled={fetchAllProgress?.running || visible.length === 0}
-            style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 14, padding: '8px 16px', borderRadius: 8, border: '0.5px solid var(--btn-border)', background: 'transparent', cursor: fetchAllProgress?.running || visible.length === 0 ? 'not-allowed' : 'pointer', color: 'var(--text)', opacity: fetchAllProgress?.running || visible.length === 0 ? 0.5 : 1 }}
-          >
-            {fetchAllProgress?.running
-              ? `Fetching ${fetchAllProgress.current} / ${fetchAllProgress.total}…`
-              : 'Fetch All Images'}
-          </button>
-          <button
-            onClick={() => { setShowUpload(true); setUploadResult(null); setUploadError(null) }}
-            style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 14, padding: '8px 16px', borderRadius: 8, border: '0.5px solid var(--btn-border)', background: 'transparent', cursor: 'pointer', color: 'var(--text)' }}
-          >
-            <Upload size={14} />Upload YAML
-          </button>
         </div>
-      </div>
+      ) : (
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20, gap: 8 }}>
+          <h1 style={{ margin: 0, fontSize: 22, fontWeight: 500, color: 'var(--text)' }}>Species</h1>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button
+              onClick={() => { setEditTarget(null); setModalMode('add') }}
+              style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 14, padding: '8px 16px', borderRadius: 8, border: '0.5px solid var(--blue-border)', background: 'var(--blue-bg)', color: 'var(--blue)', cursor: 'pointer', fontWeight: 500 }}
+            >
+              <Plus size={14} />Add Species
+            </button>
+            {fetchAllProgress && !fetchAllProgress.running && (
+              <span style={{ fontSize: 12, color: fetchAllProgress.failed < fetchAllProgress.total ? 'var(--green)' : 'var(--text-3)', alignSelf: 'center' }}>
+                {fetchAllProgress.total - fetchAllProgress.failed} fetched
+                {fetchAllProgress.failed > 0 && `, ${fetchAllProgress.failed} not found`}
+              </span>
+            )}
+            <button
+              onClick={() => fetchAllImages(visible)}
+              disabled={fetchAllProgress?.running || visible.length === 0}
+              style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 14, padding: '8px 16px', borderRadius: 8, border: '0.5px solid var(--btn-border)', background: 'transparent', cursor: fetchAllProgress?.running || visible.length === 0 ? 'not-allowed' : 'pointer', color: 'var(--text)', opacity: fetchAllProgress?.running || visible.length === 0 ? 0.5 : 1 }}
+            >
+              {fetchAllProgress?.running
+                ? `Fetching ${fetchAllProgress.current} / ${fetchAllProgress.total}…`
+                : 'Fetch All Images'}
+            </button>
+            <button
+              onClick={() => { setShowUpload(true); setUploadResult(null); setUploadError(null) }}
+              style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 14, padding: '8px 16px', borderRadius: 8, border: '0.5px solid var(--btn-border)', background: 'transparent', cursor: 'pointer', color: 'var(--text)' }}
+            >
+              <Upload size={14} />Upload YAML
+            </button>
+          </div>
+        </div>
+      )}
 
 
       <div style={{ display: 'flex', gap: 10, marginBottom: 20, flexWrap: 'wrap' }}>
