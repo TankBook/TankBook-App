@@ -43,6 +43,14 @@ export default function Settings() {
   const [savingSettings, setSavingSettings] = useState(false)
   const [settingsSaved, setSettingsSaved] = useState(false)
   const [newPreset, setNewPreset] = useState('')
+  const [isMobile, setIsMobile] = useState(() => window.matchMedia('(max-width: 768px)').matches)
+
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 768px)')
+    const handler = (e: MediaQueryListEvent) => setIsMobile(e.matches)
+    mq.addEventListener('change', handler)
+    return () => mq.removeEventListener('change', handler)
+  }, [])
 
   useEffect(() => {
     if (!loading) {
@@ -362,25 +370,41 @@ export default function Settings() {
               onClick={handleExport}
               disabled={exporting}
               style={{
-                flex: 1, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                flex: 1, display: 'flex', flexDirection: isMobile && !exporting ? 'column' : 'row',
+                alignItems: 'center', justifyContent: 'center', gap: isMobile && !exporting ? 2 : 6,
                 fontSize: 13, padding: '7px 16px', borderRadius: 8, fontWeight: 500,
                 border: '0.5px solid var(--blue-border)', background: 'var(--blue-bg)', color: 'var(--blue)',
                 cursor: exporting ? 'not-allowed' : 'pointer', opacity: exporting ? 0.5 : 1,
                 boxSizing: 'border-box',
               }}
             >
-              <Download size={13} />{exporting ? 'Exporting…' : 'Download Backup'}
+              {exporting ? 'Exporting…' : isMobile ? (
+                <>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}><Download size={13} />Download</span>
+                  <span>Backup</span>
+                </>
+              ) : (
+                <><Download size={13} />Download Backup</>
+              )}
             </button>
             <button
               onClick={() => fileRef.current?.click()}
               style={{
-                flex: 1, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                flex: 1, display: 'flex', flexDirection: isMobile ? 'column' : 'row',
+                alignItems: 'center', justifyContent: 'center', gap: isMobile ? 2 : 6,
                 fontSize: 13, padding: '7px 16px', borderRadius: 8, fontWeight: 500,
                 border: '0.5px solid var(--red-border)', background: 'var(--red-bg)', color: 'var(--red)',
                 cursor: 'pointer', boxSizing: 'border-box',
               }}
             >
-              <Upload size={13} />Restore Backup
+              {isMobile ? (
+                <>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}><Upload size={13} />Restore</span>
+                  <span>Backup</span>
+                </>
+              ) : (
+                <><Upload size={13} />Restore Backup</>
+              )}
             </button>
           </div>
 
@@ -506,12 +530,18 @@ export default function Settings() {
           </p>
         </section>
 
-        <section style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 12 }}>
-          {settingsSaved && <span style={{ fontSize: 12, color: 'var(--green)' }}>Settings saved</span>}
+        <section style={{ display: 'flex', flexDirection: isMobile ? 'column-reverse' : 'row', alignItems: isMobile ? 'stretch' : 'center', justifyContent: 'flex-end', gap: 12 }}>
+          {settingsSaved && <span style={{ fontSize: 12, color: 'var(--green)', textAlign: isMobile ? 'center' : undefined }}>Settings saved</span>}
           <button
             onClick={saveSettings}
             disabled={!settingsChanged || savingSettings}
-            style={{ padding: '8px 18px', borderRadius: 8, border: '0.5px solid var(--blue-border)', background: settingsChanged && !savingSettings ? 'var(--blue-bg)' : 'var(--surface-2)', color: settingsChanged && !savingSettings ? 'var(--blue)' : 'var(--text-3)', fontWeight: 500, cursor: settingsChanged && !savingSettings ? 'pointer' : 'default' }}
+            style={{
+              padding: '8px 18px', borderRadius: 8, border: '0.5px solid var(--blue-border)',
+              background: settingsChanged && !savingSettings ? 'var(--blue-bg)' : 'var(--surface-2)',
+              color: settingsChanged && !savingSettings ? 'var(--blue)' : 'var(--text-3)',
+              fontWeight: 500, cursor: settingsChanged && !savingSettings ? 'pointer' : 'default',
+              width: isMobile ? '100%' : undefined, boxSizing: 'border-box',
+            }}
           >
             {savingSettings ? 'Saving…' : 'Save Settings'}
           </button>
