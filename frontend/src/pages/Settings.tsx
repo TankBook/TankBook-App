@@ -101,6 +101,16 @@ export default function Settings() {
     }
   }
 
+  function resetToDefaults() {
+    setDraftDateFormat('DD/MM/YYYY')
+    setDraftUnitSystem('mm')
+    setDraftDefaultTank('')
+    setDraftAlertRetentionDays(null)
+    setDraftAppUrl('')
+    setDraftFeedingAmountPresets(['1 pinch', '1 cube'])
+    setSettingsSaved(false)
+  }
+
   const [checking, setChecking] = useState(false)
   const [updateStatus, setUpdateStatus] = useState<'idle' | 'up-to-date' | 'available' | 'no-releases' | 'error'>('idle')
   const [latestVersion, setLatestVersion] = useState<string | null>(null)
@@ -554,21 +564,33 @@ export default function Settings() {
           </p>
         </section>
 
-        <section style={{ display: 'flex', flexDirection: isMobile ? 'column-reverse' : 'row', alignItems: isMobile ? 'stretch' : 'center', justifyContent: 'flex-end', gap: 12 }}>
-          {settingsSaved && <span style={{ fontSize: 12, color: 'var(--green)', textAlign: isMobile ? 'center' : undefined }}>Settings saved</span>}
+        <section style={{ display: 'flex', flexDirection: isMobile ? 'column-reverse' : 'row', alignItems: isMobile ? 'stretch' : 'center', justifyContent: 'space-between', gap: 12 }}>
           <button
-            onClick={saveSettings}
-            disabled={!settingsChanged || savingSettings}
+            onClick={resetToDefaults}
             style={{
-              padding: '8px 18px', borderRadius: 8, border: '0.5px solid var(--blue-border)',
-              background: settingsChanged && !savingSettings ? 'var(--blue-bg)' : 'var(--surface-2)',
-              color: settingsChanged && !savingSettings ? 'var(--blue)' : 'var(--text-3)',
-              fontWeight: 500, cursor: settingsChanged && !savingSettings ? 'pointer' : 'default',
+              padding: '8px 18px', borderRadius: 8, border: '0.5px solid var(--btn-border)',
+              background: 'transparent', color: 'var(--text-2)', fontWeight: 500, cursor: 'pointer',
               width: isMobile ? '100%' : undefined, boxSizing: 'border-box',
             }}
           >
-            {savingSettings ? 'Saving…' : 'Save Settings'}
+            Reset to Defaults
           </button>
+          <div style={{ display: 'flex', flexDirection: isMobile ? 'column-reverse' : 'row', alignItems: isMobile ? 'stretch' : 'center', gap: 12 }}>
+            {settingsSaved && <span style={{ fontSize: 12, color: 'var(--green)', textAlign: isMobile ? 'center' : undefined }}>Settings saved</span>}
+            <button
+              onClick={saveSettings}
+              disabled={!settingsChanged || savingSettings}
+              style={{
+                padding: '8px 18px', borderRadius: 8, border: '0.5px solid var(--blue-border)',
+                background: settingsChanged && !savingSettings ? 'var(--blue-bg)' : 'var(--surface-2)',
+                color: settingsChanged && !savingSettings ? 'var(--blue)' : 'var(--text-3)',
+                fontWeight: 500, cursor: settingsChanged && !savingSettings ? 'pointer' : 'default',
+                width: isMobile ? '100%' : undefined, boxSizing: 'border-box',
+              }}
+            >
+              {savingSettings ? 'Saving…' : 'Save Settings'}
+            </button>
+          </div>
         </section>
 
       </Card>
