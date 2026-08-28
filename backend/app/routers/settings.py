@@ -7,7 +7,7 @@ from app.schemas.schemas import AppSettingsOut, AppSettingsUpdate
 router = APIRouter()
 
 VALID_DATE_FORMATS = ["DD/MM/YYYY", "MM/DD/YYYY", "YYYY-MM-DD"]
-VALID_UNIT_SYSTEMS = ["mm", "cm", "m"]
+VALID_UNIT_SYSTEMS = ["mm", "cm", "m", "imperial"]
 
 
 def get_or_create_settings(db: Session) -> AppSettings:
