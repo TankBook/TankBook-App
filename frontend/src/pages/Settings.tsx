@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
-import { CalendarDays, Ruler, Info, Download, Upload, Droplets, RefreshCw, Bell, Globe, Utensils, X } from 'lucide-react'
+import { CalendarDays, Ruler, Info, Download, Upload, Droplets, RefreshCw, Bell, Globe, Utensils, X, AlertTriangle } from 'lucide-react'
 import { useSettings, formatDate, DateFormat, UnitSystem } from '../context/SettingsContext'
-import { Card } from '../components/ui'
+import { Card, Modal } from '../components/ui'
 import { api, Tank } from '../api/client'
 
 const APP_VERSION = '0.7.0'
@@ -130,8 +130,16 @@ export default function Settings() {
   const [importResult, setImportResult] = useState<{ ok: boolean; tanks_restored: number } | null>(null)
   const [importError, setImportError] = useState<string | null>(null)
   const [importFile, setImportFile] = useState<File | null>(null)
-  const [confirmImport, setConfirmImport] = useState(false)
+  const [showImportModal, setShowImportModal] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
+
+  function closeImportModal() {
+    setShowImportModal(false)
+    setImportFile(null)
+    setImportResult(null)
+    setImportError(null)
+    if (fileRef.current) fileRef.current.value = ''
+  }
 
   async function handleExport() {
     setExporting(true)
@@ -155,7 +163,6 @@ export default function Settings() {
     setImporting(true)
     setImportResult(null)
     setImportError(null)
-    setConfirmImport(false)
     try {
       const text = await importFile.text()
       const data = JSON.parse(text)
@@ -352,19 +359,6 @@ export default function Settings() {
             Export all tank data, parameters, livestock, and journal entries to a JSON file. Restoring replaces all current data with the backup.
           </p>
 
-          <input
-            ref={fileRef}
-            type="file"
-            accept=".json"
-            style={{ display: 'none' }}
-            onChange={e => {
-              setImportFile(e.target.files?.[0] ?? null)
-              setImportResult(null)
-              setImportError(null)
-              setConfirmImport(true)
-            }}
-          />
-
           <div style={{ display: 'flex', gap: 8 }}>
             <button
               onClick={handleExport}
@@ -388,7 +382,7 @@ export default function Settings() {
               )}
             </button>
             <button
-              onClick={() => fileRef.current?.click()}
+              onClick={() => setShowImportModal(true)}
               style={{
                 flex: 1, display: 'flex', flexDirection: isMobile ? 'column' : 'row',
                 alignItems: 'center', justifyContent: 'center', gap: isMobile ? 2 : 6,
@@ -407,56 +401,86 @@ export default function Settings() {
               )}
             </button>
           </div>
-
-          {confirmImport && importFile && (
-            <div style={{ marginTop: 12, background: 'var(--red-bg)', border: '0.5px solid var(--red-border)', borderRadius: 8, padding: '12px 14px' }}>
-              <p style={{ margin: '0 0 10px', fontSize: 13, color: 'var(--red)', fontWeight: 500 }}>
-                Replace all current data with "{importFile.name}"? This cannot be undone.
-              </p>
-              <div style={{ display: 'flex', gap: 8 }}>
-                <button
-                  onClick={handleImport}
-                  disabled={importing}
-                  style={{
-                    fontSize: 13, padding: '6px 16px', borderRadius: 8, fontWeight: 500,
-                    border: '0.5px solid var(--red-border)', background: 'var(--red)', color: '#fff',
-                    cursor: importing ? 'not-allowed' : 'pointer', opacity: importing ? 0.6 : 1,
-                  }}
-                >
-                  {importing ? 'Restoring…' : 'Yes, restore'}
-                </button>
-                <button
-                  onClick={() => {
-                    setConfirmImport(false)
-                    setImportFile(null)
-                    if (fileRef.current) fileRef.current.value = ''
-                  }}
-                  style={{
-                    fontSize: 13, padding: '6px 14px', borderRadius: 8,
-                    border: '0.5px solid var(--btn-border)', background: 'transparent', color: 'var(--text-2)',
-                    cursor: 'pointer',
-                  }}
-                >
-                  Cancel
-                </button>
-              </div>
-            </div>
-          )}
-
-          {importResult && (
-            <div style={{ marginTop: 12, background: 'var(--green-bg)', border: '0.5px solid var(--green-border)', borderRadius: 8, padding: '8px 12px' }}>
-              <p style={{ margin: 0, fontSize: 13, color: 'var(--green)', fontWeight: 500 }}>
-                ✓ Restored {importResult.tanks_restored} tank{importResult.tanks_restored !== 1 ? 's' : ''} successfully.
-              </p>
-            </div>
-          )}
-
-          {importError && (
-            <div style={{ marginTop: 12, background: 'var(--red-bg)', border: '0.5px solid var(--red-border)', borderRadius: 8, padding: '8px 12px' }}>
-              <p style={{ margin: 0, fontSize: 13, color: 'var(--red)' }}>{importError}</p>
-            </div>
-          )}
         </section>
+
+        {showImportModal && (
+          <Modal title="Restore Backup" onClose={closeImportModal}>
+            <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start', background: 'var(--red-bg)', border: '0.5px solid var(--red-border)', borderRadius: 8, padding: '10px 12px', marginBottom: 16 }}>
+              <AlertTriangle size={16} color="var(--red)" style={{ flexShrink: 0, marginTop: 1 }} />
+              <p style={{ margin: 0, fontSize: 12, color: 'var(--red)', lineHeight: 1.5 }}>
+                Restoring a backup permanently deletes all current tanks, livestock, parameters, and journal entries, replacing them with the contents of the file you choose. This cannot be undone.
+              </p>
+            </div>
+
+            <input
+              ref={fileRef}
+              type="file"
+              accept=".json"
+              style={{ display: 'none' }}
+              onChange={e => {
+                setImportFile(e.target.files?.[0] ?? null)
+                setImportResult(null)
+                setImportError(null)
+              }}
+            />
+            <div
+              onClick={() => fileRef.current?.click()}
+              style={{
+                display: 'flex', alignItems: 'center', cursor: 'pointer',
+                border: '0.5px solid var(--btn-border)', borderRadius: 8, overflow: 'hidden',
+                background: 'var(--surface)', width: '100%', boxSizing: 'border-box',
+              }}
+            >
+              <span style={{ padding: '7px 12px', background: 'var(--surface-2)', borderRight: '0.5px solid var(--btn-border)', fontSize: 12, color: 'var(--text-2)', whiteSpace: 'nowrap' }}>
+                Choose File
+              </span>
+              <span style={{ padding: '7px 10px', fontSize: 12, color: importFile ? 'var(--text)' : 'var(--text-3)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {importFile ? importFile.name : 'No file chosen'}
+              </span>
+            </div>
+
+            {importResult && (
+              <div style={{ marginTop: 12, background: 'var(--green-bg)', border: '0.5px solid var(--green-border)', borderRadius: 8, padding: '8px 12px' }}>
+                <p style={{ margin: 0, fontSize: 13, color: 'var(--green)', fontWeight: 500 }}>
+                  ✓ Restored {importResult.tanks_restored} tank{importResult.tanks_restored !== 1 ? 's' : ''} successfully.
+                </p>
+              </div>
+            )}
+
+            {importError && (
+              <div style={{ marginTop: 12, background: 'var(--red-bg)', border: '0.5px solid var(--red-border)', borderRadius: 8, padding: '8px 12px' }}>
+                <p style={{ margin: 0, fontSize: 13, color: 'var(--red)' }}>{importError}</p>
+              </div>
+            )}
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 20 }}>
+              <button
+                onClick={closeImportModal}
+                style={{
+                  flex: isMobile ? 1 : undefined, fontSize: 13, padding: '7px 16px', borderRadius: 8,
+                  border: '0.5px solid var(--btn-border)', background: 'transparent', color: 'var(--text)',
+                  cursor: 'pointer', boxSizing: 'border-box',
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleImport}
+                disabled={!importFile || importing}
+                style={{
+                  flex: isMobile ? 1 : undefined, fontSize: 13, padding: '7px 16px', borderRadius: 8, fontWeight: 500,
+                  border: '0.5px solid var(--red-border)',
+                  background: importFile && !importing ? 'var(--red)' : 'var(--surface-2)',
+                  color: importFile && !importing ? '#fff' : 'var(--text-3)',
+                  cursor: importFile && !importing ? 'pointer' : 'default',
+                  boxSizing: 'border-box',
+                }}
+              >
+                {importing ? 'Restoring…' : 'Yes, restore backup'}
+              </button>
+            </div>
+          </Modal>
+        )}
 
         <section style={{ paddingBottom: 20, borderBottom: '0.5px solid var(--border-sub)' }}>
           <p style={{ fontWeight: 500, fontSize: 14, margin: '0 0 12px', color: 'var(--text)', display: 'flex', alignItems: 'center', gap: 6 }}>
