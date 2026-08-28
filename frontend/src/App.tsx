@@ -339,7 +339,7 @@ function QuickAdd() {
 
 const NAV_LINKS: [string, string, LucideIcon][] = [
   ['/', 'Dashboard', LayoutDashboard],
-  ['/rooms', 'Rooms', Building],
+  ['/rooms', 'Fish Rooms', Building],
   ['/species', 'Species', BookOpen],
   ['/compatibility', 'Compatibility', ShieldCheck],
   ['/journal', 'Tank Journal', NotebookPen],
