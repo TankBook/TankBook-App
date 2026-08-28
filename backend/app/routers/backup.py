@@ -6,6 +6,7 @@ from app.database import get_db
 from app.models.models import (
     Tank, TankFish, TankPlant, WaterParameter, MaintenanceTask,
     Alert, DailyTask, JournalEntry, AppSettings, Expense, InventoryItem,
+    Room, RoomTankPosition,
 )
 
 router = APIRouter()
@@ -101,6 +102,12 @@ def export_backup(db: Session = Depends(get_db)):
         for e in db.query(Expense).all()
     ]
 
+    rooms_out = [
+        {"id": r.id, "name": r.name, "width_m": r.width_m, "depth_m": r.depth_m,
+         "tank_positions": [{"tank_id": p.tank_id, "x": p.x, "y": p.y} for p in r.tank_positions]}
+        for r in db.query(Room).all()
+    ]
+
     return {
         "exported_at": datetime.utcnow().isoformat(),
         "version": BACKUP_VERSION,
@@ -115,6 +122,7 @@ def export_backup(db: Session = Depends(get_db)):
         "tanks": tanks_out,
         "expenses": expenses_out,
         "inventory_items": inventory_out,
+        "rooms": rooms_out,
     }
 
 
@@ -135,6 +143,8 @@ def import_backup(payload: dict, db: Session = Depends(get_db)):
         db.delete(expense)
     for item in db.query(InventoryItem).all():
         db.delete(item)
+    for room in db.query(Room).all():
+        db.delete(room)
     db.commit()
 
     # Restore settings
@@ -257,6 +267,16 @@ def import_backup(payload: dict, db: Session = Depends(get_db)):
             purchase_date=e["purchase_date"], notes=e.get("notes"),
             created_at=_parse_dt(e.get("created_at")) or datetime.utcnow(),
         ))
+
+    # Restore rooms and tank positions (after tanks so tank_id FKs resolve)
+    for r in payload.get("rooms", []):
+        room = Room(
+            id=r["id"], name=r["name"],
+            width_m=r.get("width_m", 3.0), depth_m=r.get("depth_m", 2.4),
+        )
+        db.add(room)
+        for p in r.get("tank_positions", []):
+            db.add(RoomTankPosition(room_id=room.id, tank_id=p["tank_id"], x=p["x"], y=p["y"]))
 
     db.commit()
     return {"ok": True, "tanks_restored": tanks_restored}
