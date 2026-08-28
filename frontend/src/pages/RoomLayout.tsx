@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Building, Plus, Pencil, Trash2, Grid, ChevronLeft, Columns, X } from 'lucide-react'
-import { useTanks } from '../hooks'
+import { useTanks, useRooms } from '../hooks'
 import { Card, FieldLabel, Tag } from '../components/ui'
-import { Tank } from '../api/client'
+import { api, Room as ApiRoom, Tank } from '../api/client'
 
 interface Room {
   id: string
@@ -18,10 +18,6 @@ interface TankPosition {
   y: number
 }
 
-const STORAGE_KEY = 'tankbook-room-layout'
-const DEFAULT_ROOM_WIDTH = 3
-const DEFAULT_ROOM_DEPTH = 2.4
-
 function defaultTankPosition(index: number): TankPosition {
   return {
     x: 15 + (index % 4) * 23,
@@ -29,47 +25,20 @@ function defaultTankPosition(index: number): TankPosition {
   }
 }
 
-function normalizeRoom(room: Partial<Room>): Room | null {
-  if (!room.id || !room.name || !Array.isArray(room.tankIds)) return null
-  const tankPositions = room.tankPositions && typeof room.tankPositions === 'object' ? room.tankPositions : {}
+function fromApiRoom(room: ApiRoom): Room {
   return {
     id: room.id,
     name: room.name,
-    tankIds: room.tankIds,
-    width: typeof room.width === 'number' && room.width > 0 ? room.width : DEFAULT_ROOM_WIDTH,
-    depth: typeof room.depth === 'number' && room.depth > 0 ? room.depth : DEFAULT_ROOM_DEPTH,
-    tankPositions: Object.fromEntries(room.tankIds.map((tankId, index) => [
-      tankId,
-      tankPositions[tankId] ?? defaultTankPosition(index),
-    ])),
+    width: room.width_m,
+    depth: room.depth_m,
+    tankIds: room.tank_positions.map(p => p.tank_id),
+    tankPositions: Object.fromEntries(room.tank_positions.map(p => [p.tank_id, { x: p.x, y: p.y }])),
   }
-}
-
-function loadStoredRooms(): Room[] {
-  if (typeof window === 'undefined') return []
-  try {
-    const raw = window.localStorage.getItem(STORAGE_KEY)
-    if (!raw) return []
-    const parsed = JSON.parse(raw) as Partial<Room>[]
-    return Array.isArray(parsed) ? parsed.map(normalizeRoom).filter((room): room is Room => room !== null) : []
-  } catch {
-    return []
-  }
-}
-
-function saveRooms(rooms: Room[]) {
-  if (typeof window === 'undefined') return
-  window.localStorage.setItem(STORAGE_KEY, JSON.stringify(rooms))
-}
-
-function generateId() {
-  return typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
-    ? crypto.randomUUID()
-    : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`
 }
 
 export default function RoomLayout() {
-  const { data: tanks, loading } = useTanks()
+  const { data: tanks, loading: tanksLoading } = useTanks()
+  const { data: apiRooms, loading: roomsLoading, reload: reloadRooms } = useRooms()
   const [rooms, setRooms] = useState<Room[]>([])
   const [newRoomName, setNewRoomName] = useState('')
   const [editingRoomId, setEditingRoomId] = useState<string | null>(null)
@@ -80,12 +49,10 @@ export default function RoomLayout() {
   const [movingTank, setMovingTank] = useState<{ roomId: string; tankId: string } | null>(null)
 
   useEffect(() => {
-    setRooms(loadStoredRooms())
-  }, [])
+    if (apiRooms) setRooms(apiRooms.map(fromApiRoom))
+  }, [apiRooms])
 
-  useEffect(() => {
-    saveRooms(rooms)
-  }, [rooms])
+  const loading = tanksLoading || roomsLoading
 
   const tankLookup = useMemo(() => {
     return new Map<string, Tank>((tanks ?? []).map(t => [t.id, t]))
@@ -100,11 +67,12 @@ export default function RoomLayout() {
     setRooms(prev => updater(prev))
   }
 
-  function addRoom() {
+  async function addRoom() {
     const trimmed = newRoomName.trim()
     if (!trimmed) return
-    updateRooms(prev => [...prev, { id: generateId(), name: trimmed, tankIds: [], width: DEFAULT_ROOM_WIDTH, depth: DEFAULT_ROOM_DEPTH, tankPositions: {} }])
     setNewRoomName('')
+    const created = await api.rooms.create({ name: trimmed })
+    updateRooms(prev => [...prev, fromApiRoom(created)])
   }
 
   function startEditing(room: Room) {
@@ -116,35 +84,52 @@ export default function RoomLayout() {
     if (!editingRoomId) return
     const trimmed = editingRoomName.trim()
     if (!trimmed) return
-    updateRooms(prev => prev.map(room => room.id === editingRoomId ? { ...room, name: trimmed } : room))
+    const roomId = editingRoomId
     setEditingRoomId(null)
+    updateRooms(prev => prev.map(room => room.id === roomId ? { ...room, name: trimmed } : room))
+    api.rooms.update(roomId, { name: trimmed }).catch(() => reloadRooms())
   }
 
   function deleteRoom(id: string) {
     updateRooms(prev => prev.filter(room => room.id !== id))
+    api.rooms.remove(id).catch(() => reloadRooms())
   }
 
   function moveTankToRoom(tankId: string, targetRoomId: string | null) {
+    const targetRoom = targetRoomId ? rooms.find(room => room.id === targetRoomId) : undefined
+    const position = targetRoom ? defaultTankPosition(targetRoom.tankIds.length) : null
     updateRooms(prev => {
       const next = prev.map(room => {
         const tankPositions = { ...room.tankPositions }
         delete tankPositions[tankId]
         return { ...room, tankIds: room.tankIds.filter(id => id !== tankId), tankPositions }
       })
-      return targetRoomId
+      return targetRoomId && position
         ? next.map(room => room.id === targetRoomId ? {
             ...room,
             tankIds: [...room.tankIds, tankId],
-            tankPositions: { ...room.tankPositions, [tankId]: defaultTankPosition(room.tankIds.length) },
+            tankPositions: { ...room.tankPositions, [tankId]: position },
           } : room)
         : next
     })
+    if (targetRoomId && position) {
+      api.rooms.setTankPosition(tankId, { room_id: targetRoomId, x: position.x, y: position.y }).catch(() => reloadRooms())
+    } else {
+      api.rooms.unassignTank(tankId).catch(() => reloadRooms())
+    }
   }
 
   function updateRoomDimensions(roomId: string, field: 'width' | 'depth', value: string) {
     const numericValue = Number(value)
     if (!Number.isFinite(numericValue) || numericValue <= 0) return
     updateRooms(prev => prev.map(room => room.id === roomId ? { ...room, [field]: numericValue } : room))
+  }
+
+  function commitRoomDimensions(roomId: string, field: 'width' | 'depth') {
+    const room = rooms.find(r => r.id === roomId)
+    if (!room) return
+    const body = field === 'width' ? { width_m: room.width } : { depth_m: room.depth }
+    api.rooms.update(roomId, body).catch(() => reloadRooms())
   }
 
   function moveTankOnMap(event: React.PointerEvent<HTMLDivElement>, roomId: string) {
@@ -162,6 +147,19 @@ export default function RoomLayout() {
     event.stopPropagation()
     event.currentTarget.setPointerCapture(event.pointerId)
     setMovingTank({ roomId, tankId })
+  }
+
+  function commitTankMove(roomId: string) {
+    if (!movingTank || movingTank.roomId !== roomId) {
+      setMovingTank(null)
+      return
+    }
+    const { tankId } = movingTank
+    const position = rooms.find(r => r.id === roomId)?.tankPositions[tankId]
+    setMovingTank(null)
+    if (position) {
+      api.rooms.setTankPosition(tankId, { room_id: roomId, x: position.x, y: position.y }).catch(() => reloadRooms())
+    }
   }
 
   function handleDragStart(tankId: string, fromRoomId: string | null) {
@@ -296,16 +294,16 @@ export default function RoomLayout() {
                 <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'center', color: 'var(--text-2)', fontSize: 12 }}>
                   <span>Room size</span>
                   <label style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
-                    <input type="number" min="0.5" step="0.1" value={room.width} onChange={e => updateRoomDimensions(room.id, 'width', e.target.value)} style={{ width: 62 }} /> m wide
+                    <input type="number" min="0.5" step="0.1" value={room.width} onChange={e => updateRoomDimensions(room.id, 'width', e.target.value)} onBlur={() => commitRoomDimensions(room.id, 'width')} style={{ width: 62 }} /> m wide
                   </label>
                   <label style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
-                    <input type="number" min="0.5" step="0.1" value={room.depth} onChange={e => updateRoomDimensions(room.id, 'depth', e.target.value)} style={{ width: 62 }} /> m deep
+                    <input type="number" min="0.5" step="0.1" value={room.depth} onChange={e => updateRoomDimensions(room.id, 'depth', e.target.value)} onBlur={() => commitRoomDimensions(room.id, 'depth')} style={{ width: 62 }} /> m deep
                   </label>
                 </div>
                 <div
                   onPointerMove={e => moveTankOnMap(e, room.id)}
-                  onPointerUp={() => setMovingTank(null)}
-                  onPointerCancel={() => setMovingTank(null)}
+                  onPointerUp={() => commitTankMove(room.id)}
+                  onPointerCancel={() => commitTankMove(room.id)}
                   style={{ position: 'relative', width: '100%', aspectRatio: `${room.width} / ${room.depth}`, minHeight: 280, overflow: 'hidden', borderRadius: 12, border: '1px solid var(--blue-border)', backgroundColor: 'var(--blue-bg)', backgroundImage: 'linear-gradient(var(--blue-border) 1px, transparent 1px), linear-gradient(90deg, var(--blue-border) 1px, transparent 1px)', backgroundSize: '10% 10%', touchAction: 'none' }}
                 >
                   {room.tankIds.map((tankId, index) => {
