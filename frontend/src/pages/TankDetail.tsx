@@ -1789,38 +1789,81 @@ ${taskRows ? `<h2>Pending Maintenance</h2>
                     const first = entries[0]
                     const totalQuantity = entries.reduce((sum, entry) => sum + entry.quantity, 0)
                     const sc = FISH_STATUS_COLORS[status] ?? FISH_STATUS_COLORS.added
+                    const notesText = [...new Set(entries.map(entry => entry.notes).filter(Boolean))].join(' · ')
+                    const hasSpeciesInfo = speciesList.some(sp => sp.slug === slug)
                     return (
-                      <div key={`${slug}-${status}`} style={{ padding: '10px 0' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 0, flexWrap: 'wrap', minWidth: 0 }}>
-                            <span style={{ fontSize: 13, color: 'var(--text)', fontWeight: 500 }}>{first.common_name ?? first.species_slug}</span>
-                            <span style={{ fontSize: 12, color: 'var(--text-2)', marginLeft: 8 }}>×{totalQuantity}</span>
-                            {first.latin_name && <span style={{ fontSize: 11, color: 'var(--text-3)', fontStyle: 'italic', marginLeft: 8 }}>{first.latin_name}</span>}
+                      <div key={`${slug}-${status}`}>
+                        {isMobile ? (
+                          <div style={{ padding: '10px 0' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
+                              <div style={{ minWidth: 0 }}>
+                                <span style={{ fontSize: 13, color: 'var(--text)', fontWeight: 500 }}>{first.common_name ?? first.species_slug}</span>
+                                <span style={{ fontSize: 12, color: 'var(--text-2)', marginLeft: 8 }}>×{totalQuantity}</span>
+                                {first.latin_name && (
+                                  <p style={{ margin: '1px 0 0', fontSize: 11, color: 'var(--text-3)', fontStyle: 'italic' }}>{first.latin_name}</p>
+                                )}
+                                {notesText && (
+                                  <p style={{ margin: '2px 0 0', fontSize: 11, color: 'var(--text-2)' }}>{notesText}</p>
+                                )}
+                              </div>
+                              <Tag bg={sc.bg} color={sc.color} style={{ flexShrink: 0 }}>{cap(status)} ×{totalQuantity}</Tag>
+                            </div>
+                            <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
+                              {hasSpeciesInfo && (
+                                <button
+                                  onClick={() => setSpeciesInfoTarget(speciesList.find(sp => sp.slug === slug) ?? null)}
+                                  title="View species info"
+                                  style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-2)', background: 'none', border: '0.5px solid var(--btn-border)', borderRadius: 6, padding: '6px 8px', cursor: 'pointer' }}
+                                >
+                                  <Info size={13} />
+                                </button>
+                              )}
+                              {entries.map(f => (
+                                <button key={f.id} onClick={() => startEditFish(f)} title="Edit" style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-2)', background: 'none', border: '0.5px solid var(--btn-border)', borderRadius: 6, padding: '6px 8px', cursor: 'pointer' }}>
+                                  <Pencil size={13} />
+                                </button>
+                              ))}
+                              {entries.map(f => (
+                                <button key={`remove-${f.id}`} aria-label={`Remove ${f.quantity} ${f.common_name ?? f.species_slug}`} title="Remove" onClick={async () => { await api.fish.remove(id!, f.id); fish.reload() }} style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--red)', background: 'none', border: '0.5px solid var(--red-border)', borderRadius: 6, padding: '6px 8px', cursor: 'pointer' }}>
+                                  <Trash2 size={13} />
+                                </button>
+                              ))}
+                            </div>
                           </div>
-                          <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', justifyContent: 'flex-end', alignItems: 'center' }}>
-                            <Tag compact bg={sc.bg} color={sc.color}>{cap(status)} ×{totalQuantity}</Tag>
-                            {speciesList.some(sp => sp.slug === slug) && (
-                              <button
-                                onClick={() => setSpeciesInfoTarget(speciesList.find(sp => sp.slug === slug) ?? null)}
-                                title="View species info"
-                                style={{ display: 'flex', alignItems: 'center', color: 'var(--text-2)', background: 'none', border: '0.5px solid var(--btn-border)', borderRadius: 6, padding: '3px', cursor: 'pointer' }}
-                              >
-                                <Info size={12} />
-                              </button>
-                            )}
-                            {entries.map(f => (
-                              <button key={f.id} onClick={() => startEditFish(f)} title="Edit" style={{ display: 'flex', alignItems: 'center', color: 'var(--text-2)', background: 'none', border: '0.5px solid var(--btn-border)', borderRadius: 6, padding: '3px', cursor: 'pointer' }}>
-                                <Pencil size={12} />
-                              </button>
-                            ))}
-                            {entries.map(f => (
-                              <button key={`remove-${f.id}`} aria-label={`Remove ${f.quantity} ${f.common_name ?? f.species_slug}`} title="Remove" onClick={async () => { await api.fish.remove(id!, f.id); fish.reload() }} style={{ display: 'flex', alignItems: 'center', color: 'var(--red)', background: 'none', border: 'none', cursor: 'pointer' }}>
-                                <Trash2 size={12} />
-                              </button>
-                            ))}
+                        ) : (
+                          <div style={{ padding: '10px 0' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 0, flexWrap: 'wrap', minWidth: 0 }}>
+                                <span style={{ fontSize: 13, color: 'var(--text)', fontWeight: 500 }}>{first.common_name ?? first.species_slug}</span>
+                                <span style={{ fontSize: 12, color: 'var(--text-2)', marginLeft: 8 }}>×{totalQuantity}</span>
+                                {first.latin_name && <span style={{ fontSize: 11, color: 'var(--text-3)', fontStyle: 'italic', marginLeft: 8 }}>{first.latin_name}</span>}
+                              </div>
+                              <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', justifyContent: 'flex-end', alignItems: 'center' }}>
+                                <Tag bg={sc.bg} color={sc.color}>{cap(status)} ×{totalQuantity}</Tag>
+                                {hasSpeciesInfo && (
+                                  <button
+                                    onClick={() => setSpeciesInfoTarget(speciesList.find(sp => sp.slug === slug) ?? null)}
+                                    title="View species info"
+                                    style={{ display: 'flex', alignItems: 'center', color: 'var(--text-2)', background: 'none', border: '0.5px solid var(--btn-border)', borderRadius: 6, padding: '3px', cursor: 'pointer' }}
+                                  >
+                                    <Info size={12} />
+                                  </button>
+                                )}
+                                {entries.map(f => (
+                                  <button key={f.id} onClick={() => startEditFish(f)} title="Edit" style={{ display: 'flex', alignItems: 'center', color: 'var(--text-2)', background: 'none', border: '0.5px solid var(--btn-border)', borderRadius: 6, padding: '3px', cursor: 'pointer' }}>
+                                    <Pencil size={12} />
+                                  </button>
+                                ))}
+                                {entries.map(f => (
+                                  <button key={`remove-${f.id}`} aria-label={`Remove ${f.quantity} ${f.common_name ?? f.species_slug}`} title="Remove" onClick={async () => { await api.fish.remove(id!, f.id); fish.reload() }} style={{ display: 'flex', alignItems: 'center', color: 'var(--red)', background: 'none', border: 'none', cursor: 'pointer' }}>
+                                    <Trash2 size={12} />
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+                            {notesText && <p style={{ margin: '6px 0 0', fontSize: 11, color: 'var(--text-3)' }}>{notesText}</p>}
                           </div>
-                        </div>
-                        {[...new Set(entries.map(entry => entry.notes).filter(Boolean))].join(' · ') && <p style={{ margin: '6px 0 0', fontSize: 11, color: 'var(--text-3)' }}>{[...new Set(entries.map(entry => entry.notes).filter(Boolean))].join(' · ')}</p>}
+                        )}
                       </div>
                     )
                   }))}
