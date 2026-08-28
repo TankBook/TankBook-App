@@ -1681,40 +1681,79 @@ ${taskRows ? `<h2>Pending Maintenance</h2>
             const sc = PLANT_STATUS_COLORS[p.plant_status] ?? PLANT_STATUS_COLORS.planted
             return (
               <div key={p.id} style={{ borderBottom: '0.5px solid var(--border-sub)' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap', padding: '10px 0' }}>
-                  <div style={{ minWidth: 0 }}>
-                    <span style={{ fontSize: 13, color: 'var(--text)', fontWeight: 500 }}>
-                      {p.common_name ?? p.species_slug}
-                    </span>
-                    <span style={{ fontSize: 12, color: 'var(--text-2)', marginLeft: 8 }}>×{p.quantity}</span>
-                    {p.latin_name && (
-                      <p style={{ margin: '1px 0 0', fontSize: 11, color: 'var(--text-3)', fontStyle: 'italic' }}>{p.latin_name}</p>
-                    )}
-                    {p.notes && (
-                      <p style={{ margin: '2px 0 0', fontSize: 11, color: 'var(--text-2)' }}>{p.notes}</p>
-                    )}
+                {isMobile ? (
+                  <div style={{ padding: '10px 0' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
+                      <div style={{ minWidth: 0 }}>
+                        <span style={{ fontSize: 13, color: 'var(--text)', fontWeight: 500 }}>
+                          {p.common_name ?? p.species_slug}
+                        </span>
+                        <span style={{ fontSize: 12, color: 'var(--text-2)', marginLeft: 8 }}>×{p.quantity}</span>
+                        {p.latin_name && (
+                          <p style={{ margin: '1px 0 0', fontSize: 11, color: 'var(--text-3)', fontStyle: 'italic' }}>{p.latin_name}</p>
+                        )}
+                        {p.notes && (
+                          <p style={{ margin: '2px 0 0', fontSize: 11, color: 'var(--text-2)' }}>{p.notes}</p>
+                        )}
+                      </div>
+                      <Tag bg={sc.bg} color={sc.color} style={{ flexShrink: 0 }}>{cap(p.plant_status)}</Tag>
+                    </div>
+                    <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
+                      <button
+                        onClick={() => {
+                          setEditingPlantId(p.id)
+                          setEditPlantQty(String(p.quantity))
+                          setEditPlantStatus(p.plant_status)
+                          setEditPlantNotes(p.notes ?? '')
+                        }}
+                        style={{ flex: 1, fontSize: 12, color: 'var(--text-2)', background: 'none', border: '0.5px solid var(--btn-border)', borderRadius: 6, padding: '6px 8px', cursor: 'pointer' }}
+                      >
+                        Edit
+                      </button>
+                      <button
+                        onClick={async () => { await api.plants.remove(id!, p.id); plants.reload() }}
+                        style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4, fontSize: 12, color: 'var(--red)', background: 'none', border: '0.5px solid var(--red-border)', borderRadius: 6, padding: '6px 8px', cursor: 'pointer' }}
+                      >
+                        <Trash2 size={12} />Remove
+                      </button>
+                    </div>
                   </div>
-                  <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-                    <Tag bg={sc.bg} color={sc.color}>{cap(p.plant_status)}</Tag>
-                    <button
-                      onClick={() => {
-                        setEditingPlantId(p.id)
-                        setEditPlantQty(String(p.quantity))
-                        setEditPlantStatus(p.plant_status)
-                        setEditPlantNotes(p.notes ?? '')
-                      }}
-                      style={{ fontSize: 11, color: 'var(--text-2)', background: 'none', border: '0.5px solid var(--btn-border)', borderRadius: 6, padding: '2px 8px', cursor: 'pointer' }}
-                    >
-                      Edit
-                    </button>
-                    <button
-                      onClick={async () => { await api.plants.remove(id!, p.id); plants.reload() }}
-                      style={{ display: 'flex', alignItems: 'center', gap: 3, fontSize: 11, color: 'var(--red)', background: 'none', border: 'none', cursor: 'pointer' }}
-                    >
-                      <Trash2 size={11} />Remove
-                    </button>
+                ) : (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap', padding: '10px 0' }}>
+                    <div style={{ minWidth: 0 }}>
+                      <span style={{ fontSize: 13, color: 'var(--text)', fontWeight: 500 }}>
+                        {p.common_name ?? p.species_slug}
+                      </span>
+                      <span style={{ fontSize: 12, color: 'var(--text-2)', marginLeft: 8 }}>×{p.quantity}</span>
+                      {p.latin_name && (
+                        <p style={{ margin: '1px 0 0', fontSize: 11, color: 'var(--text-3)', fontStyle: 'italic' }}>{p.latin_name}</p>
+                      )}
+                      {p.notes && (
+                        <p style={{ margin: '2px 0 0', fontSize: 11, color: 'var(--text-2)' }}>{p.notes}</p>
+                      )}
+                    </div>
+                    <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                      <Tag bg={sc.bg} color={sc.color}>{cap(p.plant_status)}</Tag>
+                      <button
+                        onClick={() => {
+                          setEditingPlantId(p.id)
+                          setEditPlantQty(String(p.quantity))
+                          setEditPlantStatus(p.plant_status)
+                          setEditPlantNotes(p.notes ?? '')
+                        }}
+                        style={{ fontSize: 11, color: 'var(--text-2)', background: 'none', border: '0.5px solid var(--btn-border)', borderRadius: 6, padding: '2px 8px', cursor: 'pointer' }}
+                      >
+                        Edit
+                      </button>
+                      <button
+                        onClick={async () => { await api.plants.remove(id!, p.id); plants.reload() }}
+                        style={{ display: 'flex', alignItems: 'center', gap: 3, fontSize: 11, color: 'var(--red)', background: 'none', border: 'none', cursor: 'pointer' }}
+                      >
+                        <Trash2 size={11} />Remove
+                      </button>
+                    </div>
                   </div>
-                </div>
+                )}
               </div>
             )
           })}
