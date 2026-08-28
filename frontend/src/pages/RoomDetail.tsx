@@ -120,26 +120,26 @@ export default function RoomDetail() {
               Width <input type="number" min="0.5" step="0.1" value={room.width} onChange={e => updateRoomDimensions(room.id, 'width', e.target.value)} onBlur={() => commitRoomDimensions(room.id, 'width')} style={{ width: 62 }} /> m
             </label>
             <label style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
-              Depth <input type="number" min="0.5" step="0.1" value={room.depth} onChange={e => updateRoomDimensions(room.id, 'depth', e.target.value)} onBlur={() => commitRoomDimensions(room.id, 'depth')} style={{ width: 62 }} /> m
+              Length <input type="number" min="0.5" step="0.1" value={room.length} onChange={e => updateRoomDimensions(room.id, 'length', e.target.value)} onBlur={() => commitRoomDimensions(room.id, 'length')} style={{ width: 62 }} /> m
             </label>
           </div>
           <div
             onPointerMove={e => moveTankOnMap(e, room.id)}
             onPointerUp={() => commitTankMove(room.id)}
             onPointerCancel={() => commitTankMove(room.id)}
-            style={{ position: 'relative', width: '100%', aspectRatio: `${room.width} / ${room.depth}`, minHeight: 280, overflow: 'hidden', borderRadius: 12, border: '1px solid var(--blue-border)', backgroundColor: 'var(--blue-bg)', backgroundImage: 'linear-gradient(var(--blue-border) 1px, transparent 1px), linear-gradient(90deg, var(--blue-border) 1px, transparent 1px)', backgroundSize: '10% 10%', touchAction: 'none' }}
+            style={{ position: 'relative', width: '100%', aspectRatio: `${room.width} / ${room.length}`, minHeight: 280, overflow: 'hidden', borderRadius: 12, border: '1px solid var(--blue-border)', backgroundColor: 'var(--blue-bg)', backgroundImage: 'linear-gradient(var(--blue-border) 1px, transparent 1px), linear-gradient(90deg, var(--blue-border) 1px, transparent 1px)', backgroundSize: '10% 10%', touchAction: 'none' }}
           >
             {room.tankIds.map((tankId, index) => {
               const tank = tankLookup.get(tankId)
               if (!tank) return null
               const position = room.tankPositions[tank.id] ?? defaultTankPosition(index)
-              const { width: tankWidth, depth: tankDepth } = tankFootprintPercent(tank, room)
+              const { width: tankWidth, length: tankLength } = tankFootprintPercent(tank, room)
               return (
                 <div
                   key={tank.id}
                   onPointerDown={e => startTankMove(e, room.id, tank.id)}
                   title={`${tank.name} - drag to position`}
-                  style={{ position: 'absolute', left: `${position.x}%`, top: `${position.y}%`, transform: 'translate(-50%, -50%)', width: `${tankWidth}%`, minHeight: `${tankDepth}%`, padding: '7px 8px', boxSizing: 'border-box', display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 3, borderRadius: 7, border: `1.5px solid ${movingTank?.tankId === tank.id ? 'var(--amber)' : 'var(--blue)'}`, background: 'var(--surface)', boxShadow: '0 2px 6px rgba(0,0,0,0.12)', cursor: movingTank?.tankId === tank.id ? 'grabbing' : 'grab', userSelect: 'none' }}
+                  style={{ position: 'absolute', left: `${position.x}%`, top: `${position.y}%`, transform: 'translate(-50%, -50%)', width: `${tankWidth}%`, minHeight: `${tankLength}%`, padding: '7px 8px', boxSizing: 'border-box', display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 3, borderRadius: 7, border: `1.5px solid ${movingTank?.tankId === tank.id ? 'var(--amber)' : 'var(--blue)'}`, background: 'var(--surface)', boxShadow: '0 2px 6px rgba(0,0,0,0.12)', cursor: movingTank?.tankId === tank.id ? 'grabbing' : 'grab', userSelect: 'none' }}
                 >
                   <button
                     type="button"

@@ -7,7 +7,7 @@ export interface RoomState {
   name: string
   tankIds: string[]
   width: number
-  depth: number
+  length: number
   tankPositions: Record<string, TankPosition>
 }
 
@@ -24,11 +24,11 @@ export function defaultTankPosition(index: number): TankPosition {
 }
 
 // Each room map is a 10x10 grid (see the map's backgroundSize: '10% 10%'),
-// so one grid square = room.width / 10 metres of width by room.depth / 10 of depth.
-export function tankFootprintPercent(tank: Tank, room: RoomState): { width: number; depth: number } {
+// so one grid square = room.width / 10 metres of width by room.length / 10 of length.
+export function tankFootprintPercent(tank: Tank, room: RoomState): { width: number; length: number } {
   return {
     width: Math.max(12, Math.min(32, ((tank.width_mm ?? Math.sqrt(tank.volume_litres) * 100) / (room.width * 1000)) * 100)),
-    depth: Math.max(9, Math.min(28, ((tank.depth_mm ?? Math.sqrt(tank.volume_litres) * 80) / (room.depth * 1000)) * 100)),
+    length: Math.max(9, Math.min(28, ((tank.depth_mm ?? Math.sqrt(tank.volume_litres) * 80) / (room.length * 1000)) * 100)),
   }
 }
 
@@ -37,7 +37,7 @@ function fromApiRoom(room: ApiRoom): RoomState {
     id: room.id,
     name: room.name,
     width: room.width_m,
-    depth: room.depth_m,
+    length: room.length_m,
     tankIds: room.tank_positions.map(p => p.tank_id),
     tankPositions: Object.fromEntries(room.tank_positions.map(p => [p.tank_id, { x: p.x, y: p.y }])),
   }
@@ -73,10 +73,10 @@ export function useRoomLayoutState() {
     setRooms(prev => updater(prev))
   }
 
-  async function addRoom(name: string, width?: number, depth?: number): Promise<string | null> {
+  async function addRoom(name: string, width?: number, length?: number): Promise<string | null> {
     const trimmed = name.trim()
     if (!trimmed) return null
-    const created = await api.rooms.create({ name: trimmed, width_m: width, depth_m: depth })
+    const created = await api.rooms.create({ name: trimmed, width_m: width, length_m: length })
     updateRooms(prev => [...prev, fromApiRoom(created)])
     return created.id
   }
@@ -129,16 +129,16 @@ export function useRoomLayoutState() {
     }
   }
 
-  function updateRoomDimensions(roomId: string, field: 'width' | 'depth', value: string) {
+  function updateRoomDimensions(roomId: string, field: 'width' | 'length', value: string) {
     const numericValue = Number(value)
     if (!Number.isFinite(numericValue) || numericValue <= 0) return
     updateRooms(prev => prev.map(room => room.id === roomId ? { ...room, [field]: numericValue } : room))
   }
 
-  function commitRoomDimensions(roomId: string, field: 'width' | 'depth') {
+  function commitRoomDimensions(roomId: string, field: 'width' | 'length') {
     const room = rooms.find(r => r.id === roomId)
     if (!room) return
-    const body = field === 'width' ? { width_m: room.width } : { depth_m: room.depth }
+    const body = field === 'width' ? { width_m: room.width } : { length_m: room.length }
     api.rooms.update(roomId, body).catch(() => reloadRooms())
   }
 
@@ -147,12 +147,12 @@ export function useRoomLayoutState() {
     const room = rooms.find(r => r.id === roomId)
     const tank = tankLookup.get(movingTank.tankId)
     if (!room || !tank) return
-    const { width: tankWidthPct, depth: tankDepthPct } = tankFootprintPercent(tank, room)
+    const { width: tankWidthPct, length: tankLengthPct } = tankFootprintPercent(tank, room)
     const rect = event.currentTarget.getBoundingClientRect()
     const rawX = ((event.clientX - rect.left) / rect.width) * 100
     const rawY = ((event.clientY - rect.top) / rect.height) * 100
     const x = Math.max(tankWidthPct / 2, Math.min(100 - tankWidthPct / 2, rawX))
-    const y = Math.max(tankDepthPct / 2, Math.min(100 - tankDepthPct / 2, rawY))
+    const y = Math.max(tankLengthPct / 2, Math.min(100 - tankLengthPct / 2, rawY))
     updateRooms(prev => prev.map(r => r.id === roomId ? {
       ...r,
       tankPositions: { ...r.tankPositions, [movingTank.tankId]: { x, y } },

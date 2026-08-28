@@ -210,7 +210,7 @@ class Room(Base):
     id: Mapped[str] = mapped_column(String, primary_key=True, default=new_uuid)
     name: Mapped[str] = mapped_column(String, nullable=False)
     width_m: Mapped[float] = mapped_column(Float, default=3.0)
-    depth_m: Mapped[float] = mapped_column(Float, default=2.4)
+    length_m: Mapped[float] = mapped_column(Float, default=2.4)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
     tank_positions: Mapped[list["RoomTankPosition"]] = relationship(back_populates="room", cascade="all, delete-orphan")

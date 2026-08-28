@@ -159,7 +159,7 @@ export interface Room {
   id: string
   name: string
   width_m: number
-  depth_m: number
+  length_m: number
   tank_positions: RoomTankPosition[]
 }
 
@@ -384,9 +384,9 @@ export const api = {
   },
   rooms: {
     list: () => get<Room[]>('/rooms/'),
-    create: (body: { name: string; width_m?: number; depth_m?: number }) =>
+    create: (body: { name: string; width_m?: number; length_m?: number }) =>
       post<Room>('/rooms/', body),
-    update: (id: string, body: Partial<{ name: string; width_m: number; depth_m: number }>) =>
+    update: (id: string, body: Partial<{ name: string; width_m: number; length_m: number }>) =>
       patch<Room>(`/rooms/${id}`, body),
     remove: (id: string) => del(`/rooms/${id}`),
     setTankPosition: (tankId: string, body: { room_id: string; x: number; y: number }) =>

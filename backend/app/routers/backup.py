@@ -103,7 +103,7 @@ def export_backup(db: Session = Depends(get_db)):
     ]
 
     rooms_out = [
-        {"id": r.id, "name": r.name, "width_m": r.width_m, "depth_m": r.depth_m,
+        {"id": r.id, "name": r.name, "width_m": r.width_m, "length_m": r.length_m,
          "tank_positions": [{"tank_id": p.tank_id, "x": p.x, "y": p.y} for p in r.tank_positions]}
         for r in db.query(Room).all()
     ]
@@ -272,7 +272,7 @@ def import_backup(payload: dict, db: Session = Depends(get_db)):
     for r in payload.get("rooms", []):
         room = Room(
             id=r["id"], name=r["name"],
-            width_m=r.get("width_m", 3.0), depth_m=r.get("depth_m", 2.4),
+            width_m=r.get("width_m", 3.0), length_m=r.get("length_m", 2.4),
         )
         db.add(room)
         for p in r.get("tank_positions", []):

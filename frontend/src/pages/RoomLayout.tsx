@@ -15,13 +15,13 @@ export default function RoomLayout() {
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [draftName, setDraftName] = useState('')
   const [draftWidth, setDraftWidth] = useState('3')
-  const [draftDepth, setDraftDepth] = useState('2.4')
+  const [draftLength, setDraftLength] = useState('2.4')
   const [creating, setCreating] = useState(false)
 
   function openCreateModal() {
     setDraftName('')
     setDraftWidth('3')
-    setDraftDepth('2.4')
+    setDraftLength('2.4')
     setShowCreateModal(true)
   }
 
@@ -29,7 +29,7 @@ export default function RoomLayout() {
     const trimmed = draftName.trim()
     if (!trimmed || creating) return
     setCreating(true)
-    const id = await addRoom(trimmed, Number(draftWidth) || undefined, Number(draftDepth) || undefined)
+    const id = await addRoom(trimmed, Number(draftWidth) || undefined, Number(draftLength) || undefined)
     setCreating(false)
     setShowCreateModal(false)
     if (id) navigate(`/rooms/${id}`)
@@ -155,11 +155,11 @@ export default function RoomLayout() {
                 />
               </div>
               <div style={{ flex: 1 }}>
-                <FieldLabel>Depth (m)</FieldLabel>
+                <FieldLabel>Length (m)</FieldLabel>
                 <input
                   type="number" min="0.5" step="0.1"
-                  value={draftDepth}
-                  onChange={e => setDraftDepth(e.target.value)}
+                  value={draftLength}
+                  onChange={e => setDraftLength(e.target.value)}
                   style={{ width: '100%', padding: '10px 12px', borderRadius: 10, border: '0.5px solid var(--border)', background: 'var(--surface-2)', color: 'var(--text)', boxSizing: 'border-box' }}
                 />
               </div>
