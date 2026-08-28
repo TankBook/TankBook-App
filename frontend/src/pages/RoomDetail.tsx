@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useNavigate, useParams, Link } from 'react-router-dom'
-import { ChevronLeft, Pencil, Trash2, X } from 'lucide-react'
+import { ChevronLeft, ExternalLink, Pencil, Trash2, X } from 'lucide-react'
 import { useRoomLayoutState, defaultTankPosition } from '../hooks/useRoomLayout'
 import { Card, FieldLabel, Tag } from '../components/ui'
 
@@ -144,12 +144,19 @@ export default function RoomDetail() {
                 >
                   <button
                     type="button"
+                    aria-label={`View ${tank.name} details`}
+                    onPointerDown={e => e.stopPropagation()}
+                    onClick={() => navigate(`/tanks/${tank.id}`)}
+                    style={{ position: 'absolute', top: 3, left: 3, display: 'grid', placeItems: 'center', width: 18, height: 18, padding: 0, border: 'none', borderRadius: 4, background: 'var(--surface-2)', color: 'var(--text-2)', cursor: 'pointer' }}
+                  ><ExternalLink size={11} /></button>
+                  <button
+                    type="button"
                     aria-label={`Remove ${tank.name} from ${room.name}`}
                     onPointerDown={e => e.stopPropagation()}
                     onClick={() => moveTankToRoom(tank.id, null)}
                     style={{ position: 'absolute', top: 3, right: 3, display: 'grid', placeItems: 'center', width: 18, height: 18, padding: 0, border: 'none', borderRadius: 4, background: 'var(--surface-2)', color: 'var(--text-2)', cursor: 'pointer' }}
                   ><X size={11} /></button>
-                  <strong style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 12, color: 'var(--text)' }}>{tank.name}</strong>
+                  <strong style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 12, color: 'var(--text)', marginTop: 2 }}>{tank.name}</strong>
                   <span style={{ fontSize: 10, color: 'var(--text-2)' }}>{tank.volume_litres} L</span>
                 </div>
               )
