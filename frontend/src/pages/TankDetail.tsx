@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
 import { useParams, Link, useNavigate, useSearchParams } from 'react-router-dom'
-import { Fish, Leaf, Droplets, CalendarCheck, Bell, Pencil, Trash2, Plus, ChevronLeft, ChevronDown, ListChecks, Camera, X, Utensils, BookOpen, FlaskConical, Thermometer, Lightbulb, Filter, Home, Clock, Calendar, ChevronLeft as Prev, ChevronRight as Next, Save, Target, type LucideIcon } from 'lucide-react'
+import { Fish, Leaf, Droplets, CalendarCheck, Bell, Pencil, Trash2, Plus, ChevronLeft, ChevronDown, ListChecks, Camera, X, Utensils, BookOpen, FlaskConical, Thermometer, Lightbulb, Filter, Home, Clock, Calendar, ChevronLeft as Prev, ChevronRight as Next, Save, Target, Info, type LucideIcon } from 'lucide-react'
 import {
   LineChart, Line, XAxis, YAxis, Tooltip, ReferenceLine,
   ResponsiveContainer,
@@ -9,6 +9,7 @@ import { useTank, useFish, usePlants, useParameters, useAlerts } from '../hooks'
 import { api, type Tank } from '../api/client'
 import { useSettings, formatDate, formatDateTime, fromMM, toMM, fmtDim, dimInputProps } from '../context/SettingsContext'
 import { Card, FieldLabel, Tag, SectionTitle, tabStyle } from '../components/ui'
+import { type Species, SpeciesDetailModal } from '../components/SpeciesDetail'
 
 type Tab = 'home' | 'inhabitants' | 'plants' | 'parameters' | 'weekly' | 'daily' | 'alerts' | 'gallery' | 'edit'
 
@@ -1126,6 +1127,12 @@ export default function TankDetail() {
   const [stripModal, setStripModal] = useState<{ label: string; setter: (v: string) => void } | null>(null)
   const [stripKit, setStripKit] = useState<'master' | '5in1'>('master')
   const [hiddenOptimumLines, setHiddenOptimumLines] = useState<Record<string, boolean>>({})
+  const [speciesList, setSpeciesList] = useState<Species[]>([])
+  const [speciesInfoTarget, setSpeciesInfoTarget] = useState<Species | null>(null)
+
+  useEffect(() => {
+    fetch('/api/species/').then(r => r.json()).then(setSpeciesList).catch(() => {})
+  }, [])
 
   const [dailyTasks, setDailyTasks] = useState<any[]>([])
   const [dtName, setDtName] = useState('')
@@ -1791,6 +1798,15 @@ ${taskRows ? `<h2>Pending Maintenance</h2>
                               const sc = FISH_STATUS_COLORS[status] ?? FISH_STATUS_COLORS.added
                               return <Tag key={status} compact bg={sc.bg} color={sc.color}>{cap(status)} ×{quantity}</Tag>
                             })}
+                            {speciesList.some(sp => sp.slug === first.species_slug) && (
+                              <button
+                                onClick={() => setSpeciesInfoTarget(speciesList.find(sp => sp.slug === first.species_slug) ?? null)}
+                                title="View species info"
+                                style={{ display: 'flex', alignItems: 'center', color: 'var(--text-2)', background: 'none', border: '0.5px solid var(--btn-border)', borderRadius: 6, padding: '3px', cursor: 'pointer' }}
+                              >
+                                <Info size={12} />
+                              </button>
+                            )}
                             {entries.map(f => (
                               <button key={f.id} onClick={() => startEditFish(f)} style={{ fontSize: 11, color: 'var(--text-2)', background: 'none', border: '0.5px solid var(--btn-border)', borderRadius: 6, padding: '2px 8px', cursor: 'pointer' }}>Edit {cap(f.fish_status)}</button>
                             ))}
@@ -1844,7 +1860,18 @@ ${taskRows ? `<h2>Pending Maintenance</h2>
                           <p style={{ margin: '2px 0 0', fontSize: 11, color: 'var(--text-2)' }}>{p.notes}</p>
                         )}
                       </div>
-                      <Tag bg={sc.bg} color={sc.color} style={{ flexShrink: 0 }}>{cap(p.plant_status)}</Tag>
+                      <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexShrink: 0 }}>
+                        {speciesList.some(sp => sp.slug === p.species_slug) && (
+                          <button
+                            onClick={() => setSpeciesInfoTarget(speciesList.find(sp => sp.slug === p.species_slug) ?? null)}
+                            title="View species info"
+                            style={{ display: 'flex', alignItems: 'center', color: 'var(--text-2)', background: 'none', border: '0.5px solid var(--btn-border)', borderRadius: 6, padding: '3px', cursor: 'pointer' }}
+                          >
+                            <Info size={12} />
+                          </button>
+                        )}
+                        <Tag bg={sc.bg} color={sc.color}>{cap(p.plant_status)}</Tag>
+                      </div>
                     </div>
                     <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
                       <button
@@ -1882,6 +1909,15 @@ ${taskRows ? `<h2>Pending Maintenance</h2>
                     </div>
                     <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
                       <Tag bg={sc.bg} color={sc.color}>{cap(p.plant_status)}</Tag>
+                      {speciesList.some(sp => sp.slug === p.species_slug) && (
+                        <button
+                          onClick={() => setSpeciesInfoTarget(speciesList.find(sp => sp.slug === p.species_slug) ?? null)}
+                          title="View species info"
+                          style={{ display: 'flex', alignItems: 'center', color: 'var(--text-2)', background: 'none', border: '0.5px solid var(--btn-border)', borderRadius: 6, padding: '3px', cursor: 'pointer' }}
+                        >
+                          <Info size={12} />
+                        </button>
+                      )}
                       <button
                         onClick={() => {
                           setEditingPlantId(p.id)
@@ -2654,6 +2690,11 @@ ${taskRows ? `<h2>Pending Maintenance</h2>
             </div>
           </div>
         </div>
+      )}
+
+      {/* SPECIES INFO MODAL */}
+      {speciesInfoTarget && (
+        <SpeciesDetailModal s={speciesInfoTarget} onClose={() => setSpeciesInfoTarget(null)} />
       )}
 
       {/* ADD INHABITANT MODAL */}
