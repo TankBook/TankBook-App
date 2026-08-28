@@ -93,6 +93,18 @@ export interface WaterParameter {
   notes: string | null
 }
 
+export interface TapWaterTest {
+  id: string
+  ph: number | null
+  gh_dgh: number | null
+  kh_dkh: number | null
+  chlorine_ppm: number | null
+  nitrate_ppm: number | null
+  tds_ppm: number | null
+  recorded_at: string
+  notes: string | null
+}
+
 export interface MaintenanceTask {
   id: string
   tank_id: string
@@ -257,6 +269,10 @@ export const api = {
       get<WaterParameter[]>(`/parameters/${tankId}/parameters?limit=${limit}`),
     log: (tankId: string, body: Omit<WaterParameter, 'id' | 'tank_id' | 'recorded_at'>) =>
       post<WaterParameter>(`/parameters/${tankId}/parameters`, body),
+  },
+  tapWater: {
+    list: (limit = 50) => get<TapWaterTest[]>(`/tap-water/?limit=${limit}`),
+    log: (body: Omit<TapWaterTest, 'id' | 'recorded_at'>) => post<TapWaterTest>('/tap-water/', body),
   },
   alerts: {
     list: (tankId: string, unacknowledgedOnly = false) =>
