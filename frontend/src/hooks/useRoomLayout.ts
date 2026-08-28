@@ -24,7 +24,7 @@ export function defaultTankPosition(index: number): TankPosition {
 }
 
 // Each room map is a 10x10 grid (see the map's backgroundSize: '10% 10%'),
-// so one grid square = room.width / 10 metres wide by room.depth / 10 deep.
+// so one grid square = room.width / 10 metres of width by room.depth / 10 of depth.
 export function tankFootprintPercent(tank: Tank, room: RoomState): { width: number; depth: number } {
   return {
     width: Math.max(12, Math.min(32, ((tank.width_mm ?? Math.sqrt(tank.volume_litres) * 100) / (room.width * 1000)) * 100)),

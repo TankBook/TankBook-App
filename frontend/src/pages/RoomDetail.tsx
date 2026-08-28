@@ -117,10 +117,10 @@ export default function RoomDetail() {
           <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'center', color: 'var(--text-2)', fontSize: 12 }}>
             <span>Room size</span>
             <label style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
-              <input type="number" min="0.5" step="0.1" value={room.width} onChange={e => updateRoomDimensions(room.id, 'width', e.target.value)} onBlur={() => commitRoomDimensions(room.id, 'width')} style={{ width: 62 }} /> m wide
+              Width <input type="number" min="0.5" step="0.1" value={room.width} onChange={e => updateRoomDimensions(room.id, 'width', e.target.value)} onBlur={() => commitRoomDimensions(room.id, 'width')} style={{ width: 62 }} /> m
             </label>
             <label style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
-              <input type="number" min="0.5" step="0.1" value={room.depth} onChange={e => updateRoomDimensions(room.id, 'depth', e.target.value)} onBlur={() => commitRoomDimensions(room.id, 'depth')} style={{ width: 62 }} /> m deep
+              Depth <input type="number" min="0.5" step="0.1" value={room.depth} onChange={e => updateRoomDimensions(room.id, 'depth', e.target.value)} onBlur={() => commitRoomDimensions(room.id, 'depth')} style={{ width: 62 }} /> m
             </label>
           </div>
           <div
