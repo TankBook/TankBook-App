@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
 import { useParams, Link, useNavigate, useSearchParams } from 'react-router-dom'
-import { Fish, Leaf, Droplets, CalendarCheck, Bell, Pencil, Trash2, Plus, ChevronLeft, ChevronDown, ListChecks, Camera, X, Utensils, BookOpen, FlaskConical, Thermometer, Home, Clock, Calendar, ChevronLeft as Prev, ChevronRight as Next, type LucideIcon } from 'lucide-react'
+import { Fish, Leaf, Droplets, CalendarCheck, Bell, Pencil, Trash2, Plus, ChevronLeft, ChevronDown, ListChecks, Camera, X, Utensils, BookOpen, FlaskConical, Thermometer, Lightbulb, Home, Clock, Calendar, ChevronLeft as Prev, ChevronRight as Next, type LucideIcon } from 'lucide-react'
 import {
   LineChart, Line, XAxis, YAxis, Tooltip,
   ResponsiveContainer,
@@ -438,6 +438,7 @@ function EditTankPanel({ tank, onSave }: { tank: any; onSave: () => void }) {
   const [waterType, setWaterType] = useState(tank.water_type ?? 'freshwater')
   const [substrate, setSubstrate] = useState(tank.substrate ?? '')
   const [lighting, setLighting] = useState(tank.lighting ?? '')
+  const [hasLighting, setHasLighting] = useState(!!tank.lighting)
   const [filterFlow, setFilterFlow] = useState(tank.filter_flow_lph != null ? String(tank.filter_flow_lph) : '')
   const [width, setWidth] = useState(tank.width_mm != null ? String(fromMM(tank.width_mm, unitSystem)) : '')
   const [height, setHeight] = useState(tank.height_mm != null ? String(fromMM(tank.height_mm, unitSystem)) : '')
@@ -464,7 +465,7 @@ function EditTankPanel({ tank, onSave }: { tank: any; onSave: () => void }) {
       body: JSON.stringify({
         name, volume_litres: Number(volume),
         water_type: waterType,
-        substrate: substrate || null, lighting: lighting || null,
+        substrate: substrate || null, lighting: hasLighting && lighting ? lighting : null,
         filter_flow_lph: filterFlow ? Number(filterFlow) : null,
         width_mm: width ? toMM(Number(width), unitSystem) : null,
         height_mm: height ? toMM(Number(height), unitSystem) : null,
@@ -487,7 +488,6 @@ function EditTankPanel({ tank, onSave }: { tank: any; onSave: () => void }) {
         ['Tank Name', name, setName],
         ['Volume (Litres)', volume, setVolume],
         ['Substrate', substrate, setSubstrate],
-        ['Lighting', lighting, setLighting],
         ['Filter Flow (L/h)', filterFlow, setFilterFlow],
       ].map(([lbl, val, set]) => (
         <div key={lbl as string} style={{ marginBottom: 12 }}>
@@ -550,6 +550,27 @@ function EditTankPanel({ tank, onSave }: { tank: any; onSave: () => void }) {
             />
             <span style={{ fontSize: 13, color: 'var(--text-2)' }}>W</span>
           </div>
+        )}
+        <button
+          type="button"
+          onClick={() => { const next = !hasLighting; setHasLighting(next); if (!next) setLighting('') }}
+          style={{
+            display: 'flex', alignItems: 'center', gap: 6, padding: '7px 14px', borderRadius: 8,
+            fontSize: 13, fontWeight: 500, cursor: 'pointer',
+            border: `0.5px solid ${hasLighting ? 'var(--amber-border)' : 'var(--btn-border)'}`,
+            background: hasLighting ? 'var(--amber-bg)' : 'transparent',
+            color: hasLighting ? 'var(--amber)' : 'var(--text-3)',
+            opacity: hasLighting ? 1 : 0.55,
+          }}
+        >
+          <Lightbulb size={14} /> Lighting
+        </button>
+        {hasLighting && (
+          <input
+            placeholder="e.g. Soft-glow LED, 5W"
+            value={lighting} onChange={e => setLighting(e.target.value)}
+            style={{ width: 200 }}
+          />
         )}
       </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
