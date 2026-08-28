@@ -1,8 +1,17 @@
 import { useState, useRef, useEffect } from 'react'
-import { CalendarDays, Ruler, Info, Download, Upload, Droplets, RefreshCw, Bell, Globe, Utensils, X, AlertTriangle } from 'lucide-react'
+import { CalendarDays, Ruler, Info, Download, Upload, Droplets, RefreshCw, Bell, Globe, Utensils, X, AlertTriangle, HardDrive, Fish, Image as ImageIcon } from 'lucide-react'
 import { useSettings, formatDate, DateFormat, UnitSystem } from '../context/SettingsContext'
-import { Card, Modal } from '../components/ui'
+import { Card, Modal, StatCard } from '../components/ui'
 import { api, Tank } from '../api/client'
+
+function formatBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`
+  const units = ['KB', 'MB', 'GB', 'TB']
+  let value = bytes
+  let unitIndex = -1
+  do { value /= 1024; unitIndex++ } while (value >= 1024 && unitIndex < units.length - 1)
+  return `${value.toFixed(1)} ${units[unitIndex]}`
+}
 
 const APP_VERSION = '0.7.0'
 const GITHUB_REPO = 'TankBook/TankBook-App'
@@ -134,6 +143,11 @@ export default function Settings() {
       setChecking(false)
     }
   }
+
+  const [stats, setStats] = useState<{ species_count: number; image_count: number; storage_bytes: number } | null>(null)
+  useEffect(() => {
+    fetch('/api/settings/stats').then(res => res.json()).then(setStats).catch(() => {})
+  }, [])
 
   const [exporting, setExporting] = useState(false)
   const [importing, setImporting] = useState(false)
@@ -410,6 +424,20 @@ export default function Settings() {
                 <><Upload size={13} />Restore Backup</>
               )}
             </button>
+          </div>
+        </section>
+
+        <section style={{ paddingBottom: 20, borderBottom: '0.5px solid var(--border-sub)' }}>
+          <p style={{ fontWeight: 500, fontSize: 14, margin: '0 0 4px', color: 'var(--text)', display: 'flex', alignItems: 'center', gap: 6 }}>
+            <HardDrive size={14} color="var(--text-2)" />Local Storage
+          </p>
+          <p style={{ fontSize: 12, color: 'var(--text-2)', margin: '0 0 14px' }}>
+            Species data and photos stored on this server.
+          </p>
+          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, 1fr)', gap: 12 }}>
+            <StatCard label="Storage used" value={stats ? formatBytes(stats.storage_bytes) : '—'} icon={HardDrive} />
+            <StatCard label="Species stored locally" value={stats ? stats.species_count : '—'} icon={Fish} />
+            <StatCard label="Gallery images saved" value={stats ? stats.image_count : '—'} icon={ImageIcon} />
           </div>
         </section>
 

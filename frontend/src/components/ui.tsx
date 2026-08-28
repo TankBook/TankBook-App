@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react'
 import type { CSSProperties, ReactNode } from 'react'
+import type { LucideIcon } from 'lucide-react'
 
 function formatInline(text: string): string {
   const escaped = text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
@@ -89,6 +90,21 @@ export function Card({ children, style, ...rest }: { children: ReactNode; style?
 
 export function FieldLabel({ children }: { children: ReactNode }) {
   return <label style={{ fontSize: 12, color: 'var(--text-2)', display: 'block', marginBottom: 4 }}>{children}</label>
+}
+
+export function StatCard({ label, value, accent, icon: Icon }: {
+  label: string; value: string | number; accent?: string
+  icon?: LucideIcon
+}) {
+  return (
+    <div style={{ background: 'var(--surface)', border: '0.5px solid var(--border)', borderRadius: 12, padding: '14px 16px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 4 }}>
+        <p style={{ fontSize: 12, color: 'var(--text-2)', margin: 0 }}>{label}</p>
+        {Icon && <Icon size={14} color="var(--text-3)" />}
+      </div>
+      <p style={{ fontSize: 24, fontWeight: 500, margin: 0, color: accent ?? 'var(--text)' }}>{value}</p>
+    </div>
+  )
 }
 
 export function Tag({ bg, color, children, compact, style }: {
