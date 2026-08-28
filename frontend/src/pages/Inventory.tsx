@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { Plus, Pencil, Trash2, Minus, PackagePlus, AlertTriangle } from 'lucide-react'
 import { api, InventoryItem } from '../api/client'
 import { useInventory } from '../hooks'
-import { Card, FieldLabel, SectionTitle, Tag, Modal, ConfirmDialog } from '../components/ui'
+import { Card, FieldLabel, SectionTitle, Tag, Modal, ConfirmDialog, Dropdown } from '../components/ui'
 
 const CATEGORIES = ['Equipment', 'Plants', 'Food', 'Chemicals', 'Medication', 'Decor', 'Tanks', 'Other'] as const
 
@@ -194,6 +194,19 @@ export default function Inventory() {
       </div>
 
       <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', gap: 20, alignItems: isMobile ? 'stretch' : 'flex-start' }}>
+        {/* Category selector — dropdown at the top on mobile */}
+        {isMobile && (
+          <Dropdown
+            value={selectedCategory}
+            onChange={v => setSelectedCategory(v as InventoryItem['category'])}
+            options={CATEGORIES.map(cat => {
+              const count = (items ?? []).filter(i => i.category === cat).length
+              const low = (items ?? []).some(i => i.category === cat && i.quantity <= i.low_stock_threshold)
+              return { value: cat, label: `${cat} (${count})${low ? ' ⚠' : ''}` }
+            })}
+          />
+        )}
+
         {/* Main content */}
         <div style={{ flex: 1, minWidth: 0 }}>
           {lowStock.length > 0 && (
@@ -214,39 +227,41 @@ export default function Inventory() {
           </Card>
         </div>
 
-        {/* Category menu */}
-        <div style={{ width: isMobile ? '100%' : 200, flexShrink: 0 }}>
-          <Card>
-            <SectionTitle muted>Categories</SectionTitle>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-              {CATEGORIES.map(cat => {
-                const count = (items ?? []).filter(i => i.category === cat).length
-                const low = (items ?? []).some(i => i.category === cat && i.quantity <= i.low_stock_threshold)
-                const active = cat === selectedCategory
-                return (
-                  <button
-                    key={cat}
-                    onClick={() => setSelectedCategory(cat)}
-                    style={{
-                      display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8,
-                      padding: '8px 10px', borderRadius: 8, cursor: 'pointer', textAlign: 'left',
-                      border: active ? `0.5px solid ${CAT_COLORS[cat].color}` : '0.5px solid transparent',
-                      background: active ? CAT_COLORS[cat].bg : 'transparent',
-                      color: active ? CAT_COLORS[cat].color : 'var(--text-2)',
-                      fontWeight: active ? 500 : 400, fontSize: 13,
-                    }}
-                  >
-                    <span>{cat}</span>
-                    <span style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
-                      {low && <AlertTriangle size={11} color="var(--red)" />}
-                      <span style={{ fontSize: 11, opacity: 0.7 }}>{count}</span>
-                    </span>
-                  </button>
-                )
-              })}
-            </div>
-          </Card>
-        </div>
+        {/* Category menu — vertical list on desktop */}
+        {!isMobile && (
+          <div style={{ width: 200, flexShrink: 0 }}>
+            <Card>
+              <SectionTitle muted>Categories</SectionTitle>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                {CATEGORIES.map(cat => {
+                  const count = (items ?? []).filter(i => i.category === cat).length
+                  const low = (items ?? []).some(i => i.category === cat && i.quantity <= i.low_stock_threshold)
+                  const active = cat === selectedCategory
+                  return (
+                    <button
+                      key={cat}
+                      onClick={() => setSelectedCategory(cat)}
+                      style={{
+                        display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8,
+                        padding: '8px 10px', borderRadius: 8, cursor: 'pointer', textAlign: 'left',
+                        border: active ? `0.5px solid ${CAT_COLORS[cat].color}` : '0.5px solid transparent',
+                        background: active ? CAT_COLORS[cat].bg : 'transparent',
+                        color: active ? CAT_COLORS[cat].color : 'var(--text-2)',
+                        fontWeight: active ? 500 : 400, fontSize: 13,
+                      }}
+                    >
+                      <span>{cat}</span>
+                      <span style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
+                        {low && <AlertTriangle size={11} color="var(--red)" />}
+                        <span style={{ fontSize: 11, opacity: 0.7 }}>{count}</span>
+                      </span>
+                    </button>
+                  )
+                })}
+              </div>
+            </Card>
+          </div>
+        )}
       </div>
 
       {editing && (

@@ -1,6 +1,6 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { CSSProperties, ReactNode } from 'react'
-import type { LucideIcon } from 'lucide-react'
+import { ChevronDown, type LucideIcon } from 'lucide-react'
 
 function formatInline(text: string): string {
   const escaped = text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
@@ -262,4 +262,58 @@ export function tabStyle(active: boolean, bordered = false): CSSProperties {
     color: active ? 'var(--blue)' : 'var(--text-2)',
     fontWeight: active ? 500 : 400,
   }
+}
+
+export function Dropdown({ value, onChange, options, style }: {
+  value: string
+  onChange: (v: string) => void
+  options: { value: string; label: string }[]
+  style?: CSSProperties
+}) {
+  const [open, setOpen] = useState(false)
+  const selectedLabel = options.find(o => o.value === value)?.label ?? ''
+
+  return (
+    <div style={{ position: 'relative', ...style }}>
+      <button
+        onClick={() => setOpen(o => !o)}
+        style={{
+          display: 'flex', alignItems: 'center', width: '100%', boxSizing: 'border-box',
+          fontSize: 13, padding: '6px 10px', borderRadius: 8,
+          border: '0.5px solid var(--btn-border)', background: 'var(--surface)', color: 'var(--text)', cursor: 'pointer',
+        }}
+      >
+        <span style={{ flex: 1, textAlign: 'left', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{selectedLabel}</span>
+        <ChevronDown size={14} style={{ flexShrink: 0, marginLeft: 6, color: 'var(--text-3)', transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s' }} />
+      </button>
+
+      {open && (
+        <>
+          <div onClick={() => setOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 90 }} />
+          <div style={{
+            position: 'absolute', top: 'calc(100% + 4px)', left: 0, right: 0, zIndex: 100,
+            background: 'var(--surface)', border: '0.5px solid var(--border)', borderRadius: 10,
+            boxShadow: '0 8px 24px rgba(0,0,0,0.16)', overflow: 'hidden', maxHeight: 280, overflowY: 'auto',
+          }}>
+            {options.map(o => (
+              <button
+                key={o.value}
+                onClick={() => { onChange(o.value); setOpen(false) }}
+                style={{
+                  display: 'flex', alignItems: 'center', width: '100%',
+                  padding: '8px 10px', fontSize: 13, textAlign: 'left', cursor: 'pointer',
+                  border: 'none', borderBottom: '0.5px solid var(--border-sub)',
+                  background: value === o.value ? 'var(--blue-bg)' : 'transparent',
+                  color: value === o.value ? 'var(--blue)' : 'var(--text)',
+                  fontWeight: value === o.value ? 500 : 400,
+                }}
+              >
+                {o.label}
+              </button>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  )
 }
