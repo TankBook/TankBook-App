@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
 import { useParams, Link, useNavigate, useSearchParams } from 'react-router-dom'
-import { Fish, Leaf, Droplets, CalendarCheck, Bell, Pencil, Trash2, Plus, ChevronLeft, ChevronDown, ListChecks, Camera, X, Utensils, BookOpen, FlaskConical, Thermometer, Lightbulb, Filter, Home, Clock, Calendar, ChevronLeft as Prev, ChevronRight as Next, type LucideIcon } from 'lucide-react'
+import { Fish, Leaf, Droplets, CalendarCheck, Bell, Pencil, Trash2, Plus, ChevronLeft, ChevronDown, ListChecks, Camera, X, Utensils, BookOpen, FlaskConical, Thermometer, Lightbulb, Filter, Home, Clock, Calendar, ChevronLeft as Prev, ChevronRight as Next, Save, type LucideIcon } from 'lucide-react'
 import {
   LineChart, Line, XAxis, YAxis, Tooltip,
   ResponsiveContainer,
@@ -644,20 +644,20 @@ function EditTankPanel({ tank, onSave }: { tank: any; onSave: () => void }) {
           </select>
         </div>
       )}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-        <button onClick={save} style={{ padding: '7px 16px', borderRadius: 8, border: '0.5px solid var(--blue-border)', background: 'var(--blue-bg)', color: 'var(--blue)', fontSize: 13, fontWeight: 500, cursor: 'pointer', width: isMobile ? '100%' : undefined, boxSizing: 'border-box' }}>Save changes</button>
-        {saved && <span style={{ fontSize: 12, color: 'var(--green)' }}>Saved ✓</span>}
-      </div>
-
       <div style={{ marginTop: 28, paddingTop: 20, borderTop: '0.5px solid var(--border)' }}>
-        <p style={{ margin: '0 0 10px', fontSize: 12, fontWeight: 600, color: 'var(--red)', letterSpacing: '0.06em', textTransform: 'uppercase' }}>Danger Zone</p>
         {!showDeleteConfirm ? (
-          <button
-            onClick={() => setShowDeleteConfirm(true)}
-            style={{ padding: '7px 16px', borderRadius: 8, border: '0.5px solid var(--red-border)', background: 'transparent', color: 'var(--red)', fontSize: 13, cursor: 'pointer', width: isMobile ? '100%' : undefined, boxSizing: 'border-box' }}
-          >
-            Delete Tank…
-          </button>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>
+            <button
+              onClick={() => setShowDeleteConfirm(true)}
+              style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '7px 16px', borderRadius: 8, border: '0.5px solid var(--red-border)', background: 'transparent', color: 'var(--red)', fontSize: 13, cursor: 'pointer', width: isMobile ? '100%' : undefined, boxSizing: 'border-box' }}
+            >
+              <Trash2 size={14} /> Delete Tank
+            </button>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, width: isMobile ? '100%' : undefined }}>
+              <button onClick={save} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '7px 16px', borderRadius: 8, border: '0.5px solid var(--blue-border)', background: 'var(--blue-bg)', color: 'var(--blue)', fontSize: 13, fontWeight: 500, cursor: 'pointer', width: isMobile ? '100%' : undefined, boxSizing: 'border-box' }}><Save size={14} /> Save changes</button>
+              {saved && <span style={{ fontSize: 12, color: 'var(--green)' }}>Saved ✓</span>}
+            </div>
+          </div>
         ) : (
           <div style={{ background: 'var(--red-bg)', border: '0.5px solid var(--red-border)', borderRadius: 10, padding: '14px 16px' }}>
             <p style={{ margin: '0 0 4px', fontSize: 13, fontWeight: 500, color: 'var(--red)' }}>Delete "{tank.name}"?</p>
