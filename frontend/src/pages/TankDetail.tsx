@@ -806,6 +806,7 @@ function TankGraphic({ fishCount, plantCount, co2 }: { fishCount: number; plantC
 
 export default function TankDetail() {
   const { id } = useParams<{ id: string }>()
+  const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
   const [tab, setTab] = useState<Tab>(() => {
     const t = searchParams.get('tab')
@@ -819,6 +820,8 @@ export default function TankDetail() {
       return next
     }, { replace: true })
   }, [tab])
+  const fromRoomId = searchParams.get('fromRoom')
+  const fromRoomName = searchParams.get('fromRoomName')
   const { data: tank, reload: reloadTank } = useTank(id!)
   const fish = useFish(id!)
   const plants = usePlants(id!)
@@ -1200,16 +1203,28 @@ ${taskRows ? `<h2>Pending Maintenance</h2>
   return (
     <div>
       <div style={{ marginBottom: 24 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <Link to="/" style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 13, color: 'var(--text-2)', textDecoration: 'none', padding: '6px 10px', border: '0.5px solid var(--btn-border)', borderRadius: 7, background: 'transparent' }}>
-            <ChevronLeft size={13} />All tanks
-          </Link>
-          <button
-            onClick={() => openCarersGuide(tank, fish.data ?? [], plants.data ?? [], tasks.filter(t => t.status === 'pending'))}
-            style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 12, padding: '5px 12px', borderRadius: 8, border: '0.5px solid var(--btn-border)', background: 'transparent', color: 'var(--text-2)', cursor: 'pointer' }}
-          >
-            <BookOpen size={13} />Carer's Guide
-          </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+          <div style={{ flex: 1, display: 'flex' }}>
+            <Link to="/" style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 13, color: 'var(--text-2)', textDecoration: 'none', padding: '6px 10px', border: '0.5px solid var(--btn-border)', borderRadius: 7, background: 'transparent' }}>
+              <ChevronLeft size={13} />All tanks
+            </Link>
+          </div>
+          {fromRoomId && (
+            <button
+              onClick={() => navigate(`/rooms/${fromRoomId}`)}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 13, color: 'var(--blue)', padding: '6px 10px', border: '0.5px solid var(--blue-border)', borderRadius: 7, background: 'var(--blue-bg)', cursor: 'pointer' }}
+            >
+              <ChevronLeft size={13} />Back to {fromRoomName || 'room'}
+            </button>
+          )}
+          <div style={{ flex: 1, display: 'flex', justifyContent: 'flex-end' }}>
+            <button
+              onClick={() => openCarersGuide(tank, fish.data ?? [], plants.data ?? [], tasks.filter(t => t.status === 'pending'))}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 12, padding: '5px 12px', borderRadius: 8, border: '0.5px solid var(--btn-border)', background: 'transparent', color: 'var(--text-2)', cursor: 'pointer' }}
+            >
+              <BookOpen size={13} />Carer's Guide
+            </button>
+          </div>
         </div>
         <div style={{ marginTop: 8 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>

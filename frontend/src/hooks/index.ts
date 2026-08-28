@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { api, Tank, TankFish, TankPlant, WaterParameter, Alert, InventoryItem } from '../api/client'
+import { api, Tank, TankFish, TankPlant, WaterParameter, Alert, InventoryItem, Room } from '../api/client'
 
 function useFetch<T>(fetcher: () => Promise<T>, deps: unknown[] = []) {
   const [data, setData] = useState<T | null>(null)
@@ -49,4 +49,8 @@ export function useAlerts(tankId: string, unacknowledgedOnly = false) {
 
 export function useInventory() {
   return useFetch<InventoryItem[]>(() => api.inventory.list())
+}
+
+export function useRooms() {
+  return useFetch<Room[]>(() => api.rooms.list())
 }

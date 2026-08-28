@@ -149,6 +149,20 @@ export interface SpeciesBody {
   notes?: string
 }
 
+export interface RoomTankPosition {
+  tank_id: string
+  x: number
+  y: number
+}
+
+export interface Room {
+  id: string
+  name: string
+  width_m: number
+  length_m: number
+  tank_positions: RoomTankPosition[]
+}
+
 export interface Alert {
   id: string
   tank_id: string
@@ -367,5 +381,16 @@ export const api = {
     adjust: (id: string, delta: number) => patch<InventoryItem>(`/inventory/${id}/adjust`, { delta }),
     restock: (id: string, body: { quantity: number; amount?: number | null; purchase_date?: string | null }) =>
       post<InventoryItem>(`/inventory/${id}/restock`, body),
+  },
+  rooms: {
+    list: () => get<Room[]>('/rooms/'),
+    create: (body: { name: string; width_m?: number; length_m?: number }) =>
+      post<Room>('/rooms/', body),
+    update: (id: string, body: Partial<{ name: string; width_m: number; length_m: number }>) =>
+      patch<Room>(`/rooms/${id}`, body),
+    remove: (id: string) => del(`/rooms/${id}`),
+    setTankPosition: (tankId: string, body: { room_id: string; x: number; y: number }) =>
+      put<RoomTankPosition>(`/rooms/tank-positions/${tankId}`, body),
+    unassignTank: (tankId: string) => del(`/rooms/tank-positions/${tankId}`),
   },
 }
