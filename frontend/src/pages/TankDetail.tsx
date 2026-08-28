@@ -488,13 +488,81 @@ function EditTankPanel({ tank, onSave }: { tank: any; onSave: () => void }) {
         ['Tank Name', name, setName],
         ['Volume (Litres)', volume, setVolume],
         ['Substrate', substrate, setSubstrate],
-        ['Filter Flow (L/h)', filterFlow, setFilterFlow],
       ].map(([lbl, val, set]) => (
         <div key={lbl as string} style={{ marginBottom: 12 }}>
           <FieldLabel>{lbl as string}</FieldLabel>
           <input value={val as string} onChange={e => (set as any)(e.target.value)} style={{ width: '100%', boxSizing: 'border-box' }} />
         </div>
       ))}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10, marginBottom: 12 }}>
+        <button
+          type="button"
+          onClick={() => setCo2((c: boolean) => !c)}
+          style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '7px 10px', borderRadius: 8,
+            fontSize: 13, fontWeight: 500, cursor: 'pointer',
+            border: `0.5px solid ${co2 ? 'var(--green-border)' : 'var(--btn-border)'}`,
+            background: co2 ? 'var(--green-bg)' : 'transparent',
+            color: co2 ? 'var(--green)' : 'var(--text-3)',
+            opacity: co2 ? 1 : 0.55,
+          }}
+        >
+          <FlaskConical size={14} /> CO₂ Injection
+        </button>
+        <button
+          type="button"
+          onClick={() => { const next = !hasHeater; setHasHeater(next); if (!next) setHeaterWatts('') }}
+          style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '7px 10px', borderRadius: 8,
+            fontSize: 13, fontWeight: 500, cursor: 'pointer',
+            border: `0.5px solid ${hasHeater ? 'var(--orange-border, color-mix(in srgb, var(--orange, #ef6c00) 30%, transparent))' : 'var(--btn-border)'}`,
+            background: hasHeater ? 'var(--orange-bg)' : 'transparent',
+            color: hasHeater ? 'var(--orange, #ef6c00)' : 'var(--text-3)',
+            opacity: hasHeater ? 1 : 0.55,
+          }}
+        >
+          <Thermometer size={14} /> Heater
+        </button>
+        <button
+          type="button"
+          onClick={() => { const next = !hasLighting; setHasLighting(next); if (!next) setLighting('') }}
+          style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '7px 10px', borderRadius: 8,
+            fontSize: 13, fontWeight: 500, cursor: 'pointer',
+            border: `0.5px solid ${hasLighting ? 'var(--amber-border)' : 'var(--btn-border)'}`,
+            background: hasLighting ? 'var(--amber-bg)' : 'transparent',
+            color: hasLighting ? 'var(--amber)' : 'var(--text-3)',
+            opacity: hasLighting ? 1 : 0.55,
+          }}
+        >
+          <Lightbulb size={14} /> Lighting
+        </button>
+      </div>
+      {(hasHeater || hasLighting) && (
+        <div style={{ display: 'flex', gap: 10, marginBottom: 12, flexWrap: 'wrap', alignItems: 'center' }}>
+          {hasHeater && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <input
+                type="number" min="1" placeholder="Watts"
+                value={heaterWatts} onChange={e => setHeaterWatts(e.target.value)}
+                style={{ width: 80 }}
+              />
+              <span style={{ fontSize: 13, color: 'var(--text-2)' }}>W</span>
+            </div>
+          )}
+          {hasLighting && (
+            <input
+              placeholder="e.g. Soft-glow LED, 5W"
+              value={lighting} onChange={e => setLighting(e.target.value)}
+              style={{ width: 200 }}
+            />
+          )}
+        </div>
+      )}
+      <div style={{ marginBottom: 12 }}>
+        <FieldLabel>Filter Flow (L/h)</FieldLabel>
+        <input value={filterFlow} onChange={e => setFilterFlow(e.target.value)} style={{ width: '100%', boxSizing: 'border-box' }} />
+      </div>
       <div style={{ marginBottom: 12 }}>
         <FieldLabel>Water Type</FieldLabel>
         <select value={waterType} onChange={e => setWaterType(e.target.value)} style={{ width: '100%', boxSizing: 'border-box' }}>
@@ -511,67 +579,6 @@ function EditTankPanel({ tank, onSave }: { tank: any; onSave: () => void }) {
               value={val} onChange={e => set(e.target.value)} style={{ width: '100%', boxSizing: 'border-box' }} />
           </div>
         ))}
-      </div>
-      <div style={{ display: 'flex', gap: 10, marginBottom: 16, flexWrap: 'wrap', alignItems: 'center' }}>
-        <button
-          type="button"
-          onClick={() => setCo2((c: boolean) => !c)}
-          style={{
-            display: 'flex', alignItems: 'center', gap: 6, padding: '7px 14px', borderRadius: 8,
-            fontSize: 13, fontWeight: 500, cursor: 'pointer',
-            border: `0.5px solid ${co2 ? 'var(--green-border)' : 'var(--btn-border)'}`,
-            background: co2 ? 'var(--green-bg)' : 'transparent',
-            color: co2 ? 'var(--green)' : 'var(--text-3)',
-            opacity: co2 ? 1 : 0.55,
-          }}
-        >
-          <FlaskConical size={14} /> CO₂ Injection
-        </button>
-        <button
-          type="button"
-          onClick={() => { const next = !hasHeater; setHasHeater(next); if (!next) setHeaterWatts('') }}
-          style={{
-            display: 'flex', alignItems: 'center', gap: 6, padding: '7px 14px', borderRadius: 8,
-            fontSize: 13, fontWeight: 500, cursor: 'pointer',
-            border: `0.5px solid ${hasHeater ? 'var(--orange-border, color-mix(in srgb, var(--orange, #ef6c00) 30%, transparent))' : 'var(--btn-border)'}`,
-            background: hasHeater ? 'var(--orange-bg)' : 'transparent',
-            color: hasHeater ? 'var(--orange, #ef6c00)' : 'var(--text-3)',
-            opacity: hasHeater ? 1 : 0.55,
-          }}
-        >
-          <Thermometer size={14} /> Heater
-        </button>
-        {hasHeater && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <input
-              type="number" min="1" placeholder="Watts"
-              value={heaterWatts} onChange={e => setHeaterWatts(e.target.value)}
-              style={{ width: 80 }}
-            />
-            <span style={{ fontSize: 13, color: 'var(--text-2)' }}>W</span>
-          </div>
-        )}
-        <button
-          type="button"
-          onClick={() => { const next = !hasLighting; setHasLighting(next); if (!next) setLighting('') }}
-          style={{
-            display: 'flex', alignItems: 'center', gap: 6, padding: '7px 14px', borderRadius: 8,
-            fontSize: 13, fontWeight: 500, cursor: 'pointer',
-            border: `0.5px solid ${hasLighting ? 'var(--amber-border)' : 'var(--btn-border)'}`,
-            background: hasLighting ? 'var(--amber-bg)' : 'transparent',
-            color: hasLighting ? 'var(--amber)' : 'var(--text-3)',
-            opacity: hasLighting ? 1 : 0.55,
-          }}
-        >
-          <Lightbulb size={14} /> Lighting
-        </button>
-        {hasLighting && (
-          <input
-            placeholder="e.g. Soft-glow LED, 5W"
-            value={lighting} onChange={e => setLighting(e.target.value)}
-            style={{ width: 200 }}
-          />
-        )}
       </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
         <button onClick={save} style={{ padding: '7px 16px', borderRadius: 8, border: '0.5px solid var(--blue-border)', background: 'var(--blue-bg)', color: 'var(--blue)', fontSize: 13, fontWeight: 500, cursor: 'pointer', width: isMobile ? '100%' : undefined, boxSizing: 'border-box' }}>Save changes</button>
