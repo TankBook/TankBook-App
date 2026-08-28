@@ -38,6 +38,7 @@ class Tank(Base):
     alerts: Mapped[list["Alert"]] = relationship(back_populates="tank", cascade="all, delete-orphan")
     daily_tasks: Mapped[list["DailyTask"]] = relationship(back_populates="tank", cascade="all, delete-orphan")
     journal_entries: Mapped[list["JournalEntry"]] = relationship(back_populates="tank", cascade="all, delete-orphan")
+    room_position: Mapped["RoomTankPosition | None"] = relationship(back_populates="tank", cascade="all, delete-orphan")
 
 
 class TankFish(Base):
@@ -201,6 +202,31 @@ class Expense(Base):
     purchase_date: Mapped[str] = mapped_column(String, nullable=False)
     notes: Mapped[str | None] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
+class Room(Base):
+    __tablename__ = "rooms"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=new_uuid)
+    name: Mapped[str] = mapped_column(String, nullable=False)
+    width_m: Mapped[float] = mapped_column(Float, default=3.0)
+    depth_m: Mapped[float] = mapped_column(Float, default=2.4)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    tank_positions: Mapped[list["RoomTankPosition"]] = relationship(back_populates="room", cascade="all, delete-orphan")
+
+
+class RoomTankPosition(Base):
+    __tablename__ = "room_tank_positions"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=new_uuid)
+    room_id: Mapped[str] = mapped_column(String, ForeignKey("rooms.id", ondelete="CASCADE"), nullable=False)
+    tank_id: Mapped[str] = mapped_column(String, ForeignKey("tanks.id", ondelete="CASCADE"), nullable=False, unique=True)
+    x: Mapped[float] = mapped_column(Float, nullable=False)
+    y: Mapped[float] = mapped_column(Float, nullable=False)
+
+    room: Mapped["Room"] = relationship(back_populates="tank_positions")
+    tank: Mapped["Tank"] = relationship(back_populates="room_position")
 
 
 class InventoryItem(Base):

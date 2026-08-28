@@ -218,6 +218,42 @@ class AppSettingsOut(BaseModel):
     model_config = {"from_attributes": True}
 
 
+# --- Rooms ---
+
+class RoomCreate(BaseModel):
+    name: str
+    width_m: float = 3.0
+    depth_m: float = 2.4
+
+
+class RoomUpdate(BaseModel):
+    name: str | None = None
+    width_m: float | None = None
+    depth_m: float | None = None
+
+
+class RoomTankPositionOut(BaseModel):
+    tank_id: str
+    x: float
+    y: float
+    model_config = {"from_attributes": True}
+
+
+class RoomOut(BaseModel):
+    id: str
+    name: str
+    width_m: float
+    depth_m: float
+    tank_positions: list[RoomTankPositionOut] = []
+    model_config = {"from_attributes": True}
+
+
+class RoomTankPositionUpsert(BaseModel):
+    room_id: str
+    x: float
+    y: float
+
+
 # --- Expenses ---
 
 class ExpenseCreate(BaseModel):
