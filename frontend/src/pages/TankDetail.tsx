@@ -1127,6 +1127,7 @@ export default function TankDetail() {
   const [stripModal, setStripModal] = useState<{ label: string; setter: (v: string) => void } | null>(null)
   const [stripKit, setStripKit] = useState<'master' | '5in1'>('master')
   const [hiddenOptimumLines, setHiddenOptimumLines] = useState<Record<string, boolean>>({})
+  const [mobileChartEndOffset, setMobileChartEndOffset] = useState(0)
   const [speciesList, setSpeciesList] = useState<Species[]>([])
   const [speciesInfoTarget, setSpeciesInfoTarget] = useState<Species | null>(null)
 
@@ -1479,7 +1480,12 @@ ${taskRows ? `<h2>Pending Maintenance</h2>
   if (!tank) return <p style={{ color: 'var(--text-2)' }}>Loading…</p>
 
   const unackAlerts = alerts.data?.filter(a => !a.acknowledged) ?? []
-  const chartData = [...(params.data ?? [])].reverse()
+  const allChartData = [...(params.data ?? [])].reverse()
+  const mobileChartMaxOffset = Math.max(0, allChartData.length - 3)
+  const mobileChartOffset = Math.min(mobileChartEndOffset, mobileChartMaxOffset)
+  const mobileChartEnd = allChartData.length - mobileChartOffset
+  const mobileChartStart = Math.max(0, mobileChartEnd - 3)
+  const chartData = isMobile ? allChartData.slice(mobileChartStart, mobileChartEnd) : allChartData
   const hasParamInput = [ph, temp, ammonia, nitrite, nitrate, gh, kh, salinity, sg].some(v => v.trim() !== '')
 
   const pendingTasks = tasks.filter(t => t.status === 'pending')
@@ -2066,8 +2072,29 @@ ${taskRows ? `<h2>Pending Maintenance</h2>
             >Save Reading</button>
           </Card>
 
-          {chartData.length > 0 && (
+          {allChartData.length > 0 && (
             <>
+              {isMobile && allChartData.length > 3 && (
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, padding: '2px 2px' }}>
+                  <button
+                    onClick={() => setMobileChartEndOffset(o => Math.min(mobileChartMaxOffset, o + 3))}
+                    disabled={mobileChartOffset >= mobileChartMaxOffset}
+                    style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, padding: '6px 10px', borderRadius: 8, border: '0.5px solid var(--btn-border)', background: 'var(--surface)', color: mobileChartOffset >= mobileChartMaxOffset ? 'var(--text-4)' : 'var(--text-2)', cursor: mobileChartOffset >= mobileChartMaxOffset ? 'default' : 'pointer' }}
+                  >
+                    <Prev size={13} />Older
+                  </button>
+                  <span style={{ fontSize: 11, color: 'var(--text-3)' }}>
+                    {formatDate(allChartData[mobileChartStart].recorded_at, dateFormat)} – {formatDate(allChartData[mobileChartEnd - 1].recorded_at, dateFormat)}
+                  </span>
+                  <button
+                    onClick={() => setMobileChartEndOffset(o => Math.max(0, o - 3))}
+                    disabled={mobileChartOffset <= 0}
+                    style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, padding: '6px 10px', borderRadius: 8, border: '0.5px solid var(--btn-border)', background: 'var(--surface)', color: mobileChartOffset <= 0 ? 'var(--text-4)' : 'var(--text-2)', cursor: mobileChartOffset <= 0 ? 'default' : 'pointer' }}
+                  >
+                    Newer<Next size={13} />
+                  </button>
+                </div>
+              )}
               {[
                 { key: 'ph', label: 'pH', color: '#378add', domain: [5, 9] },
                 { key: 'temperature_c', label: 'Temperature (°C)', color: '#e07b3a', domain: [15, 35] },
@@ -2078,7 +2105,7 @@ ${taskRows ? `<h2>Pending Maintenance</h2>
                   { key: 'salinity_ppt', label: 'Salinity (ppt)', color: '#1abc9c', domain: [0, 45] },
                   { key: 'specific_gravity', label: 'Specific Gravity', color: '#16a085', domain: [1.000, 1.035] },
                 ] : []),
-              ].filter(({ key }) => chartData.some((d: any) => d[key] != null)).map(({ key, label: lbl, color, domain }) => {
+              ].filter(({ key }) => allChartData.some((d: any) => d[key] != null)).map(({ key, label: lbl, color, domain }) => {
                 const range = getParamRange(key, tank.water_type)
                 const optimum = range ? (range.idealMin + range.idealMax) / 2 : null
                 const showOptimum = optimum != null && !hiddenOptimumLines[key]
