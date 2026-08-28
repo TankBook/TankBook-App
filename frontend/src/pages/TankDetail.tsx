@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
 import { useParams, Link, useNavigate, useSearchParams } from 'react-router-dom'
-import { Fish, Leaf, Droplets, CalendarCheck, Bell, Pencil, Trash2, Plus, ChevronLeft, ChevronDown, ListChecks, Camera, X, Utensils, BookOpen, FlaskConical, Home, Clock, Calendar, ChevronLeft as Prev, ChevronRight as Next, type LucideIcon } from 'lucide-react'
+import { Fish, Leaf, Droplets, CalendarCheck, Bell, Pencil, Trash2, Plus, ChevronLeft, ChevronDown, ListChecks, Camera, X, Utensils, BookOpen, FlaskConical, Thermometer, Home, Clock, Calendar, ChevronLeft as Prev, ChevronRight as Next, type LucideIcon } from 'lucide-react'
 import {
   LineChart, Line, XAxis, YAxis, Tooltip,
   ResponsiveContainer,
@@ -512,13 +512,35 @@ function EditTankPanel({ tank, onSave }: { tank: any; onSave: () => void }) {
           </div>
         ))}
       </div>
-      <div style={{ display: 'flex', gap: 20, marginBottom: 16, flexWrap: 'wrap' }}>
-        <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: 'var(--text-label)' }}>
-          <input type="checkbox" checked={co2} onChange={e => setCo2(e.target.checked)} /> CO₂ Injection
-        </label>
-        <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: 'var(--text-label)' }}>
-          <input type="checkbox" checked={hasHeater} onChange={e => { setHasHeater(e.target.checked); if (!e.target.checked) setHeaterWatts('') }} /> Heater
-        </label>
+      <div style={{ display: 'flex', gap: 10, marginBottom: 16, flexWrap: 'wrap', alignItems: 'center' }}>
+        <button
+          type="button"
+          onClick={() => setCo2((c: boolean) => !c)}
+          style={{
+            display: 'flex', alignItems: 'center', gap: 6, padding: '7px 14px', borderRadius: 8,
+            fontSize: 13, fontWeight: 500, cursor: 'pointer',
+            border: `0.5px solid ${co2 ? 'var(--green-border)' : 'var(--btn-border)'}`,
+            background: co2 ? 'var(--green-bg)' : 'transparent',
+            color: co2 ? 'var(--green)' : 'var(--text-3)',
+            opacity: co2 ? 1 : 0.55,
+          }}
+        >
+          <FlaskConical size={14} /> CO₂ Injection
+        </button>
+        <button
+          type="button"
+          onClick={() => { const next = !hasHeater; setHasHeater(next); if (!next) setHeaterWatts('') }}
+          style={{
+            display: 'flex', alignItems: 'center', gap: 6, padding: '7px 14px', borderRadius: 8,
+            fontSize: 13, fontWeight: 500, cursor: 'pointer',
+            border: `0.5px solid ${hasHeater ? 'var(--orange-border, color-mix(in srgb, var(--orange, #ef6c00) 30%, transparent))' : 'var(--btn-border)'}`,
+            background: hasHeater ? 'var(--orange-bg)' : 'transparent',
+            color: hasHeater ? 'var(--orange, #ef6c00)' : 'var(--text-3)',
+            opacity: hasHeater ? 1 : 0.55,
+          }}
+        >
+          <Thermometer size={14} /> Heater
+        </button>
         {hasHeater && (
           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
             <input
