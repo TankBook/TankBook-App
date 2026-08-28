@@ -146,7 +146,7 @@ export default function RoomDetail() {
                     type="button"
                     aria-label={`View ${tank.name} details`}
                     onPointerDown={e => e.stopPropagation()}
-                    onClick={() => navigate(`/tanks/${tank.id}`)}
+                    onClick={() => navigate(`/tanks/${tank.id}?fromRoom=${room.id}&fromRoomName=${encodeURIComponent(room.name)}`)}
                     style={{ position: 'absolute', top: 3, left: 3, display: 'grid', placeItems: 'center', width: 18, height: 18, padding: 0, border: 'none', borderRadius: 4, background: 'var(--surface-2)', color: 'var(--text-2)', cursor: 'pointer' }}
                   ><ExternalLink size={11} /></button>
                   <button
