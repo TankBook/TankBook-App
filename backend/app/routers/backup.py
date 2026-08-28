@@ -123,7 +123,12 @@ def import_backup(payload: dict, db: Session = Depends(get_db)):
     if payload.get("version") != BACKUP_VERSION:
         raise HTTPException(400, f"Unsupported backup version: {payload.get('version')}. Expected {BACKUP_VERSION}.")
 
-    # Wipe existing data — ORM delete cascades all children
+    # Wipe existing data — ORM delete cascades all children.
+    # MaintenanceTask.parent_task_id self-references another task in the same
+    # cascade, so null those out first or the FK constraint blocks the delete
+    # for any tank with a completed recurring task history.
+    db.query(MaintenanceTask).update({MaintenanceTask.parent_task_id: None})
+    db.commit()
     for tank in db.query(Tank).all():
         db.delete(tank)
     for expense in db.query(Expense).all():
