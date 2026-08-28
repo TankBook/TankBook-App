@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Link, useLocation } from 'react-router-do
 import { LayoutDashboard, BookOpen, Cog, NotebookPen, ShieldCheck, Calculator, Receipt, Menu, X, Plus, Fish, Droplets, ChevronLeft, Package, Building, Sun, Moon, type LucideIcon } from 'lucide-react'
 import { api } from './api/client'
 import RoomLayout from './pages/RoomLayout'
+import RoomDetail from './pages/RoomDetail'
 
 function GitHubIcon({ size = 14 }: { size?: number }) {
   return (
@@ -489,6 +490,7 @@ export default function App() {
             <Routes>
               <Route path="/" element={<Dashboard />} />
               <Route path="/rooms" element={<RoomLayout />} />
+              <Route path="/rooms/:id" element={<RoomDetail />} />
               <Route path="/tanks/:id" element={<TankDetail />} />
               <Route path="/species" element={<SpeciesBrowser />} />
               <Route path="/compatibility" element={<CompatibilityChecker />} />
