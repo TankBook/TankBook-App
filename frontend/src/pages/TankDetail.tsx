@@ -1304,6 +1304,7 @@ ${taskRows ? `<h2>Pending Maintenance</h2>
 
   const unackAlerts = alerts.data?.filter(a => !a.acknowledged) ?? []
   const chartData = [...(params.data ?? [])].reverse()
+  const hasParamInput = [ph, temp, ammonia, nitrite, nitrate, gh, kh, salinity, sg].some(v => v.trim() !== '')
 
   const pendingTasks = tasks.filter(t => t.status === 'pending')
   const doneTasks = tasks.filter(t => t.status === 'done')
@@ -1773,8 +1774,8 @@ ${taskRows ? `<h2>Pending Maintenance</h2>
             <SectionTitle>Log Parameters</SectionTitle>
             <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fill, minmax(110px, 1fr))', gap: 10 }}>
               {([
-                ['pH', ph, setPh],
                 ['Temp (°C)', temp, setTemp],
+                ['pH', ph, setPh],
                 ['Ammonia', ammonia, setAmmonia],
                 ['Nitrite', nitrite, setNitrite],
                 ['Nitrate', nitrate, setNitrate],
@@ -1801,13 +1802,16 @@ ${taskRows ? `<h2>Pending Maintenance</h2>
               ))}
             </div>
             <button
+              disabled={!hasParamInput}
               style={{
-                marginTop: 12, padding: '7px 18px', borderRadius: 8, fontSize: 13, fontWeight: 500, cursor: 'pointer',
+                marginTop: 12, padding: '7px 18px', borderRadius: 8, fontSize: 13, fontWeight: 500,
+                cursor: hasParamInput ? 'pointer' : 'not-allowed',
                 border: '0.5px solid var(--blue-border)', background: 'var(--blue-bg)', color: 'var(--blue)',
+                opacity: hasParamInput ? 1 : 0.45,
                 transition: 'background 0.15s, color 0.15s',
                 width: isMobile ? '100%' : undefined, boxSizing: 'border-box',
               }}
-              onMouseEnter={e => { e.currentTarget.style.background = 'var(--blue)'; e.currentTarget.style.color = '#fff' }}
+              onMouseEnter={e => { if (!e.currentTarget.disabled) { e.currentTarget.style.background = 'var(--blue)'; e.currentTarget.style.color = '#fff' } }}
               onMouseLeave={e => { e.currentTarget.style.background = 'var(--blue-bg)'; e.currentTarget.style.color = 'var(--blue)' }}
               onClick={async () => {
                 await api.parameters.log(id!, {
