@@ -92,7 +92,7 @@ function VolumeCalculator() {
         key={id}
         onClick={() => { setShape(id); setWidth(''); setHeight(''); setDepth(''); setDiameter('') }}
         style={{
-          padding: '6px 16px', borderRadius: 8, fontSize: 13, cursor: 'pointer', fontWeight: active ? 500 : 400,
+          flex: 1, padding: '6px 16px', borderRadius: 8, fontSize: 13, cursor: 'pointer', fontWeight: active ? 500 : 400,
           border: active ? '0.5px solid var(--blue-border)' : '0.5px solid var(--btn-border)',
           background: active ? 'var(--blue-bg)' : 'transparent',
           color: active ? 'var(--blue)' : 'var(--text-2)',
