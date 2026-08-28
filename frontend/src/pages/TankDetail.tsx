@@ -504,6 +504,14 @@ function EditTankPanel({ tank, onSave }: { tank: any; onSave: () => void }) {
         </div>
       </div>
       <div style={{ marginBottom: 12 }}>
+        <FieldLabel>Water Type</FieldLabel>
+        <select value={waterType} onChange={e => setWaterType(e.target.value)} style={{ width: '100%', boxSizing: 'border-box' }}>
+          <option value="freshwater">Freshwater</option>
+          <option value="saltwater">Saltwater / Marine</option>
+          <option value="brackish">Brackish</option>
+        </select>
+      </div>
+      <div style={{ marginBottom: 12 }}>
         <FieldLabel>Substrate</FieldLabel>
         <input value={substrate} onChange={e => setSubstrate(e.target.value)} style={{ width: '100%', boxSizing: 'border-box' }} />
       </div>
@@ -596,14 +604,6 @@ function EditTankPanel({ tank, onSave }: { tank: any; onSave: () => void }) {
           )}
         </div>
       )}
-      <div style={{ marginBottom: 12 }}>
-        <FieldLabel>Water Type</FieldLabel>
-        <select value={waterType} onChange={e => setWaterType(e.target.value)} style={{ width: '100%', boxSizing: 'border-box' }}>
-          <option value="freshwater">Freshwater</option>
-          <option value="saltwater">Saltwater / Marine</option>
-          <option value="brackish">Brackish</option>
-        </select>
-      </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
         <button onClick={save} style={{ padding: '7px 16px', borderRadius: 8, border: '0.5px solid var(--blue-border)', background: 'var(--blue-bg)', color: 'var(--blue)', fontSize: 13, fontWeight: 500, cursor: 'pointer', width: isMobile ? '100%' : undefined, boxSizing: 'border-box' }}>Save changes</button>
         {saved && <span style={{ fontSize: 12, color: 'var(--green)' }}>Saved ✓</span>}
