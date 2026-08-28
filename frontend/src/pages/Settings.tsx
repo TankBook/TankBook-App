@@ -302,24 +302,6 @@ export default function Settings() {
           <p style={{ fontSize: 12, color: 'var(--text-2)', margin: '0 0 14px' }}>
             Presets for how much to feed. These become selectable when editing an inhabitant's feeding info.
           </p>
-          {draftFeedingAmountPresets.length > 0 && (
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 10 }}>
-              {draftFeedingAmountPresets.map(preset => (
-                <span
-                  key={preset}
-                  style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 12, padding: '4px 6px 4px 10px', borderRadius: 999, background: 'var(--surface-2)', border: '0.5px solid var(--border)', color: 'var(--text)' }}
-                >
-                  {preset}
-                  <button
-                    onClick={() => setDraftFeedingAmountPresets(draftFeedingAmountPresets.filter(p => p !== preset))}
-                    style={{ display: 'flex', alignItems: 'center', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-3)', padding: 2, lineHeight: 0 }}
-                  >
-                    <X size={12} />
-                  </button>
-                </span>
-              ))}
-            </div>
-          )}
           <div style={{ display: 'flex', gap: 8 }}>
             <input
               value={newPreset}
@@ -342,6 +324,24 @@ export default function Settings() {
               Add
             </button>
           </div>
+          {draftFeedingAmountPresets.length > 0 && (
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 10 }}>
+              {draftFeedingAmountPresets.map(preset => (
+                <span
+                  key={preset}
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 12, padding: '4px 6px 4px 10px', borderRadius: 999, background: 'var(--surface-2)', border: '0.5px solid var(--border)', color: 'var(--text)' }}
+                >
+                  {preset}
+                  <button
+                    onClick={() => setDraftFeedingAmountPresets(draftFeedingAmountPresets.filter(p => p !== preset))}
+                    style={{ display: 'flex', alignItems: 'center', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-3)', padding: 2, lineHeight: 0 }}
+                  >
+                    <X size={12} />
+                  </button>
+                </span>
+              ))}
+            </div>
+          )}
         </section>
 
         <section style={{ paddingBottom: 20, borderBottom: '0.5px solid var(--border-sub)' }}>
