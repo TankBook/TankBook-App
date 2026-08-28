@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useNavigate, useParams, Link } from 'react-router-dom'
 import { ChevronLeft, ExternalLink, Pencil, Trash2, X } from 'lucide-react'
-import { useRoomLayoutState, defaultTankPosition } from '../hooks/useRoomLayout'
+import { useRoomLayoutState, defaultTankPosition, tankFootprintPercent } from '../hooks/useRoomLayout'
 import { Card, FieldLabel, Tag } from '../components/ui'
 
 export default function RoomDetail() {
@@ -133,8 +133,7 @@ export default function RoomDetail() {
               const tank = tankLookup.get(tankId)
               if (!tank) return null
               const position = room.tankPositions[tank.id] ?? defaultTankPosition(index)
-              const tankWidth = Math.max(12, Math.min(32, ((tank.width_mm ?? Math.sqrt(tank.volume_litres) * 100) / (room.width * 1000)) * 100))
-              const tankDepth = Math.max(9, Math.min(28, ((tank.depth_mm ?? Math.sqrt(tank.volume_litres) * 80) / (room.depth * 1000)) * 100))
+              const { width: tankWidth, depth: tankDepth } = tankFootprintPercent(tank, room)
               return (
                 <div
                   key={tank.id}
