@@ -1809,11 +1809,13 @@ ${taskRows ? `<h2>Pending Maintenance</h2>
                               </button>
                             )}
                             {entries.map(f => (
-                              <button key={f.id} onClick={() => startEditFish(f)} style={{ fontSize: 11, color: 'var(--text-2)', background: 'none', border: '0.5px solid var(--btn-border)', borderRadius: 6, padding: '2px 8px', cursor: 'pointer' }}>Edit</button>
+                              <button key={f.id} onClick={() => startEditFish(f)} title="Edit" style={{ display: 'flex', alignItems: 'center', color: 'var(--text-2)', background: 'none', border: '0.5px solid var(--btn-border)', borderRadius: 6, padding: '3px', cursor: 'pointer' }}>
+                                <Pencil size={12} />
+                              </button>
                             ))}
                             {entries.map(f => (
-                              <button key={`remove-${f.id}`} aria-label={`Remove ${f.quantity} ${f.common_name ?? f.species_slug}`} onClick={async () => { await api.fish.remove(id!, f.id); fish.reload() }} style={{ display: 'flex', alignItems: 'center', gap: 3, fontSize: 11, color: 'var(--red)', background: 'none', border: 'none', cursor: 'pointer' }}>
-                                <Trash2 size={11} />
+                              <button key={`remove-${f.id}`} aria-label={`Remove ${f.quantity} ${f.common_name ?? f.species_slug}`} title="Remove" onClick={async () => { await api.fish.remove(id!, f.id); fish.reload() }} style={{ display: 'flex', alignItems: 'center', color: 'var(--red)', background: 'none', border: 'none', cursor: 'pointer' }}>
+                                <Trash2 size={12} />
                               </button>
                             ))}
                           </div>
@@ -1882,15 +1884,17 @@ ${taskRows ? `<h2>Pending Maintenance</h2>
                           setEditPlantStatus(p.plant_status)
                           setEditPlantNotes(p.notes ?? '')
                         }}
-                        style={{ flex: 1, fontSize: 12, color: 'var(--text-2)', background: 'none', border: '0.5px solid var(--btn-border)', borderRadius: 6, padding: '6px 8px', cursor: 'pointer' }}
+                        title="Edit"
+                        style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-2)', background: 'none', border: '0.5px solid var(--btn-border)', borderRadius: 6, padding: '6px 8px', cursor: 'pointer' }}
                       >
-                        Edit
+                        <Pencil size={13} />
                       </button>
                       <button
                         onClick={async () => { await api.plants.remove(id!, p.id); plants.reload() }}
-                        style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4, fontSize: 12, color: 'var(--red)', background: 'none', border: '0.5px solid var(--red-border)', borderRadius: 6, padding: '6px 8px', cursor: 'pointer' }}
+                        title="Remove"
+                        style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--red)', background: 'none', border: '0.5px solid var(--red-border)', borderRadius: 6, padding: '6px 8px', cursor: 'pointer' }}
                       >
-                        <Trash2 size={12} />Remove
+                        <Trash2 size={13} />
                       </button>
                     </div>
                   </div>
@@ -1926,15 +1930,17 @@ ${taskRows ? `<h2>Pending Maintenance</h2>
                           setEditPlantStatus(p.plant_status)
                           setEditPlantNotes(p.notes ?? '')
                         }}
-                        style={{ fontSize: 11, color: 'var(--text-2)', background: 'none', border: '0.5px solid var(--btn-border)', borderRadius: 6, padding: '2px 8px', cursor: 'pointer' }}
+                        title="Edit"
+                        style={{ display: 'flex', alignItems: 'center', color: 'var(--text-2)', background: 'none', border: '0.5px solid var(--btn-border)', borderRadius: 6, padding: '3px', cursor: 'pointer' }}
                       >
-                        Edit
+                        <Pencil size={12} />
                       </button>
                       <button
                         onClick={async () => { await api.plants.remove(id!, p.id); plants.reload() }}
-                        style={{ display: 'flex', alignItems: 'center', gap: 3, fontSize: 11, color: 'var(--red)', background: 'none', border: 'none', cursor: 'pointer' }}
+                        title="Remove"
+                        style={{ display: 'flex', alignItems: 'center', color: 'var(--red)', background: 'none', border: 'none', cursor: 'pointer' }}
                       >
-                        <Trash2 size={11} />Remove
+                        <Trash2 size={12} />
                       </button>
                     </div>
                   </div>
