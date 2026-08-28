@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Layers, Fish, Leaf, Bug, Waves, Bell, Clock, Plus, AlertTriangle, Timer, Thermometer, FlaskConical, GripVertical, Filter, type LucideIcon } from 'lucide-react'
+import { Layers, Fish, Leaf, Bug, Waves, Bell, Clock, Plus, AlertTriangle, Timer, Thermometer, FlaskConical, GripVertical, Filter } from 'lucide-react'
 import { useTanks } from '../hooks'
 import { api } from '../api/client'
 import { useSettings, formatDate, toMM, dimInputProps } from '../context/SettingsContext'
-import { Card, FieldLabel, Tag } from '../components/ui'
+import { Card, FieldLabel, StatCard, Tag } from '../components/ui'
 
 interface DashboardStats {
   total_tanks: number
@@ -39,21 +39,6 @@ const WATER_TYPE_STYLES: Record<string, { bg: string; color: string; label: stri
 function WaterTypeBadge({ type }: { type: string }) {
   const s = WATER_TYPE_STYLES[type] ?? WATER_TYPE_STYLES.freshwater
   return <Tag bg={s.bg} color={s.color}>{s.label}</Tag>
-}
-
-function StatCard({ label, value, accent, icon: Icon }: {
-  label: string; value: string | number; accent?: string
-  icon?: LucideIcon
-}) {
-  return (
-    <div style={{ background: 'var(--surface)', border: '0.5px solid var(--border)', borderRadius: 12, padding: '14px 16px' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 4 }}>
-        <p style={{ fontSize: 12, color: 'var(--text-2)', margin: 0 }}>{label}</p>
-        {Icon && <Icon size={14} color="var(--text-3)" />}
-      </div>
-      <p style={{ fontSize: 24, fontWeight: 500, margin: 0, color: accent ?? 'var(--text)' }}>{value}</p>
-    </div>
-  )
 }
 
 const PARAMS = [
@@ -220,6 +205,7 @@ export default function Dashboard() {
   const [skipTaskId, setSkipTaskId] = useState<string | null>(null)
   const [skipTimes, setSkipTimes] = useState('1')
   const [isMobile, setIsMobile] = useState(() => window.matchMedia('(max-width: 768px)').matches)
+  const [isTabletWidth, setIsTabletWidth] = useState(() => window.matchMedia('(max-width: 960px)').matches)
 
   const [orderedTanks, setOrderedTanks] = useState<DashboardStats['tanks']>([])
   const [dragId, setDragId] = useState<string | null>(null)
@@ -228,6 +214,13 @@ export default function Dashboard() {
   useEffect(() => {
     const mq = window.matchMedia('(max-width: 768px)')
     const handler = (e: MediaQueryListEvent) => setIsMobile(e.matches)
+    mq.addEventListener('change', handler)
+    return () => mq.removeEventListener('change', handler)
+  }, [])
+
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 960px)')
+    const handler = (e: MediaQueryListEvent) => setIsTabletWidth(e.matches)
     mq.addEventListener('change', handler)
     return () => mq.removeEventListener('change', handler)
   }, [])
@@ -307,7 +300,7 @@ export default function Dashboard() {
   if (loading || !stats) return <p style={{ color: 'var(--text-2)' }}>Loading dashboard…</p>
 
   const statsRow = (
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: 10, marginBottom: 24 }}>
+    <div style={{ display: 'grid', gridTemplateColumns: `repeat(${isMobile ? 2 : isTabletWidth ? 3 : 6}, 1fr)`, gap: 10, marginBottom: 24 }}>
       <StatCard label="Tanks" value={stats.total_tanks} icon={Layers} />
       <StatCard label="Fish" value={stats.total_fish} icon={Fish} />
       <StatCard label="Fish species" value={stats.total_species} icon={Fish} />
@@ -327,30 +320,55 @@ export default function Dashboard() {
           const isLast = i === stats.upcoming_tasks.length - 1
           return (
             <div key={t.id} style={{ padding: '8px 0', borderBottom: !isLast || skipping ? '0.5px solid var(--border-sub)' : 'none' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 6 }}>
-                <div style={{ minWidth: 0 }}>
-                  <p style={{ fontSize: 12, fontWeight: 500, color: 'var(--text)', margin: '0 0 2px' }}>{t.task_type}</p>
+              {isMobile ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 6 }}>
+                    <p style={{ fontSize: 12, fontWeight: 500, color: 'var(--text)', margin: 0, minWidth: 0 }}>{t.task_type}</p>
+                    <span style={{ fontSize: 11, color: 'var(--text-3)', flexShrink: 0 }}>{formatDate(t.due_at, dateFormat)}</span>
+                  </div>
                   <p style={{ fontSize: 11, color: 'var(--text-2)', margin: 0 }}>
                     {tank?.name}{t.is_recurring ? ' ↻' : ''}{t.description ? ` · ${t.description}` : ''}
                   </p>
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4, flexShrink: 0 }}>
-                  <span style={{ fontSize: 11, color: 'var(--text-3)' }}>{formatDate(t.due_at, dateFormat)}</span>
-                  <div style={{ display: 'flex', gap: 4 }}>
+                  <div style={{ display: 'flex', gap: 6 }}>
                     <button
                       onClick={() => completeTask(t.tank_id, t.id)}
                       disabled={completingId === t.id}
-                      style={{ fontSize: 11, padding: '2px 8px', borderRadius: 6, border: '0.5px solid var(--green-border)', background: 'var(--green-bg)', color: 'var(--green)', cursor: 'pointer', opacity: completingId === t.id ? 0.5 : 1 }}
+                      style={{ flex: 1, fontSize: 12, padding: '5px 8px', borderRadius: 6, border: '0.5px solid var(--green-border)', background: 'var(--green-bg)', color: 'var(--green)', cursor: 'pointer', opacity: completingId === t.id ? 0.5 : 1 }}
                     >
                       {completingId === t.id ? '…' : 'Done'}
                     </button>
                     <button
                       onClick={() => { setSkipTaskId(skipping ? null : t.id); setSkipTimes('1') }}
-                      style={{ fontSize: 11, padding: '2px 8px', borderRadius: 6, border: '0.5px solid var(--amber-border)', background: skipping ? 'var(--amber-bg)' : 'transparent', color: 'var(--amber)', cursor: 'pointer' }}
+                      style={{ flex: 1, fontSize: 12, padding: '5px 8px', borderRadius: 6, border: '0.5px solid var(--amber-border)', background: skipping ? 'var(--amber-bg)' : 'transparent', color: 'var(--amber)', cursor: 'pointer' }}
                     >Skip</button>
                   </div>
                 </div>
-              </div>
+              ) : (
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 6 }}>
+                  <div style={{ minWidth: 0 }}>
+                    <p style={{ fontSize: 12, fontWeight: 500, color: 'var(--text)', margin: '0 0 2px' }}>{t.task_type}</p>
+                    <p style={{ fontSize: 11, color: 'var(--text-2)', margin: 0 }}>
+                      {tank?.name}{t.is_recurring ? ' ↻' : ''}{t.description ? ` · ${t.description}` : ''}
+                    </p>
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4, flexShrink: 0 }}>
+                    <span style={{ fontSize: 11, color: 'var(--text-3)' }}>{formatDate(t.due_at, dateFormat)}</span>
+                    <div style={{ display: 'flex', gap: 4 }}>
+                      <button
+                        onClick={() => completeTask(t.tank_id, t.id)}
+                        disabled={completingId === t.id}
+                        style={{ fontSize: 11, padding: '2px 8px', borderRadius: 6, border: '0.5px solid var(--green-border)', background: 'var(--green-bg)', color: 'var(--green)', cursor: 'pointer', opacity: completingId === t.id ? 0.5 : 1 }}
+                      >
+                        {completingId === t.id ? '…' : 'Done'}
+                      </button>
+                      <button
+                        onClick={() => { setSkipTaskId(skipping ? null : t.id); setSkipTimes('1') }}
+                        style={{ fontSize: 11, padding: '2px 8px', borderRadius: 6, border: '0.5px solid var(--amber-border)', background: skipping ? 'var(--amber-bg)' : 'transparent', color: 'var(--amber)', cursor: 'pointer' }}
+                      >Skip</button>
+                    </div>
+                  </div>
+                </div>
+              )}
               {skipping && (
                 <div style={{ marginTop: 6, display: 'flex', alignItems: 'center', gap: 6, padding: '6px 8px', borderRadius: 8, background: 'var(--amber-bg)', border: '0.5px solid var(--amber-border)' }}>
                   <span style={{ fontSize: 11, color: 'var(--amber)', whiteSpace: 'nowrap' }}>
@@ -384,7 +402,7 @@ export default function Dashboard() {
       <div style={{ display: 'flex', gap: 20, alignItems: 'flex-start' }}>
         <div style={{ flex: 1, minWidth: 0 }}>
           <p style={{ fontWeight: 500, fontSize: 15, margin: '0 0 12px', color: 'var(--text)' }}>Your Tanks</p>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 16 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(2, 1fr)', gap: 16 }}>
             {orderedTanks.map(t => (
               <TankOverviewCard
                 key={t.id}

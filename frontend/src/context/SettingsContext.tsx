@@ -2,7 +2,7 @@ import { createContext, useContext, useState, useEffect, ReactNode } from 'react
 
 export type DateFormat = 'DD/MM/YYYY' | 'MM/DD/YYYY' | 'YYYY-MM-DD'
 export type Theme = 'light' | 'dark'
-export type UnitSystem = 'mm' | 'cm' | 'm'
+export type UnitSystem = 'mm' | 'cm' | 'm' | 'imperial'
 
 interface SettingsContextValue {
   dateFormat: DateFormat
@@ -15,6 +15,8 @@ interface SettingsContextValue {
   setAlertRetentionDays: (days: number | null) => Promise<void>
   appUrl: string | null
   setAppUrl: (url: string | null) => Promise<void>
+  feedingAmountPresets: string[]
+  setFeedingAmountPresets: (presets: string[]) => Promise<void>
   theme: Theme
   toggleTheme: () => void
   loading: boolean
@@ -31,6 +33,8 @@ const SettingsContext = createContext<SettingsContextValue>({
   setAlertRetentionDays: async () => {},
   appUrl: null,
   setAppUrl: async () => {},
+  feedingAmountPresets: [],
+  setFeedingAmountPresets: async () => {},
   theme: 'light',
   toggleTheme: () => {},
   loading: true,
@@ -42,6 +46,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
   const [defaultTank, setDefaultTankState] = useState<string | null>(null)
   const [alertRetentionDays, setAlertRetentionDaysState] = useState<number | null>(null)
   const [appUrl, setAppUrlState] = useState<string | null>(null)
+  const [feedingAmountPresets, setFeedingAmountPresetsState] = useState<string[]>([])
   const [theme, setTheme] = useState<Theme>(
     () => (localStorage.getItem('theme') as Theme) ?? 'light'
   )
@@ -56,6 +61,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
         setDefaultTankState(d.default_tank_id ?? null)
         setAlertRetentionDaysState(d.alert_retention_days ?? null)
         setAppUrlState(d.app_url ?? null)
+        setFeedingAmountPresetsState(d.feeding_amount_presets ?? [])
       })
       .catch(() => {})
       .finally(() => setLoading(false))
@@ -111,12 +117,21 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     })
   }
 
+  async function setFeedingAmountPresets(presets: string[]) {
+    setFeedingAmountPresetsState(presets)
+    await fetch('/api/settings/', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ feeding_amount_presets: presets }),
+    })
+  }
+
   function toggleTheme() {
     setTheme(t => (t === 'light' ? 'dark' : 'light'))
   }
 
   return (
-    <SettingsContext.Provider value={{ dateFormat, setDateFormat, unitSystem, setUnitSystem, defaultTank, setDefaultTank, alertRetentionDays, setAlertRetentionDays, appUrl, setAppUrl, theme, toggleTheme, loading }}>
+    <SettingsContext.Provider value={{ dateFormat, setDateFormat, unitSystem, setUnitSystem, defaultTank, setDefaultTank, alertRetentionDays, setAlertRetentionDays, appUrl, setAppUrl, feedingAmountPresets, setFeedingAmountPresets, theme, toggleTheme, loading }}>
       {children}
     </SettingsContext.Provider>
   )
@@ -153,12 +168,14 @@ export function formatDateTime(date: string | Date, format: DateFormat): string 
 export function fromMM(mm: number, unit: UnitSystem): number {
   if (unit === 'cm') return mm / 10
   if (unit === 'm') return mm / 1000
+  if (unit === 'imperial') return mm / 25.4
   return mm
 }
 
 export function toMM(value: number, unit: UnitSystem): number {
   if (unit === 'cm') return Math.round(value * 10)
   if (unit === 'm') return Math.round(value * 1000)
+  if (unit === 'imperial') return Math.round(value * 25.4)
   return Math.round(value)
 }
 
@@ -167,11 +184,13 @@ export function fmtDim(mm: number | null | undefined, unit: UnitSystem): string 
   const v = fromMM(mm, unit)
   if (unit === 'mm') return `${v} mm`
   if (unit === 'cm') return `${parseFloat(v.toFixed(1))} cm`
+  if (unit === 'imperial') return `${parseFloat(v.toFixed(2))} in`
   return `${parseFloat(v.toFixed(3))} m`
 }
 
 export function dimInputProps(unit: UnitSystem): { step: string; placeholder: string } {
   if (unit === 'mm') return { step: '1', placeholder: 'e.g. 600' }
   if (unit === 'cm') return { step: '0.1', placeholder: 'e.g. 60' }
+  if (unit === 'imperial') return { step: '0.01', placeholder: 'e.g. 23.62' }
   return { step: '0.001', placeholder: 'e.g. 0.6' }
 }

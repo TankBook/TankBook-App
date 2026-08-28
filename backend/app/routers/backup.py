@@ -1,3 +1,4 @@
+import json
 from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
@@ -5,6 +6,7 @@ from app.database import get_db
 from app.models.models import (
     Tank, TankFish, TankPlant, WaterParameter, MaintenanceTask,
     Alert, DailyTask, JournalEntry, AppSettings, Expense, InventoryItem,
+    Room, RoomTankPosition,
 )
 
 router = APIRouter()
@@ -52,9 +54,11 @@ def export_backup(db: Session = Depends(get_db)):
                       "organism_type": r.organism_type, "fish_status": r.fish_status,
                       "health_status": r.health_status, "food_types": r.food_types,
                       "feeding_times_per_day": r.feeding_times_per_day,
+                      "feeding_amount": r.feeding_amount,
                       "notes": r.notes, "added_at": _dt(r.added_at)}
                      for r in fish],
             "plants": [{"id": r.id, "species_slug": r.species_slug, "quantity": r.quantity,
+                        "plant_status": r.plant_status,
                         "notes": r.notes, "added_at": _dt(r.added_at)}
                        for r in plants],
             "parameters": [{"id": r.id, "ph": r.ph, "ammonia_ppm": r.ammonia_ppm,
@@ -98,6 +102,12 @@ def export_backup(db: Session = Depends(get_db)):
         for e in db.query(Expense).all()
     ]
 
+    rooms_out = [
+        {"id": r.id, "name": r.name, "width_m": r.width_m, "length_m": r.length_m,
+         "tank_positions": [{"tank_id": p.tank_id, "x": p.x, "y": p.y} for p in r.tank_positions]}
+        for r in db.query(Room).all()
+    ]
+
     return {
         "exported_at": datetime.utcnow().isoformat(),
         "version": BACKUP_VERSION,
@@ -107,10 +117,12 @@ def export_backup(db: Session = Depends(get_db)):
             "default_tank_id": settings.default_tank_id if settings else None,
             "alert_retention_days": settings.alert_retention_days if settings else None,
             "app_url": settings.app_url if settings else None,
+            "feeding_amount_presets": settings.feeding_amount_presets if settings else [],
         },
         "tanks": tanks_out,
         "expenses": expenses_out,
         "inventory_items": inventory_out,
+        "rooms": rooms_out,
     }
 
 
@@ -119,13 +131,20 @@ def import_backup(payload: dict, db: Session = Depends(get_db)):
     if payload.get("version") != BACKUP_VERSION:
         raise HTTPException(400, f"Unsupported backup version: {payload.get('version')}. Expected {BACKUP_VERSION}.")
 
-    # Wipe existing data — ORM delete cascades all children
+    # Wipe existing data — ORM delete cascades all children.
+    # MaintenanceTask.parent_task_id self-references another task in the same
+    # cascade, so null those out first or the FK constraint blocks the delete
+    # for any tank with a completed recurring task history.
+    db.query(MaintenanceTask).update({MaintenanceTask.parent_task_id: None})
+    db.commit()
     for tank in db.query(Tank).all():
         db.delete(tank)
     for expense in db.query(Expense).all():
         db.delete(expense)
     for item in db.query(InventoryItem).all():
         db.delete(item)
+    for room in db.query(Room).all():
+        db.delete(room)
     db.commit()
 
     # Restore settings
@@ -139,6 +158,8 @@ def import_backup(payload: dict, db: Session = Depends(get_db)):
     s.default_tank_id = src_settings.get("default_tank_id")
     s.alert_retention_days = src_settings.get("alert_retention_days")
     s.app_url = src_settings.get("app_url")
+    presets = src_settings.get("feeding_amount_presets")
+    s.feeding_amount_presets_json = json.dumps(presets) if presets else None
     db.commit()
 
     tanks_restored = 0
@@ -164,6 +185,7 @@ def import_backup(payload: dict, db: Session = Depends(get_db)):
                 quantity=f["quantity"], organism_type=f.get("organism_type", "fish"),
                 fish_status=f.get("fish_status", "added"), health_status=f.get("health_status", "healthy"),
                 food_types=f.get("food_types"), feeding_times_per_day=f.get("feeding_times_per_day"),
+                feeding_amount=f.get("feeding_amount"),
                 notes=f.get("notes"), added_at=_parse_dt(f.get("added_at")) or datetime.utcnow(),
             ))
         db.flush()
@@ -171,7 +193,8 @@ def import_backup(payload: dict, db: Session = Depends(get_db)):
         for p in t.get("plants", []):
             db.add(TankPlant(
                 id=p["id"], tank_id=tank.id, species_slug=p["species_slug"],
-                quantity=p["quantity"], notes=p.get("notes"),
+                quantity=p["quantity"], plant_status=p.get("plant_status", "planted"),
+                notes=p.get("notes"),
                 added_at=_parse_dt(p.get("added_at")) or datetime.utcnow(),
             ))
 
@@ -244,6 +267,16 @@ def import_backup(payload: dict, db: Session = Depends(get_db)):
             purchase_date=e["purchase_date"], notes=e.get("notes"),
             created_at=_parse_dt(e.get("created_at")) or datetime.utcnow(),
         ))
+
+    # Restore rooms and tank positions (after tanks so tank_id FKs resolve)
+    for r in payload.get("rooms", []):
+        room = Room(
+            id=r["id"], name=r["name"],
+            width_m=r.get("width_m", 3.0), length_m=r.get("length_m", 2.4),
+        )
+        db.add(room)
+        for p in r.get("tank_positions", []):
+            db.add(RoomTankPosition(room_id=room.id, tank_id=p["tank_id"], x=p["x"], y=p["y"]))
 
     db.commit()
     return {"ok": True, "tanks_restored": tanks_restored}

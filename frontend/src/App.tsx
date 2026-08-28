@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react'
 import { BrowserRouter, Routes, Route, Link, useLocation } from 'react-router-dom'
-import { LayoutDashboard, BookOpen, Cog, NotebookPen, ShieldCheck, Calculator, Receipt, Menu, X, Plus, Fish, Droplets, ChevronLeft, Package, Building, type LucideIcon } from 'lucide-react'
+import { LayoutDashboard, BookOpen, Cog, NotebookPen, ShieldCheck, Calculator, Receipt, Menu, X, Plus, Fish, Droplets, ChevronLeft, Package, Building, Sun, Moon, type LucideIcon } from 'lucide-react'
 import { api } from './api/client'
 import RoomLayout from './pages/RoomLayout'
+import RoomDetail from './pages/RoomDetail'
 
 function GitHubIcon({ size = 14 }: { size?: number }) {
   return (
@@ -50,6 +51,14 @@ function QuickAdd() {
   const [mode, setMode] = useState<'pick' | 'tank' | 'param' | 'expense' | 'inventory'>('pick')
   const [tanks, setTanks] = useState<{ id: string; name: string }[]>([])
   const [saving, setSaving] = useState(false)
+  const [isMobile, setIsMobile] = useState(() => window.matchMedia('(max-width: 768px)').matches)
+
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 768px)')
+    const handler = (e: MediaQueryListEvent) => setIsMobile(e.matches)
+    mq.addEventListener('change', handler)
+    return () => mq.removeEventListener('change', handler)
+  }, [])
 
   const [qaName, setQaName] = useState('')
   const [qaVolume, setQaVolume] = useState('')
@@ -137,7 +146,17 @@ function QuickAdd() {
 
   const saveRow = (onClick: () => void, disabled: boolean) => (
     <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 16 }}>
-      <button onClick={onClick} disabled={disabled || saving} style={{ padding: '7px 20px', borderRadius: 8, border: '0.5px solid var(--blue-border)', background: disabled || saving ? 'var(--surface-2)' : 'var(--blue-bg)', color: disabled || saving ? 'var(--text-3)' : 'var(--blue)', fontWeight: 500, fontSize: 13, cursor: disabled || saving ? 'default' : 'pointer' }}>
+      <button
+        onClick={onClick}
+        disabled={disabled || saving}
+        style={{
+          padding: '7px 20px', borderRadius: 8, border: '0.5px solid var(--blue-border)',
+          background: disabled || saving ? 'var(--surface-2)' : 'var(--blue-bg)',
+          color: disabled || saving ? 'var(--text-3)' : 'var(--blue)',
+          fontWeight: 500, fontSize: 13, cursor: disabled || saving ? 'default' : 'pointer',
+          width: isMobile ? '100%' : undefined, boxSizing: 'border-box',
+        }}
+      >
         {saving ? 'Saving…' : 'Save'}
       </button>
     </div>
@@ -321,7 +340,7 @@ function QuickAdd() {
 
 const NAV_LINKS: [string, string, LucideIcon][] = [
   ['/', 'Dashboard', LayoutDashboard],
-  ['/rooms', 'Rooms', Building],
+  ['/rooms', 'Fish Rooms', Building],
   ['/species', 'Species', BookOpen],
   ['/compatibility', 'Compatibility', ShieldCheck],
   ['/journal', 'Tank Journal', NotebookPen],
@@ -334,10 +353,10 @@ function Nav() {
   const { pathname } = useLocation()
   const { theme, toggleTheme } = useSettings()
   const [menuOpen, setMenuOpen] = useState(false)
-  const [isMobile, setIsMobile] = useState(() => window.matchMedia('(max-width: 768px)').matches)
+  const [isMobile, setIsMobile] = useState(() => window.matchMedia('(max-width: 1280px)').matches)
 
   useEffect(() => {
-    const mq = window.matchMedia('(max-width: 768px)')
+    const mq = window.matchMedia('(max-width: 1280px)')
     const handler = (e: MediaQueryListEvent) => { setIsMobile(e.matches); setMenuOpen(false) }
     mq.addEventListener('change', handler)
     return () => mq.removeEventListener('change', handler)
@@ -373,9 +392,9 @@ function Nav() {
         </span>
       </span>
 
-      {!isMobile && NAV_LINKS.map(([to, label, Icon]) => link(to, label, Icon))}
-
-      <span style={{ flex: 1 }} />
+      <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4, minWidth: 0 }}>
+        {!isMobile && NAV_LINKS.map(([to, label, Icon]) => link(to, label, Icon))}
+      </div>
 
       <QuickAdd />
 
@@ -383,13 +402,13 @@ function Nav() {
         onClick={toggleTheme}
         title={theme === 'light' ? 'Switch to dark mode' : 'Switch to light mode'}
         style={{
-          fontSize: 15, padding: '4px 8px',
-          border: '0.5px solid var(--border)', borderRadius: 8,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          padding: '6px', border: '0.5px solid var(--border)', borderRadius: 8,
           background: 'transparent', color: 'var(--text-2)',
-          cursor: 'pointer', lineHeight: 1, marginRight: 4,
+          cursor: 'pointer', lineHeight: 0, marginRight: 4,
         }}
       >
-        {theme === 'light' ? '☾' : '☀'}
+        {theme === 'light' ? <Moon size={16} /> : <Sun size={16} />}
       </button>
 
       {isMobile ? (
@@ -471,6 +490,7 @@ export default function App() {
             <Routes>
               <Route path="/" element={<Dashboard />} />
               <Route path="/rooms" element={<RoomLayout />} />
+              <Route path="/rooms/:id" element={<RoomDetail />} />
               <Route path="/tanks/:id" element={<TankDetail />} />
               <Route path="/species" element={<SpeciesBrowser />} />
               <Route path="/compatibility" element={<CompatibilityChecker />} />

@@ -37,6 +37,7 @@ class TankFishCreate(BaseModel):
     health_status: str = "healthy"
     food_types: str | None = None
     feeding_times_per_day: int | None = None
+    feeding_amount: str | None = None
     notes: str | None = None
 
 
@@ -47,6 +48,7 @@ class TankFishUpdate(BaseModel):
     health_status: str | None = None
     food_types: str | None = None
     feeding_times_per_day: int | None = None
+    feeding_amount: str | None = None
     notes: str | None = None
 
 
@@ -202,6 +204,7 @@ class AppSettingsUpdate(BaseModel):
     default_tank_id: str | None = None
     alert_retention_days: int | None = None
     app_url: str | None = None
+    feeding_amount_presets: list[str] | None = None
 
 
 class AppSettingsOut(BaseModel):
@@ -210,8 +213,51 @@ class AppSettingsOut(BaseModel):
     default_tank_id: str | None = None
     alert_retention_days: int | None = None
     app_url: str | None = None
+    feeding_amount_presets: list[str] = []
     updated_at: datetime
     model_config = {"from_attributes": True}
+
+
+class SettingsStatsOut(BaseModel):
+    species_count: int
+    image_count: int
+    storage_bytes: int
+
+
+# --- Rooms ---
+
+class RoomCreate(BaseModel):
+    name: str
+    width_m: float = 3.0
+    length_m: float = 2.4
+
+
+class RoomUpdate(BaseModel):
+    name: str | None = None
+    width_m: float | None = None
+    length_m: float | None = None
+
+
+class RoomTankPositionOut(BaseModel):
+    tank_id: str
+    x: float
+    y: float
+    model_config = {"from_attributes": True}
+
+
+class RoomOut(BaseModel):
+    id: str
+    name: str
+    width_m: float
+    length_m: float
+    tank_positions: list[RoomTankPositionOut] = []
+    model_config = {"from_attributes": True}
+
+
+class RoomTankPositionUpsert(BaseModel):
+    room_id: str
+    x: float
+    y: float
 
 
 # --- Expenses ---

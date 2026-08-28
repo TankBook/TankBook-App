@@ -1,3 +1,4 @@
+import json
 import uuid
 from datetime import datetime
 from sqlalchemy import String, Integer, Float, Boolean, Text, ForeignKey, DateTime
@@ -37,6 +38,7 @@ class Tank(Base):
     alerts: Mapped[list["Alert"]] = relationship(back_populates="tank", cascade="all, delete-orphan")
     daily_tasks: Mapped[list["DailyTask"]] = relationship(back_populates="tank", cascade="all, delete-orphan")
     journal_entries: Mapped[list["JournalEntry"]] = relationship(back_populates="tank", cascade="all, delete-orphan")
+    room_position: Mapped["RoomTankPosition | None"] = relationship(back_populates="tank", cascade="all, delete-orphan")
 
 
 class TankFish(Base):
@@ -51,6 +53,7 @@ class TankFish(Base):
     health_status: Mapped[str] = mapped_column(String, default="healthy")
     food_types: Mapped[str | None] = mapped_column(Text)
     feeding_times_per_day: Mapped[int | None] = mapped_column(Integer)
+    feeding_amount: Mapped[str | None] = mapped_column(String)
     added_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     notes: Mapped[str | None] = mapped_column(Text)
 
@@ -177,7 +180,14 @@ class AppSettings(Base):
     default_tank_id: Mapped[str | None] = mapped_column(String, nullable=True)
     alert_retention_days: Mapped[int | None] = mapped_column(Integer, nullable=True)
     app_url: Mapped[str | None] = mapped_column(String, nullable=True)
+    feeding_amount_presets_json: Mapped[str | None] = mapped_column(Text, nullable=True)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    @property
+    def feeding_amount_presets(self) -> list[str]:
+        if not self.feeding_amount_presets_json:
+            return []
+        return json.loads(self.feeding_amount_presets_json)
 
 
 class Expense(Base):
@@ -192,6 +202,31 @@ class Expense(Base):
     purchase_date: Mapped[str] = mapped_column(String, nullable=False)
     notes: Mapped[str | None] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
+class Room(Base):
+    __tablename__ = "rooms"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=new_uuid)
+    name: Mapped[str] = mapped_column(String, nullable=False)
+    width_m: Mapped[float] = mapped_column(Float, default=3.0)
+    length_m: Mapped[float] = mapped_column(Float, default=2.4)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    tank_positions: Mapped[list["RoomTankPosition"]] = relationship(back_populates="room", cascade="all, delete-orphan")
+
+
+class RoomTankPosition(Base):
+    __tablename__ = "room_tank_positions"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=new_uuid)
+    room_id: Mapped[str] = mapped_column(String, ForeignKey("rooms.id", ondelete="CASCADE"), nullable=False)
+    tank_id: Mapped[str] = mapped_column(String, ForeignKey("tanks.id", ondelete="CASCADE"), nullable=False, unique=True)
+    x: Mapped[float] = mapped_column(Float, nullable=False)
+    y: Mapped[float] = mapped_column(Float, nullable=False)
+
+    room: Mapped["Room"] = relationship(back_populates="tank_positions")
+    tank: Mapped["Tank"] = relationship(back_populates="room_position")
 
 
 class InventoryItem(Base):

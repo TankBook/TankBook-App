@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Plus, Pencil, Trash2, Minus, PackagePlus, AlertTriangle } from 'lucide-react'
 import { api, InventoryItem } from '../api/client'
 import { useInventory } from '../hooks'
@@ -26,6 +26,14 @@ export default function Inventory() {
   const { data: items, reload } = useInventory()
 
   const [selectedCategory, setSelectedCategory] = useState<InventoryItem['category']>(CATEGORIES[0])
+  const [isMobile, setIsMobile] = useState(() => window.matchMedia('(max-width: 768px)').matches)
+
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 768px)')
+    const handler = (e: MediaQueryListEvent) => setIsMobile(e.matches)
+    mq.addEventListener('change', handler)
+    return () => mq.removeEventListener('change', handler)
+  }, [])
 
   const [editing, setEditing] = useState<InventoryItem | 'new' | null>(null)
   const [formName, setFormName] = useState('')
@@ -104,6 +112,59 @@ export default function Inventory() {
 
   function itemRow(item: InventoryItem) {
     const low = item.quantity <= item.low_stock_threshold
+
+    const quantityControls = (
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+        <button onClick={() => adjust(item, -1)} disabled={item.quantity === 0} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 24, height: 24, borderRadius: 6, border: '0.5px solid var(--btn-border)', background: 'transparent', color: 'var(--text-2)', cursor: item.quantity === 0 ? 'default' : 'pointer', opacity: item.quantity === 0 ? 0.4 : 1 }}>
+          <Minus size={12} />
+        </button>
+        <span style={{ fontSize: 13, fontWeight: 600, color: low ? 'var(--red)' : 'var(--text)', minWidth: 56, textAlign: 'center' }}>
+          {item.quantity}{item.unit_label ? ` ${item.unit_label}` : ''}
+        </span>
+        <button onClick={() => adjust(item, 1)} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 24, height: 24, borderRadius: 6, border: '0.5px solid var(--btn-border)', background: 'transparent', color: 'var(--text-2)', cursor: 'pointer' }}>
+          <Plus size={12} />
+        </button>
+      </div>
+    )
+
+    const restockButton = (
+      <button onClick={() => openRestock(item)} title="Restock" style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, padding: '4px 10px', borderRadius: 6, border: '0.5px solid var(--blue-border)', background: 'var(--blue-bg)', color: 'var(--blue)', cursor: 'pointer', flexShrink: 0 }}>
+        <PackagePlus size={12} />Restock
+      </button>
+    )
+
+    const editDeleteButtons = (
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0 }}>
+        <button onClick={() => openEdit(item)} title="Edit" style={{ lineHeight: 0, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-3)' }}>
+          <Pencil size={13} />
+        </button>
+        <button onClick={() => setDeleteTarget(item)} title="Delete" style={{ lineHeight: 0, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--red)' }}>
+          <Trash2 size={13} />
+        </button>
+      </div>
+    )
+
+    if (isMobile) {
+      return (
+        <div key={item.id} style={{ padding: '10px 0', borderBottom: '0.5px solid var(--border-sub)', display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <div>
+            <span style={{ fontSize: 13, color: 'var(--text)', fontWeight: 500 }}>{item.name}</span>
+            {low && (
+              <Tag bg="var(--red-bg)" color="var(--red)" compact style={{ marginLeft: 8 }}>Low stock</Tag>
+            )}
+            {item.notes && <p style={{ margin: '2px 0 0', fontSize: 11, color: 'var(--text-3)' }}>{item.notes}</p>}
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
+            {quantityControls}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              {restockButton}
+              {editDeleteButtons}
+            </div>
+          </div>
+        </div>
+      )
+    }
+
     return (
       <div key={item.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 0', borderBottom: '0.5px solid var(--border-sub)' }}>
         <div style={{ flex: 1, minWidth: 0 }}>
@@ -113,29 +174,9 @@ export default function Inventory() {
           )}
           {item.notes && <p style={{ margin: '2px 0 0', fontSize: 11, color: 'var(--text-3)' }}>{item.notes}</p>}
         </div>
-
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
-          <button onClick={() => adjust(item, -1)} disabled={item.quantity === 0} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 24, height: 24, borderRadius: 6, border: '0.5px solid var(--btn-border)', background: 'transparent', color: 'var(--text-2)', cursor: item.quantity === 0 ? 'default' : 'pointer', opacity: item.quantity === 0 ? 0.4 : 1 }}>
-            <Minus size={12} />
-          </button>
-          <span style={{ fontSize: 13, fontWeight: 600, color: low ? 'var(--red)' : 'var(--text)', minWidth: 56, textAlign: 'center' }}>
-            {item.quantity}{item.unit_label ? ` ${item.unit_label}` : ''}
-          </span>
-          <button onClick={() => adjust(item, 1)} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 24, height: 24, borderRadius: 6, border: '0.5px solid var(--btn-border)', background: 'transparent', color: 'var(--text-2)', cursor: 'pointer' }}>
-            <Plus size={12} />
-          </button>
-        </div>
-
-        <button onClick={() => openRestock(item)} title="Restock" style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, padding: '4px 10px', borderRadius: 6, border: '0.5px solid var(--blue-border)', background: 'var(--blue-bg)', color: 'var(--blue)', cursor: 'pointer', flexShrink: 0 }}>
-          <PackagePlus size={12} />Restock
-        </button>
-
-        <button onClick={() => openEdit(item)} title="Edit" style={{ lineHeight: 0, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-3)', flexShrink: 0 }}>
-          <Pencil size={13} />
-        </button>
-        <button onClick={() => setDeleteTarget(item)} title="Delete" style={{ lineHeight: 0, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--red)', flexShrink: 0 }}>
-          <Trash2 size={13} />
-        </button>
+        {quantityControls}
+        {restockButton}
+        {editDeleteButtons}
       </div>
     )
   }
@@ -152,7 +193,7 @@ export default function Inventory() {
         </button>
       </div>
 
-      <div style={{ display: 'flex', gap: 20, alignItems: 'flex-start', flexWrap: 'wrap' }}>
+      <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', gap: 20, alignItems: isMobile ? 'stretch' : 'flex-start' }}>
         {/* Main content */}
         <div style={{ flex: 1, minWidth: 0 }}>
           {lowStock.length > 0 && (
@@ -174,7 +215,7 @@ export default function Inventory() {
         </div>
 
         {/* Category menu */}
-        <div style={{ width: 200, flexShrink: 0 }}>
+        <div style={{ width: isMobile ? '100%' : 200, flexShrink: 0 }}>
           <Card>
             <SectionTitle muted>Categories</SectionTitle>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>

@@ -23,15 +23,17 @@ const CALCULATORS: CalcDef[] = [
 
 type TankShape = 'rectangular' | 'cylinder'
 
-function toCm(v: number, unit: 'mm' | 'cm' | 'm'): number {
+function toCm(v: number, unit: 'mm' | 'cm' | 'm' | 'imperial'): number {
   if (unit === 'mm') return v / 10
   if (unit === 'm')  return v * 100
+  if (unit === 'imperial') return v * 2.54
   return v
 }
 
-function fmtSurface(cm2: number, unit: 'mm' | 'cm' | 'm'): string {
+function fmtSurface(cm2: number, unit: 'mm' | 'cm' | 'm' | 'imperial'): string {
   if (unit === 'mm') return `${(cm2 * 100).toFixed(0)} mm²`
   if (unit === 'm')  return `${(cm2 / 10000).toFixed(4)} m²`
+  if (unit === 'imperial') return `${(cm2 / 6.4516).toFixed(2)} in²`
   return `${cm2.toFixed(0)} cm²`
 }
 
