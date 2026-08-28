@@ -1,8 +1,8 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
 import { useParams, Link, useNavigate, useSearchParams } from 'react-router-dom'
-import { Fish, Leaf, Droplets, CalendarCheck, Bell, Pencil, Trash2, Plus, ChevronLeft, ChevronDown, ListChecks, Camera, X, Utensils, BookOpen, FlaskConical, Thermometer, Lightbulb, Filter, Home, Clock, Calendar, ChevronLeft as Prev, ChevronRight as Next, Save, type LucideIcon } from 'lucide-react'
+import { Fish, Leaf, Droplets, CalendarCheck, Bell, Pencil, Trash2, Plus, ChevronLeft, ChevronDown, ListChecks, Camera, X, Utensils, BookOpen, FlaskConical, Thermometer, Lightbulb, Filter, Home, Clock, Calendar, ChevronLeft as Prev, ChevronRight as Next, Save, Target, type LucideIcon } from 'lucide-react'
 import {
-  LineChart, Line, XAxis, YAxis, Tooltip,
+  LineChart, Line, XAxis, YAxis, Tooltip, ReferenceLine,
   ResponsiveContainer,
 } from 'recharts'
 import { useTank, useFish, usePlants, useParameters, useAlerts } from '../hooks'
@@ -985,6 +985,7 @@ export default function TankDetail() {
   const [sg, setSg] = useState('')
   const [stripModal, setStripModal] = useState<{ label: string; setter: (v: string) => void } | null>(null)
   const [stripKit, setStripKit] = useState<'master' | '5in1'>('master')
+  const [hiddenOptimumLines, setHiddenOptimumLines] = useState<Record<string, boolean>>({})
 
   const [dailyTasks, setDailyTasks] = useState<any[]>([])
   const [dtName, setDtName] = useState('')
@@ -1840,23 +1841,56 @@ ${taskRows ? `<h2>Pending Maintenance</h2>
                   { key: 'salinity_ppt', label: 'Salinity (ppt)', color: '#1abc9c', domain: [0, 45] },
                   { key: 'specific_gravity', label: 'Specific Gravity', color: '#16a085', domain: [1.000, 1.035] },
                 ] : []),
-              ].filter(({ key }) => chartData.some((d: any) => d[key] != null)).map(({ key, label: lbl, color, domain }) => (
-                <Card key={key}>
-                  <SectionTitle>{lbl}</SectionTitle>
-                  <ResponsiveContainer width="100%" height={160}>
-                    <LineChart data={chartData} margin={{ top: 4, right: 8, left: -20, bottom: 0 }}>
-                      <XAxis dataKey="recorded_at" tickFormatter={v => formatDate(v, dateFormat)} tick={{ fontSize: 11, fill: 'var(--text-2)' }} />
-                      <YAxis domain={domain as [number, number]} tick={{ fontSize: 11, fill: 'var(--text-2)' }} />
-                      <Tooltip
-                        formatter={(v: number) => v.toFixed(2)}
-                        labelFormatter={v => formatDateTime(v, dateFormat)}
-                        contentStyle={{ background: 'var(--surface)', border: '0.5px solid var(--border)', borderRadius: 8, fontSize: 12, color: 'var(--text)' }}
-                      />
-                      <Line type="monotone" dataKey={key} stroke={color} dot={chartData.length < 15} strokeWidth={1.5} />
-                    </LineChart>
-                  </ResponsiveContainer>
-                </Card>
-              ))}
+              ].filter(({ key }) => chartData.some((d: any) => d[key] != null)).map(({ key, label: lbl, color, domain }) => {
+                const range = getParamRange(key, tank.water_type)
+                const optimum = range ? (range.idealMin + range.idealMax) / 2 : null
+                const showOptimum = optimum != null && !hiddenOptimumLines[key]
+                return (
+                  <Card key={key}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginBottom: 12 }}>
+                      <p style={{ fontWeight: 500, fontSize: 14, margin: 0, color: 'var(--text)' }}>
+                        {lbl}
+                        {showOptimum && (
+                          <span style={{ fontSize: 12, fontWeight: 400, color: 'var(--text-3)', marginLeft: 8 }}>
+                            Optimum: {optimum!.toFixed(2)}
+                          </span>
+                        )}
+                      </p>
+                      {optimum != null && (
+                        <button
+                          type="button"
+                          title={showOptimum ? 'Hide optimum line' : 'Show optimum line'}
+                          onClick={() => setHiddenOptimumLines(prev => ({ ...prev, [key]: !prev[key] }))}
+                          style={{
+                            display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '4px 8px', borderRadius: 6,
+                            border: `0.5px solid ${showOptimum ? 'var(--blue-border)' : 'var(--btn-border)'}`,
+                            background: showOptimum ? 'var(--blue-bg)' : 'transparent',
+                            color: showOptimum ? 'var(--blue)' : 'var(--text-3)',
+                            cursor: 'pointer', flexShrink: 0,
+                          }}
+                        >
+                          <Target size={13} />
+                        </button>
+                      )}
+                    </div>
+                    <ResponsiveContainer width="100%" height={160}>
+                      <LineChart data={chartData} margin={{ top: 4, right: 8, left: -20, bottom: 0 }}>
+                        <XAxis dataKey="recorded_at" tickFormatter={v => formatDate(v, dateFormat)} tick={{ fontSize: 11, fill: 'var(--text-2)' }} interval={0} />
+                        <YAxis domain={domain as [number, number]} tick={{ fontSize: 11, fill: 'var(--text-2)' }} />
+                        <Tooltip
+                          formatter={(v: number) => v.toFixed(2)}
+                          labelFormatter={v => formatDateTime(v, dateFormat)}
+                          contentStyle={{ background: 'var(--surface)', border: '0.5px solid var(--border)', borderRadius: 8, fontSize: 12, color: 'var(--text)' }}
+                        />
+                        {showOptimum && (
+                          <ReferenceLine y={optimum!} stroke="var(--text-3)" strokeDasharray="4 4" strokeWidth={1} />
+                        )}
+                        <Line type="monotone" dataKey={key} stroke={color} dot={chartData.length < 15} strokeWidth={1.5} />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </Card>
+                )
+              })}
             </>
           )}
         </div>
