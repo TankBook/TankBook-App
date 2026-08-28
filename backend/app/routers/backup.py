@@ -1,3 +1,4 @@
+import json
 from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
@@ -52,9 +53,11 @@ def export_backup(db: Session = Depends(get_db)):
                       "organism_type": r.organism_type, "fish_status": r.fish_status,
                       "health_status": r.health_status, "food_types": r.food_types,
                       "feeding_times_per_day": r.feeding_times_per_day,
+                      "feeding_amount": r.feeding_amount,
                       "notes": r.notes, "added_at": _dt(r.added_at)}
                      for r in fish],
             "plants": [{"id": r.id, "species_slug": r.species_slug, "quantity": r.quantity,
+                        "plant_status": r.plant_status,
                         "notes": r.notes, "added_at": _dt(r.added_at)}
                        for r in plants],
             "parameters": [{"id": r.id, "ph": r.ph, "ammonia_ppm": r.ammonia_ppm,
@@ -107,6 +110,7 @@ def export_backup(db: Session = Depends(get_db)):
             "default_tank_id": settings.default_tank_id if settings else None,
             "alert_retention_days": settings.alert_retention_days if settings else None,
             "app_url": settings.app_url if settings else None,
+            "feeding_amount_presets": settings.feeding_amount_presets if settings else [],
         },
         "tanks": tanks_out,
         "expenses": expenses_out,
@@ -139,6 +143,8 @@ def import_backup(payload: dict, db: Session = Depends(get_db)):
     s.default_tank_id = src_settings.get("default_tank_id")
     s.alert_retention_days = src_settings.get("alert_retention_days")
     s.app_url = src_settings.get("app_url")
+    presets = src_settings.get("feeding_amount_presets")
+    s.feeding_amount_presets_json = json.dumps(presets) if presets else None
     db.commit()
 
     tanks_restored = 0
@@ -164,6 +170,7 @@ def import_backup(payload: dict, db: Session = Depends(get_db)):
                 quantity=f["quantity"], organism_type=f.get("organism_type", "fish"),
                 fish_status=f.get("fish_status", "added"), health_status=f.get("health_status", "healthy"),
                 food_types=f.get("food_types"), feeding_times_per_day=f.get("feeding_times_per_day"),
+                feeding_amount=f.get("feeding_amount"),
                 notes=f.get("notes"), added_at=_parse_dt(f.get("added_at")) or datetime.utcnow(),
             ))
         db.flush()
@@ -171,7 +178,8 @@ def import_backup(payload: dict, db: Session = Depends(get_db)):
         for p in t.get("plants", []):
             db.add(TankPlant(
                 id=p["id"], tank_id=tank.id, species_slug=p["species_slug"],
-                quantity=p["quantity"], notes=p.get("notes"),
+                quantity=p["quantity"], plant_status=p.get("plant_status", "planted"),
+                notes=p.get("notes"),
                 added_at=_parse_dt(p.get("added_at")) or datetime.utcnow(),
             ))
 
