@@ -35,6 +35,7 @@ import LivestockJournal from './pages/LivestockJournal'
 import CompatibilityChecker from './pages/CompatibilityChecker'
 import Calculators from './pages/Calculators'
 import Inventory from './pages/Inventory'
+import UpdateToast from './components/UpdateToast'
 import { SettingsProvider, useSettings } from './context/SettingsContext'
 
 const QA_CATEGORIES = ['Equipment', 'Livestock', 'Plants', 'Food', 'Chemicals', 'Medication', 'Decor', 'Subscription', 'Other']
@@ -503,6 +504,7 @@ export default function App() {
           </div>
           <Footer />
         </div>
+        <UpdateToast />
       </BrowserRouter>
     </SettingsProvider>
   )
