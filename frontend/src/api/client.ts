@@ -7,6 +7,7 @@ export interface Tank {
   water_type: string
   substrate: string | null
   lighting: string | null
+  has_filter: boolean
   filter_flow_lph: number | null
   width_mm: number | null
   height_mm: number | null
@@ -16,6 +17,7 @@ export interface Tank {
   co2_method: string | null
   has_heater: boolean
   heater_watts: number | null
+  has_lighting: boolean
   light_intensity: string | null
   light_watts: number | null
   light_technology: string | null

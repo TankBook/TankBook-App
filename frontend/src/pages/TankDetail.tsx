@@ -437,12 +437,12 @@ function EditTankPanel({ tank, onSave }: { tank: any; onSave: () => void }) {
   const [volume, setVolume] = useState(String(tank.volume_litres))
   const [waterType, setWaterType] = useState(tank.water_type ?? 'freshwater')
   const [substrate, setSubstrate] = useState(tank.substrate ?? '')
-  const [hasLighting, setHasLighting] = useState(!!(tank.light_intensity || tank.light_watts || tank.light_technology || tank.lighting))
+  const [hasLighting, setHasLighting] = useState(tank.has_lighting)
   const [lightIntensity, setLightIntensity] = useState(tank.light_intensity ?? '')
   const [lightWatts, setLightWatts] = useState(tank.light_watts != null ? String(tank.light_watts) : '')
   const [lightTechnology, setLightTechnology] = useState(tank.light_technology ?? '')
   const [filterFlow, setFilterFlow] = useState(tank.filter_flow_lph != null ? String(tank.filter_flow_lph) : '')
-  const [hasFilter, setHasFilter] = useState(!!tank.filter_flow_lph)
+  const [hasFilter, setHasFilter] = useState(tank.has_filter)
   const [width, setWidth] = useState(tank.width_mm != null ? String(fromMM(tank.width_mm, unitSystem)) : '')
   const [height, setHeight] = useState(tank.height_mm != null ? String(fromMM(tank.height_mm, unitSystem)) : '')
   const [depth, setDepth] = useState(tank.depth_mm != null ? String(fromMM(tank.depth_mm, unitSystem)) : '')
@@ -471,6 +471,7 @@ function EditTankPanel({ tank, onSave }: { tank: any; onSave: () => void }) {
         name, volume_litres: Number(volume),
         water_type: waterType,
         substrate: substrate || null,
+        has_filter: hasFilter,
         filter_flow_lph: hasFilter && filterFlow ? Number(filterFlow) : null,
         width_mm: width ? toMM(Number(width), unitSystem) : null,
         height_mm: height ? toMM(Number(height), unitSystem) : null,
@@ -480,6 +481,7 @@ function EditTankPanel({ tank, onSave }: { tank: any; onSave: () => void }) {
         co2_method: co2 && co2Method ? co2Method : null,
         has_heater: hasHeater,
         heater_watts: hasHeater && heaterWatts ? Number(heaterWatts) : null,
+        has_lighting: hasLighting,
         light_intensity: hasLighting && lightIntensity ? lightIntensity : null,
         light_watts: hasLighting && lightWatts ? Number(lightWatts) : null,
         light_technology: hasLighting && lightTechnology ? lightTechnology : null,
