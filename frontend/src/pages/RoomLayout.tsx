@@ -191,7 +191,7 @@ export default function RoomLayout() {
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <Building size={20} />
           <div>
-            <p style={{ margin: 0, fontSize: 22, fontWeight: 700, color: 'var(--text)' }}>Room layout</p>
+            <p style={{ margin: 0, fontSize: 22, fontWeight: 700, color: 'var(--text)' }}>Fish Rooms</p>
             <p style={{ margin: '4px 0 0', color: 'var(--text-2)', fontSize: 13 }}>Organize your tanks by room and drag tanks between spaces.</p>
           </div>
         </div>
