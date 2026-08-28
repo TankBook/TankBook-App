@@ -37,6 +37,7 @@ class TankFishCreate(BaseModel):
     health_status: str = "healthy"
     food_types: str | None = None
     feeding_times_per_day: int | None = None
+    feeding_amount: str | None = None
     notes: str | None = None
 
 
@@ -47,6 +48,7 @@ class TankFishUpdate(BaseModel):
     health_status: str | None = None
     food_types: str | None = None
     feeding_times_per_day: int | None = None
+    feeding_amount: str | None = None
     notes: str | None = None
 
 
@@ -202,6 +204,7 @@ class AppSettingsUpdate(BaseModel):
     default_tank_id: str | None = None
     alert_retention_days: int | None = None
     app_url: str | None = None
+    feeding_amount_presets: list[str] | None = None
 
 
 class AppSettingsOut(BaseModel):
@@ -210,6 +213,7 @@ class AppSettingsOut(BaseModel):
     default_tank_id: str | None = None
     alert_retention_days: int | None = None
     app_url: str | None = None
+    feeding_amount_presets: list[str] = []
     updated_at: datetime
     model_config = {"from_attributes": True}
 

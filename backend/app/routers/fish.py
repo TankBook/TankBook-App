@@ -20,6 +20,7 @@ def _enrich(row: TankFish) -> dict:
         "health_status": row.health_status,
         "food_types": row.food_types,
         "feeding_times_per_day": row.feeding_times_per_day,
+        "feeding_amount": row.feeding_amount,
         "notes": row.notes,
         "added_at": row.added_at,
         "common_name": species.get("common_name"),

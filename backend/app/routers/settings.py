@@ -1,3 +1,5 @@
+import json
+
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 from app.database import get_db
@@ -33,6 +35,9 @@ def update_settings(body: AppSettingsUpdate, db: Session = Depends(get_db)):
         data.pop("date_format")
     if "unit_system" in data and data["unit_system"] not in VALID_UNIT_SYSTEMS:
         data.pop("unit_system")
+    if "feeding_amount_presets" in data:
+        presets = data.pop("feeding_amount_presets")
+        settings.feeding_amount_presets_json = json.dumps(presets) if presets else None
     for k, v in data.items():
         setattr(settings, k, v)
     db.commit()

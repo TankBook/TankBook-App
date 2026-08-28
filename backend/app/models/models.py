@@ -1,3 +1,4 @@
+import json
 import uuid
 from datetime import datetime
 from sqlalchemy import String, Integer, Float, Boolean, Text, ForeignKey, DateTime
@@ -51,6 +52,7 @@ class TankFish(Base):
     health_status: Mapped[str] = mapped_column(String, default="healthy")
     food_types: Mapped[str | None] = mapped_column(Text)
     feeding_times_per_day: Mapped[int | None] = mapped_column(Integer)
+    feeding_amount: Mapped[str | None] = mapped_column(String)
     added_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     notes: Mapped[str | None] = mapped_column(Text)
 
@@ -177,7 +179,14 @@ class AppSettings(Base):
     default_tank_id: Mapped[str | None] = mapped_column(String, nullable=True)
     alert_retention_days: Mapped[int | None] = mapped_column(Integer, nullable=True)
     app_url: Mapped[str | None] = mapped_column(String, nullable=True)
+    feeding_amount_presets_json: Mapped[str | None] = mapped_column(Text, nullable=True)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    @property
+    def feeding_amount_presets(self) -> list[str]:
+        if not self.feeding_amount_presets_json:
+            return []
+        return json.loads(self.feeding_amount_presets_json)
 
 
 class Expense(Base):
