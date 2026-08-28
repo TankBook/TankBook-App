@@ -1,8 +1,17 @@
 import { useState, useRef, useEffect } from 'react'
-import { CalendarDays, Ruler, Info, Download, Upload, Droplets, RefreshCw, Bell, Globe, Utensils, X } from 'lucide-react'
+import { CalendarDays, Ruler, Info, Download, Upload, Droplets, RefreshCw, Bell, Globe, Utensils, X, AlertTriangle, HardDrive, Fish, Image as ImageIcon } from 'lucide-react'
 import { useSettings, formatDate, DateFormat, UnitSystem } from '../context/SettingsContext'
-import { Card } from '../components/ui'
+import { Card, Modal, StatCard } from '../components/ui'
 import { api, Tank } from '../api/client'
+
+function formatBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`
+  const units = ['KB', 'MB', 'GB', 'TB']
+  let value = bytes
+  let unitIndex = -1
+  do { value /= 1024; unitIndex++ } while (value >= 1024 && unitIndex < units.length - 1)
+  return `${value.toFixed(1)} ${units[unitIndex]}`
+}
 
 const APP_VERSION = '0.7.0'
 const GITHUB_REPO = 'TankBook/TankBook-App'
@@ -101,6 +110,16 @@ export default function Settings() {
     }
   }
 
+  function resetToDefaults() {
+    setDraftDateFormat('DD/MM/YYYY')
+    setDraftUnitSystem('mm')
+    setDraftDefaultTank('')
+    setDraftAlertRetentionDays(null)
+    setDraftAppUrl('')
+    setDraftFeedingAmountPresets(['1 pinch', '1 cube'])
+    setSettingsSaved(false)
+  }
+
   const [checking, setChecking] = useState(false)
   const [updateStatus, setUpdateStatus] = useState<'idle' | 'up-to-date' | 'available' | 'no-releases' | 'error'>('idle')
   const [latestVersion, setLatestVersion] = useState<string | null>(null)
@@ -125,13 +144,26 @@ export default function Settings() {
     }
   }
 
+  const [stats, setStats] = useState<{ species_count: number; image_count: number; storage_bytes: number } | null>(null)
+  useEffect(() => {
+    fetch('/api/settings/stats').then(res => res.json()).then(setStats).catch(() => {})
+  }, [])
+
   const [exporting, setExporting] = useState(false)
   const [importing, setImporting] = useState(false)
   const [importResult, setImportResult] = useState<{ ok: boolean; tanks_restored: number } | null>(null)
   const [importError, setImportError] = useState<string | null>(null)
   const [importFile, setImportFile] = useState<File | null>(null)
-  const [confirmImport, setConfirmImport] = useState(false)
+  const [showImportModal, setShowImportModal] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
+
+  function closeImportModal() {
+    setShowImportModal(false)
+    setImportFile(null)
+    setImportResult(null)
+    setImportError(null)
+    if (fileRef.current) fileRef.current.value = ''
+  }
 
   async function handleExport() {
     setExporting(true)
@@ -155,7 +187,6 @@ export default function Settings() {
     setImporting(true)
     setImportResult(null)
     setImportError(null)
-    setConfirmImport(false)
     try {
       const text = await importFile.text()
       const data = JSON.parse(text)
@@ -181,7 +212,7 @@ export default function Settings() {
         App-wide settings for TankBook. There are no user accounts, so these apply to everyone using this instance.
       </p>
 
-      <Card style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 28, padding: 24 }}>
+      <Card style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 16, padding: 24 }}>
 
         <section style={{ paddingBottom: 20, borderBottom: '0.5px solid var(--border-sub)' }}>
           <p style={{ fontWeight: 500, fontSize: 14, margin: '0 0 4px', color: 'var(--text)', display: 'flex', alignItems: 'center', gap: 6 }}><Droplets size={14} color="var(--text-2)" />Default Tank</p>
@@ -200,8 +231,6 @@ export default function Settings() {
           </select>
         </section>
 
-        {/* Left column — display preferences */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 16, justifyContent: 'space-between', alignSelf: 'stretch' }}>
         <section style={{ paddingBottom: 20, borderBottom: '0.5px solid var(--border-sub)' }}>
           <p style={{ fontWeight: 500, fontSize: 14, margin: '0 0 4px', color: 'var(--text)', display: 'flex', alignItems: 'center', gap: 6 }}><CalendarDays size={14} color="var(--text-2)" />Date Format</p>
           <p style={{ fontSize: 12, color: 'var(--text-2)', margin: '0 0 14px' }}>
@@ -214,8 +243,8 @@ export default function Settings() {
                 style={{
                   display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                   padding: '10px 12px', borderRadius: 8, cursor: 'pointer',
-                    border: draftDateFormat === opt.value ? '1px solid var(--blue-border)' : '0.5px solid var(--border)',
-                    background: draftDateFormat === opt.value ? 'var(--blue-bg)' : 'transparent',
+                  border: draftDateFormat === opt.value ? '1px solid var(--blue-border)' : '0.5px solid var(--border)',
+                  background: draftDateFormat === opt.value ? 'var(--blue-bg)' : 'transparent',
                 }}
               >
                 <span style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -299,29 +328,11 @@ export default function Settings() {
           />
         </section>
 
-        <section style={{ paddingBottom: 20 }}>
+        <section style={{ paddingBottom: 20, borderBottom: '0.5px solid var(--border-sub)' }}>
           <p style={{ fontWeight: 500, fontSize: 14, margin: '0 0 4px', color: 'var(--text)', display: 'flex', alignItems: 'center', gap: 6 }}><Utensils size={14} color="var(--text-2)" />Feeding Amounts</p>
           <p style={{ fontSize: 12, color: 'var(--text-2)', margin: '0 0 14px' }}>
             Presets for how much to feed. These become selectable when editing an inhabitant's feeding info.
           </p>
-          {draftFeedingAmountPresets.length > 0 && (
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 10 }}>
-              {draftFeedingAmountPresets.map(preset => (
-                <span
-                  key={preset}
-                  style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 12, padding: '4px 6px 4px 10px', borderRadius: 999, background: 'var(--surface-2)', border: '0.5px solid var(--border)', color: 'var(--text)' }}
-                >
-                  {preset}
-                  <button
-                    onClick={() => setDraftFeedingAmountPresets(draftFeedingAmountPresets.filter(p => p !== preset))}
-                    style={{ display: 'flex', alignItems: 'center', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-3)', padding: 2, lineHeight: 0 }}
-                  >
-                    <X size={12} />
-                  </button>
-                </span>
-              ))}
-            </div>
-          )}
           <div style={{ display: 'flex', gap: 8 }}>
             <input
               value={newPreset}
@@ -344,43 +355,101 @@ export default function Settings() {
               Add
             </button>
           </div>
+          {draftFeedingAmountPresets.length > 0 && (
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 10 }}>
+              {draftFeedingAmountPresets.map(preset => (
+                <span
+                  key={preset}
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 12, padding: '4px 6px 4px 10px', borderRadius: 999, background: 'var(--surface-2)', border: '0.5px solid var(--border)', color: 'var(--text)' }}
+                >
+                  {preset}
+                  <button
+                    onClick={() => setDraftFeedingAmountPresets(draftFeedingAmountPresets.filter(p => p !== preset))}
+                    style={{ display: 'flex', alignItems: 'center', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-3)', padding: 2, lineHeight: 0 }}
+                  >
+                    <X size={12} />
+                  </button>
+                </span>
+              ))}
+            </div>
+          )}
         </section>
-        </div>{/* end left column */}
 
-        {/* Right column — data & info */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 16, justifyContent: 'space-between', alignSelf: 'stretch' }}>
         <section style={{ paddingBottom: 20, borderBottom: '0.5px solid var(--border-sub)' }}>
           <p style={{ fontWeight: 500, fontSize: 14, margin: '0 0 4px', color: 'var(--text)', display: 'flex', alignItems: 'center', gap: 6 }}>
             <Download size={14} color="var(--text-2)" />Data Backup
           </p>
-          <p style={{ fontSize: 12, color: 'var(--text-2)', margin: '0 0 16px' }}>
-            Export all tank data, parameters, livestock, and journal entries to a JSON file. Import replaces all current data with the backup.
+          <p style={{ fontSize: 12, color: 'var(--text-2)', margin: '0 0 14px' }}>
+            Export all tank data, parameters, livestock, and journal entries to a JSON file. Restoring replaces all current data with the backup.
           </p>
 
-          {/* Export */}
-          <div style={{ marginBottom: 16 }}>
-            <p style={{ fontSize: 12, fontWeight: 500, color: 'var(--text)', margin: '0 0 8px' }}>Export</p>
+          <div style={{ display: 'flex', gap: 8 }}>
             <button
               onClick={handleExport}
               disabled={exporting}
               style={{
-                display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                flex: 1, display: 'flex', flexDirection: isMobile && !exporting ? 'column' : 'row',
+                alignItems: 'center', justifyContent: 'center', gap: isMobile && !exporting ? 2 : 6,
                 fontSize: 13, padding: '7px 16px', borderRadius: 8, fontWeight: 500,
                 border: '0.5px solid var(--blue-border)', background: 'var(--blue-bg)', color: 'var(--blue)',
                 cursor: exporting ? 'not-allowed' : 'pointer', opacity: exporting ? 0.5 : 1,
-                width: isMobile ? '100%' : undefined, boxSizing: 'border-box',
+                boxSizing: 'border-box',
               }}
             >
-              <Download size={13} />{exporting ? 'Exporting…' : 'Download Backup'}
+              {exporting ? 'Exporting…' : isMobile ? (
+                <>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}><Download size={13} />Download</span>
+                  <span>Backup</span>
+                </>
+              ) : (
+                <><Download size={13} />Download Backup</>
+              )}
+            </button>
+            <button
+              onClick={() => setShowImportModal(true)}
+              style={{
+                flex: 1, display: 'flex', flexDirection: isMobile ? 'column' : 'row',
+                alignItems: 'center', justifyContent: 'center', gap: isMobile ? 2 : 6,
+                fontSize: 13, padding: '7px 16px', borderRadius: 8, fontWeight: 500,
+                border: '0.5px solid var(--red-border)', background: 'var(--red-bg)', color: 'var(--red)',
+                cursor: 'pointer', boxSizing: 'border-box',
+              }}
+            >
+              {isMobile ? (
+                <>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}><Upload size={13} />Restore</span>
+                  <span>Backup</span>
+                </>
+              ) : (
+                <><Upload size={13} />Restore Backup</>
+              )}
             </button>
           </div>
+        </section>
 
-          {/* Import */}
-          <div style={{ borderTop: '0.5px solid var(--border-sub)', paddingTop: 16 }}>
-            <p style={{ fontSize: 12, fontWeight: 500, color: 'var(--text)', margin: '0 0 4px' }}>Import</p>
-            <p style={{ fontSize: 11, color: 'var(--red)', margin: '0 0 10px' }}>
-              Warning: importing will permanently replace all current data.
-            </p>
+        <section style={{ paddingBottom: 20, borderBottom: '0.5px solid var(--border-sub)' }}>
+          <p style={{ fontWeight: 500, fontSize: 14, margin: '0 0 4px', color: 'var(--text)', display: 'flex', alignItems: 'center', gap: 6 }}>
+            <HardDrive size={14} color="var(--text-2)" />Local Storage
+          </p>
+          <p style={{ fontSize: 12, color: 'var(--text-2)', margin: '0 0 14px' }}>
+            Species data and photos stored on this server.
+          </p>
+          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, 1fr)', gap: 12 }}>
+            <StatCard label="Storage used" value={stats ? formatBytes(stats.storage_bytes) : '—'} icon={HardDrive} />
+            <StatCard label="Species stored locally" value={stats ? stats.species_count : '—'} icon={Fish} />
+            <StatCard label="Gallery images saved" value={stats ? stats.image_count : '—'} icon={ImageIcon} />
+          </div>
+        </section>
+
+        {showImportModal && (
+          <Modal title="Restore Backup" onClose={closeImportModal}>
+            <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start', background: 'var(--red-bg)', border: '0.5px solid var(--red-border)', borderRadius: 8, padding: '10px 12px', marginBottom: 16 }}>
+              <AlertTriangle size={16} color="var(--red)" style={{ flexShrink: 0, marginTop: 1 }} />
+              <p style={{ margin: 0, fontSize: 12, color: 'var(--red)', lineHeight: 1.5 }}>
+                Restoring a backup permanently deletes all current tanks, livestock, parameters, and journal entries, replacing them with the contents of the file you choose. This cannot be undone.
+              </p>
+            </div>
+
             <input
               ref={fileRef}
               type="file"
@@ -390,74 +459,26 @@ export default function Settings() {
                 setImportFile(e.target.files?.[0] ?? null)
                 setImportResult(null)
                 setImportError(null)
-                setConfirmImport(false)
               }}
             />
-            <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-              <div
-                onClick={() => fileRef.current?.click()}
-                style={{
-                  display: 'flex', alignItems: 'center', cursor: 'pointer',
-                  border: '0.5px solid var(--btn-border)', borderRadius: 8, overflow: 'hidden',
-                  background: 'var(--surface)',
-                }}
-              >
-                <span style={{ padding: '7px 12px', background: 'var(--surface-2)', borderRight: '0.5px solid var(--btn-border)', fontSize: 12, color: 'var(--text-2)', whiteSpace: 'nowrap' }}>
-                  Choose File
-                </span>
-                <span style={{ padding: '7px 10px', fontSize: 12, color: importFile ? 'var(--text)' : 'var(--text-3)' }}>
-                  {importFile ? importFile.name : 'No file chosen'}
-                </span>
-              </div>
-
-              {importFile && !confirmImport && (
-                <button
-                  onClick={() => setConfirmImport(true)}
-                  style={{
-                    fontSize: 13, padding: '7px 16px', borderRadius: 8, fontWeight: 500,
-                    border: '0.5px solid var(--red-border)', background: 'var(--red-bg)', color: 'var(--red)',
-                    cursor: 'pointer',
-                  }}
-                >
-                  <Upload size={13} style={{ display: 'inline', marginRight: 5, verticalAlign: 'middle' }} />
-                  Restore Backup
-                </button>
-              )}
+            <div
+              onClick={() => fileRef.current?.click()}
+              style={{
+                display: 'flex', alignItems: 'center', cursor: 'pointer',
+                border: '0.5px solid var(--btn-border)', borderRadius: 8, overflow: 'hidden',
+                background: 'var(--surface)', width: '100%', boxSizing: 'border-box',
+              }}
+            >
+              <span style={{ padding: '7px 12px', background: 'var(--surface-2)', borderRight: '0.5px solid var(--btn-border)', fontSize: 12, color: 'var(--text-2)', whiteSpace: 'nowrap' }}>
+                Choose File
+              </span>
+              <span style={{ padding: '7px 10px', fontSize: 12, color: importFile ? 'var(--text)' : 'var(--text-3)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {importFile ? importFile.name : 'No file chosen'}
+              </span>
             </div>
 
-            {confirmImport && (
-              <div style={{ marginTop: 10, background: 'var(--red-bg)', border: '0.5px solid var(--red-border)', borderRadius: 8, padding: '12px 14px' }}>
-                <p style={{ margin: '0 0 10px', fontSize: 13, color: 'var(--red)', fontWeight: 500 }}>
-                  This will delete all current data and replace it with the backup. Are you sure?
-                </p>
-                <div style={{ display: 'flex', gap: 8 }}>
-                  <button
-                    onClick={handleImport}
-                    disabled={importing}
-                    style={{
-                      fontSize: 13, padding: '6px 16px', borderRadius: 8, fontWeight: 500,
-                      border: '0.5px solid var(--red-border)', background: 'var(--red)', color: '#fff',
-                      cursor: importing ? 'not-allowed' : 'pointer', opacity: importing ? 0.6 : 1,
-                    }}
-                  >
-                    {importing ? 'Restoring…' : 'Yes, restore'}
-                  </button>
-                  <button
-                    onClick={() => setConfirmImport(false)}
-                    style={{
-                      fontSize: 13, padding: '6px 14px', borderRadius: 8,
-                      border: '0.5px solid var(--btn-border)', background: 'transparent', color: 'var(--text-2)',
-                      cursor: 'pointer',
-                    }}
-                  >
-                    Cancel
-                  </button>
-                </div>
-              </div>
-            )}
-
             {importResult && (
-              <div style={{ marginTop: 10, background: 'var(--green-bg)', border: '0.5px solid var(--green-border)', borderRadius: 8, padding: '8px 12px' }}>
+              <div style={{ marginTop: 12, background: 'var(--green-bg)', border: '0.5px solid var(--green-border)', borderRadius: 8, padding: '8px 12px' }}>
                 <p style={{ margin: 0, fontSize: 13, color: 'var(--green)', fontWeight: 500 }}>
                   ✓ Restored {importResult.tanks_restored} tank{importResult.tanks_restored !== 1 ? 's' : ''} successfully.
                 </p>
@@ -465,12 +486,39 @@ export default function Settings() {
             )}
 
             {importError && (
-              <div style={{ marginTop: 10, background: 'var(--red-bg)', border: '0.5px solid var(--red-border)', borderRadius: 8, padding: '8px 12px' }}>
+              <div style={{ marginTop: 12, background: 'var(--red-bg)', border: '0.5px solid var(--red-border)', borderRadius: 8, padding: '8px 12px' }}>
                 <p style={{ margin: 0, fontSize: 13, color: 'var(--red)' }}>{importError}</p>
               </div>
             )}
-          </div>
-        </section>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 20 }}>
+              <button
+                onClick={closeImportModal}
+                style={{
+                  flex: isMobile ? 1 : undefined, fontSize: 13, padding: '7px 16px', borderRadius: 8,
+                  border: '0.5px solid var(--btn-border)', background: 'transparent', color: 'var(--text)',
+                  cursor: 'pointer', boxSizing: 'border-box',
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleImport}
+                disabled={!importFile || importing}
+                style={{
+                  flex: isMobile ? 1 : undefined, fontSize: 13, padding: '7px 16px', borderRadius: 8, fontWeight: 500,
+                  border: '0.5px solid var(--red-border)',
+                  background: importFile && !importing ? 'var(--red)' : 'var(--surface-2)',
+                  color: importFile && !importing ? '#fff' : 'var(--text-3)',
+                  cursor: importFile && !importing ? 'pointer' : 'default',
+                  boxSizing: 'border-box',
+                }}
+              >
+                {importing ? 'Restoring…' : 'Yes, restore backup'}
+              </button>
+            </div>
+          </Modal>
+        )}
 
         <section style={{ paddingBottom: 20, borderBottom: '0.5px solid var(--border-sub)' }}>
           <p style={{ fontWeight: 500, fontSize: 14, margin: '0 0 12px', color: 'var(--text)', display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -543,17 +591,34 @@ export default function Settings() {
             while tank and parameter data is stored in SQLite.
           </p>
         </section>
-        </div>{/* end right column */}
 
-        <section style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 12, paddingTop: 20 }}>
-          {settingsSaved && <span style={{ fontSize: 12, color: 'var(--green)' }}>Settings saved</span>}
+        <section style={{ display: 'flex', flexDirection: isMobile ? 'column-reverse' : 'row', alignItems: isMobile ? 'stretch' : 'center', justifyContent: 'space-between', gap: 12 }}>
           <button
-            onClick={saveSettings}
-            disabled={!settingsChanged || savingSettings}
-            style={{ padding: '8px 18px', borderRadius: 8, border: '0.5px solid var(--blue-border)', background: settingsChanged && !savingSettings ? 'var(--blue-bg)' : 'var(--surface-2)', color: settingsChanged && !savingSettings ? 'var(--blue)' : 'var(--text-3)', fontWeight: 500, cursor: settingsChanged && !savingSettings ? 'pointer' : 'default' }}
+            onClick={resetToDefaults}
+            style={{
+              padding: '8px 18px', borderRadius: 8, border: '0.5px solid var(--btn-border)',
+              background: 'transparent', color: 'var(--text-2)', fontWeight: 500, cursor: 'pointer',
+              width: isMobile ? '100%' : undefined, boxSizing: 'border-box',
+            }}
           >
-            {savingSettings ? 'Saving…' : 'Save Settings'}
+            Reset to Defaults
           </button>
+          <div style={{ display: 'flex', flexDirection: isMobile ? 'column-reverse' : 'row', alignItems: isMobile ? 'stretch' : 'center', gap: 12 }}>
+            {settingsSaved && <span style={{ fontSize: 12, color: 'var(--green)', textAlign: isMobile ? 'center' : undefined }}>Settings saved</span>}
+            <button
+              onClick={saveSettings}
+              disabled={!settingsChanged || savingSettings}
+              style={{
+                padding: '8px 18px', borderRadius: 8, border: '0.5px solid var(--blue-border)',
+                background: settingsChanged && !savingSettings ? 'var(--blue-bg)' : 'var(--surface-2)',
+                color: settingsChanged && !savingSettings ? 'var(--blue)' : 'var(--text-3)',
+                fontWeight: 500, cursor: settingsChanged && !savingSettings ? 'pointer' : 'default',
+                width: isMobile ? '100%' : undefined, boxSizing: 'border-box',
+              }}
+            >
+              {savingSettings ? 'Saving…' : 'Save Settings'}
+            </button>
+          </div>
         </section>
 
       </Card>

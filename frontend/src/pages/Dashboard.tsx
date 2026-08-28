@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Layers, Fish, Leaf, Bug, Waves, Bell, Clock, Plus, AlertTriangle, Timer, Thermometer, FlaskConical, GripVertical, Filter, type LucideIcon } from 'lucide-react'
+import { Layers, Fish, Leaf, Bug, Waves, Bell, Clock, Plus, AlertTriangle, Timer, Thermometer, FlaskConical, GripVertical, Filter } from 'lucide-react'
 import { useTanks } from '../hooks'
 import { api } from '../api/client'
 import { useSettings, formatDate, toMM, dimInputProps } from '../context/SettingsContext'
-import { Card, FieldLabel, Tag } from '../components/ui'
+import { Card, FieldLabel, StatCard, Tag } from '../components/ui'
 
 interface DashboardStats {
   total_tanks: number
@@ -39,21 +39,6 @@ const WATER_TYPE_STYLES: Record<string, { bg: string; color: string; label: stri
 function WaterTypeBadge({ type }: { type: string }) {
   const s = WATER_TYPE_STYLES[type] ?? WATER_TYPE_STYLES.freshwater
   return <Tag bg={s.bg} color={s.color}>{s.label}</Tag>
-}
-
-function StatCard({ label, value, accent, icon: Icon }: {
-  label: string; value: string | number; accent?: string
-  icon?: LucideIcon
-}) {
-  return (
-    <div style={{ background: 'var(--surface)', border: '0.5px solid var(--border)', borderRadius: 12, padding: '14px 16px' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 4 }}>
-        <p style={{ fontSize: 12, color: 'var(--text-2)', margin: 0 }}>{label}</p>
-        {Icon && <Icon size={14} color="var(--text-3)" />}
-      </div>
-      <p style={{ fontSize: 24, fontWeight: 500, margin: 0, color: accent ?? 'var(--text)' }}>{value}</p>
-    </div>
-  )
 }
 
 const PARAMS = [

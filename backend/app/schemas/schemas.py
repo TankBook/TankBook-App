@@ -218,6 +218,12 @@ class AppSettingsOut(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class SettingsStatsOut(BaseModel):
+    species_count: int
+    image_count: int
+    storage_bytes: int
+
+
 # --- Expenses ---
 
 class ExpenseCreate(BaseModel):
