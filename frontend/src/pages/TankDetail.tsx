@@ -585,59 +585,56 @@ function EditTankPanel({ tank, onSave }: { tank: any; onSave: () => void }) {
         </button>
       </div>
       {hasFilter && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 12 }}>
+        <div className="unit-field" style={{ marginBottom: 12 }}>
           <input
             type="number" min="1" placeholder="Flow rate"
             value={filterFlow} onChange={e => setFilterFlow(e.target.value)}
-            style={{ width: 90 }}
           />
-          <span style={{ fontSize: 13, color: 'var(--text-2)' }}>L/h</span>
+          <span>L/h</span>
         </div>
       )}
       {co2 && (
-        <div style={{ display: 'flex', gap: 10, marginBottom: 12, flexWrap: 'wrap', alignItems: 'center' }}>
-          <select value={co2Source} onChange={e => setCo2Source(e.target.value)} style={{ width: 160 }}>
-            <option value="">Source…</option>
+        <div style={{ display: 'flex', gap: 10, marginBottom: 12, alignItems: 'center' }}>
+          <select value={co2Source} onChange={e => setCo2Source(e.target.value)} style={{ flex: 1, minWidth: 0 }}>
+            <option value="">Source</option>
             <option value="Pressurized CO2">Pressurized CO2</option>
             <option value="Yeast">Yeast</option>
             <option value="Chemical">Chemical</option>
             <option value="Liquid Carbon">Liquid Carbon</option>
           </select>
-          <select value={co2Method} onChange={e => setCo2Method(e.target.value)} style={{ width: 170 }}>
-            <option value="">Injection method…</option>
+          <select value={co2Method} onChange={e => setCo2Method(e.target.value)} style={{ flex: 1, minWidth: 0 }}>
+            <option value="">Injection method</option>
             <option value="In-line with Filter">In-line with Filter</option>
             <option value="CO2 Diffuser">CO2 Diffuser</option>
           </select>
         </div>
       )}
       {hasHeater && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 12 }}>
+        <div className="unit-field" style={{ marginBottom: 12 }}>
           <input
             type="number" min="1" placeholder="Watts"
             value={heaterWatts} onChange={e => setHeaterWatts(e.target.value)}
-            style={{ width: 80 }}
           />
-          <span style={{ fontSize: 13, color: 'var(--text-2)' }}>W</span>
+          <span>W</span>
         </div>
       )}
       {hasLighting && (
-        <div style={{ display: 'flex', gap: 10, marginBottom: 12, flexWrap: 'wrap', alignItems: 'center' }}>
-          <select value={lightIntensity} onChange={e => setLightIntensity(e.target.value)} style={{ width: 120 }}>
-            <option value="">Intensity…</option>
+        <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', gap: 10, marginBottom: 12, alignItems: isMobile ? 'stretch' : 'center' }}>
+          <select value={lightIntensity} onChange={e => setLightIntensity(e.target.value)} style={{ flex: 1, minWidth: 0 }}>
+            <option value="">Intensity</option>
             <option value="low">Low</option>
             <option value="medium">Medium</option>
             <option value="high">High</option>
           </select>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <div className="unit-field" style={{ flex: 1 }}>
             <input
               type="number" min="1" placeholder="Watts"
               value={lightWatts} onChange={e => setLightWatts(e.target.value)}
-              style={{ width: 80 }}
             />
-            <span style={{ fontSize: 13, color: 'var(--text-2)' }}>W</span>
+            <span>W</span>
           </div>
-          <select value={lightTechnology} onChange={e => setLightTechnology(e.target.value)} style={{ width: 150 }}>
-            <option value="">Technology…</option>
+          <select value={lightTechnology} onChange={e => setLightTechnology(e.target.value)} style={{ flex: 1, minWidth: 0 }}>
+            <option value="">Technology</option>
             <option value="LED">LED</option>
             <option value="T5">T5 Fluorescent</option>
             <option value="T8">T8 Fluorescent</option>
