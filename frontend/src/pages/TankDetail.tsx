@@ -437,14 +437,18 @@ function EditTankPanel({ tank, onSave }: { tank: any; onSave: () => void }) {
   const [volume, setVolume] = useState(String(tank.volume_litres))
   const [waterType, setWaterType] = useState(tank.water_type ?? 'freshwater')
   const [substrate, setSubstrate] = useState(tank.substrate ?? '')
-  const [lighting, setLighting] = useState(tank.lighting ?? '')
-  const [hasLighting, setHasLighting] = useState(!!tank.lighting)
+  const [hasLighting, setHasLighting] = useState(!!(tank.light_intensity || tank.light_watts || tank.light_technology || tank.lighting))
+  const [lightIntensity, setLightIntensity] = useState(tank.light_intensity ?? '')
+  const [lightWatts, setLightWatts] = useState(tank.light_watts != null ? String(tank.light_watts) : '')
+  const [lightTechnology, setLightTechnology] = useState(tank.light_technology ?? '')
   const [filterFlow, setFilterFlow] = useState(tank.filter_flow_lph != null ? String(tank.filter_flow_lph) : '')
   const [hasFilter, setHasFilter] = useState(!!tank.filter_flow_lph)
   const [width, setWidth] = useState(tank.width_mm != null ? String(fromMM(tank.width_mm, unitSystem)) : '')
   const [height, setHeight] = useState(tank.height_mm != null ? String(fromMM(tank.height_mm, unitSystem)) : '')
   const [depth, setDepth] = useState(tank.depth_mm != null ? String(fromMM(tank.depth_mm, unitSystem)) : '')
   const [co2, setCo2] = useState(tank.co2_injection)
+  const [co2Source, setCo2Source] = useState(tank.co2_source ?? '')
+  const [co2Method, setCo2Method] = useState(tank.co2_method ?? '')
   const [hasHeater, setHasHeater] = useState(tank.has_heater)
   const [heaterWatts, setHeaterWatts] = useState(tank.heater_watts != null ? String(tank.heater_watts) : '')
   const [saved, setSaved] = useState(false)
@@ -466,14 +470,19 @@ function EditTankPanel({ tank, onSave }: { tank: any; onSave: () => void }) {
       body: JSON.stringify({
         name, volume_litres: Number(volume),
         water_type: waterType,
-        substrate: substrate || null, lighting: hasLighting && lighting ? lighting : null,
+        substrate: substrate || null,
         filter_flow_lph: hasFilter && filterFlow ? Number(filterFlow) : null,
         width_mm: width ? toMM(Number(width), unitSystem) : null,
         height_mm: height ? toMM(Number(height), unitSystem) : null,
         depth_mm: depth ? toMM(Number(depth), unitSystem) : null,
         co2_injection: co2,
+        co2_source: co2 && co2Source ? co2Source : null,
+        co2_method: co2 && co2Method ? co2Method : null,
         has_heater: hasHeater,
         heater_watts: hasHeater && heaterWatts ? Number(heaterWatts) : null,
+        light_intensity: hasLighting && lightIntensity ? lightIntensity : null,
+        light_watts: hasLighting && lightWatts ? Number(lightWatts) : null,
+        light_technology: hasLighting && lightTechnology ? lightTechnology : null,
         setup_date: tank.setup_date,
       }),
     })
@@ -532,7 +541,7 @@ function EditTankPanel({ tank, onSave }: { tank: any; onSave: () => void }) {
         </button>
         <button
           type="button"
-          onClick={() => setCo2((c: boolean) => !c)}
+          onClick={() => { const next = !co2; setCo2(next); if (!next) { setCo2Source(''); setCo2Method('') } }}
           style={{
             display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '7px 10px', borderRadius: 8,
             fontSize: 13, fontWeight: 500, cursor: 'pointer',
@@ -560,7 +569,7 @@ function EditTankPanel({ tank, onSave }: { tank: any; onSave: () => void }) {
         </button>
         <button
           type="button"
-          onClick={() => { const next = !hasLighting; setHasLighting(next); if (!next) setLighting('') }}
+          onClick={() => { const next = !hasLighting; setHasLighting(next); if (!next) { setLightIntensity(''); setLightWatts(''); setLightTechnology('') } }}
           style={{
             display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '7px 10px', borderRadius: 8,
             fontSize: 13, fontWeight: 500, cursor: 'pointer',
@@ -573,35 +582,67 @@ function EditTankPanel({ tank, onSave }: { tank: any; onSave: () => void }) {
           <Lightbulb size={14} /> Lighting
         </button>
       </div>
-      {(hasFilter || hasHeater || hasLighting) && (
+      {hasFilter && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 12 }}>
+          <input
+            type="number" min="1" placeholder="Flow rate"
+            value={filterFlow} onChange={e => setFilterFlow(e.target.value)}
+            style={{ width: 90 }}
+          />
+          <span style={{ fontSize: 13, color: 'var(--text-2)' }}>L/h</span>
+        </div>
+      )}
+      {co2 && (
         <div style={{ display: 'flex', gap: 10, marginBottom: 12, flexWrap: 'wrap', alignItems: 'center' }}>
-          {hasFilter && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <input
-                type="number" min="1" placeholder="Flow rate"
-                value={filterFlow} onChange={e => setFilterFlow(e.target.value)}
-                style={{ width: 90 }}
-              />
-              <span style={{ fontSize: 13, color: 'var(--text-2)' }}>L/h</span>
-            </div>
-          )}
-          {hasHeater && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <input
-                type="number" min="1" placeholder="Watts"
-                value={heaterWatts} onChange={e => setHeaterWatts(e.target.value)}
-                style={{ width: 80 }}
-              />
-              <span style={{ fontSize: 13, color: 'var(--text-2)' }}>W</span>
-            </div>
-          )}
-          {hasLighting && (
+          <select value={co2Source} onChange={e => setCo2Source(e.target.value)} style={{ width: 160 }}>
+            <option value="">Source…</option>
+            <option value="Pressurized CO2">Pressurized CO2</option>
+            <option value="Yeast">Yeast</option>
+            <option value="Chemical">Chemical</option>
+            <option value="Liquid Carbon">Liquid Carbon</option>
+          </select>
+          <select value={co2Method} onChange={e => setCo2Method(e.target.value)} style={{ width: 170 }}>
+            <option value="">Injection method…</option>
+            <option value="In-line with Filter">In-line with Filter</option>
+            <option value="CO2 Diffuser">CO2 Diffuser</option>
+          </select>
+        </div>
+      )}
+      {hasHeater && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 12 }}>
+          <input
+            type="number" min="1" placeholder="Watts"
+            value={heaterWatts} onChange={e => setHeaterWatts(e.target.value)}
+            style={{ width: 80 }}
+          />
+          <span style={{ fontSize: 13, color: 'var(--text-2)' }}>W</span>
+        </div>
+      )}
+      {hasLighting && (
+        <div style={{ display: 'flex', gap: 10, marginBottom: 12, flexWrap: 'wrap', alignItems: 'center' }}>
+          <select value={lightIntensity} onChange={e => setLightIntensity(e.target.value)} style={{ width: 120 }}>
+            <option value="">Intensity…</option>
+            <option value="low">Low</option>
+            <option value="medium">Medium</option>
+            <option value="high">High</option>
+          </select>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
             <input
-              placeholder="e.g. Soft-glow LED, 5W"
-              value={lighting} onChange={e => setLighting(e.target.value)}
-              style={{ width: 200 }}
+              type="number" min="1" placeholder="Watts"
+              value={lightWatts} onChange={e => setLightWatts(e.target.value)}
+              style={{ width: 80 }}
             />
-          )}
+            <span style={{ fontSize: 13, color: 'var(--text-2)' }}>W</span>
+          </div>
+          <select value={lightTechnology} onChange={e => setLightTechnology(e.target.value)} style={{ width: 150 }}>
+            <option value="">Technology…</option>
+            <option value="LED">LED</option>
+            <option value="T5">T5 Fluorescent</option>
+            <option value="T8">T8 Fluorescent</option>
+            <option value="Metal Halide">Metal Halide</option>
+            <option value="CFL">CFL</option>
+            <option value="Other">Other</option>
+          </select>
         </div>
       )}
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>

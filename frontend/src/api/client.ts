@@ -12,8 +12,13 @@ export interface Tank {
   height_mm: number | null
   depth_mm: number | null
   co2_injection: boolean
+  co2_source: string | null
+  co2_method: string | null
   has_heater: boolean
   heater_watts: number | null
+  light_intensity: string | null
+  light_watts: number | null
+  light_technology: string | null
   setup_date: string | null
   created_at: string
 }

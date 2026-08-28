@@ -16,8 +16,13 @@ class TankCreate(BaseModel):
     height_mm: int | None = None
     depth_mm: int | None = None
     co2_injection: bool = False
+    co2_source: str | None = None
+    co2_method: str | None = None
     has_heater: bool = False
     heater_watts: int | None = None
+    light_intensity: str | None = None
+    light_watts: int | None = None
+    light_technology: str | None = None
     setup_date: datetime | None = None
 
 

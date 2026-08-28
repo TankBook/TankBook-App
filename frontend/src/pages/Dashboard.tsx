@@ -262,6 +262,8 @@ export default function Dashboard() {
       volume_litres: Number(volume),
       water_type: waterType,
       co2_injection: co2,
+      co2_source: null,
+      co2_method: null,
       substrate: substrate || null,
       lighting: lighting || null,
       filter_flow_lph: filterFlow ? Number(filterFlow) : null,
@@ -270,6 +272,9 @@ export default function Dashboard() {
       depth_mm: depth ? toMM(Number(depth), unitSystem) : null,
       has_heater: false,
       heater_watts: null,
+      light_intensity: null,
+      light_watts: null,
+      light_technology: null,
       setup_date: null,
     })
     setName(''); setVolume(''); setWaterType('freshwater'); setCo2(false)
