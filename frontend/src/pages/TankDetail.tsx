@@ -1718,7 +1718,7 @@ ${taskRows ? `<h2>Pending Maintenance</h2>
               </div>
             )
           })}
-          <div style={{ marginTop: 16, borderTop: '0.5px solid var(--border-sub)', paddingTop: 14 }}>
+          <div style={{ marginTop: 16 }}>
             <button
               onClick={() => setShowAddPlant(true)}
               style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6, fontSize: 13, padding: '7px 16px', borderRadius: 8, fontWeight: 500, cursor: 'pointer', border: '0.5px solid var(--green-border)', background: 'var(--green-bg)', color: 'var(--green)', width: isMobile ? '100%' : undefined, boxSizing: 'border-box' }}
