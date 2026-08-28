@@ -1679,7 +1679,6 @@ ${taskRows ? `<h2>Pending Maintenance</h2>
           {plants.data?.length === 0 && <p style={{ fontSize: 13, color: 'var(--text-2)' }}>No plants added yet.</p>}
           {plants.data?.map(p => {
             const sc = PLANT_STATUS_COLORS[p.plant_status] ?? PLANT_STATUS_COLORS.planted
-            const isEditing = editingPlantId === p.id
             return (
               <div key={p.id} style={{ borderBottom: '0.5px solid var(--border-sub)' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap', padding: '10px 0' }}>
@@ -1699,7 +1698,6 @@ ${taskRows ? `<h2>Pending Maintenance</h2>
                     <Tag bg={sc.bg} color={sc.color}>{cap(p.plant_status)}</Tag>
                     <button
                       onClick={() => {
-                        if (isEditing) { setEditingPlantId(null); return }
                         setEditingPlantId(p.id)
                         setEditPlantQty(String(p.quantity))
                         setEditPlantStatus(p.plant_status)
@@ -1707,7 +1705,7 @@ ${taskRows ? `<h2>Pending Maintenance</h2>
                       }}
                       style={{ fontSize: 11, color: 'var(--text-2)', background: 'none', border: '0.5px solid var(--btn-border)', borderRadius: 6, padding: '2px 8px', cursor: 'pointer' }}
                     >
-                      {isEditing ? 'Cancel' : 'Edit'}
+                      Edit
                     </button>
                     <button
                       onClick={async () => { await api.plants.remove(id!, p.id); plants.reload() }}
@@ -1717,42 +1715,6 @@ ${taskRows ? `<h2>Pending Maintenance</h2>
                     </button>
                   </div>
                 </div>
-                {isEditing && (
-                  <div style={{ background: 'var(--surface-2)', borderRadius: 8, padding: '12px 14px', marginBottom: 10 }}>
-                    <div style={{ display: 'grid', gridTemplateColumns: '80px 1fr', gap: 10, marginBottom: 10 }}>
-                      <div>
-                        <FieldLabel>Quantity</FieldLabel>
-                        <input type="number" min="1" value={editPlantQty} onChange={e => setEditPlantQty(e.target.value)} style={{ width: '100%', boxSizing: 'border-box' }} />
-                      </div>
-                      <div>
-                        <FieldLabel>Status</FieldLabel>
-                        <select value={editPlantStatus} onChange={e => setEditPlantStatus(e.target.value)} style={{ width: '100%' }}>
-                          <option value="planned">Planned</option>
-                          <option value="planted">Planted</option>
-                          <option value="removed">Removed</option>
-                        </select>
-                      </div>
-                    </div>
-                    <div style={{ marginBottom: 10 }}>
-                      <FieldLabel>Notes</FieldLabel>
-                      <input value={editPlantNotes} onChange={e => setEditPlantNotes(e.target.value)} placeholder="Optional notes…" style={{ width: '100%', boxSizing: 'border-box' }} />
-                    </div>
-                    <button
-                      onClick={async () => {
-                        await api.plants.update(id!, p.id, {
-                          quantity: Number(editPlantQty),
-                          plant_status: editPlantStatus,
-                          notes: editPlantNotes || null,
-                        })
-                        setEditingPlantId(null)
-                        plants.reload()
-                      }}
-                      style={{ padding: '6px 16px', borderRadius: 8, border: '0.5px solid var(--green-border)', background: 'var(--green-bg)', color: 'var(--green)', fontSize: 13, fontWeight: 500, cursor: 'pointer' }}
-                    >
-                      Save
-                    </button>
-                  </div>
-                )}
               </div>
             )
           })}
@@ -2515,6 +2477,59 @@ ${taskRows ? `<h2>Pending Maintenance</h2>
             <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
               <button onClick={() => setEditingFishId(null)} style={{ padding: '7px 16px', borderRadius: 8, fontSize: 13, cursor: 'pointer', border: '0.5px solid var(--btn-border)', background: 'transparent', color: 'var(--text)' }}>Cancel</button>
               <button onClick={saveEditFish} style={{ padding: '7px 16px', borderRadius: 8, fontSize: 13, fontWeight: 500, cursor: 'pointer', border: '0.5px solid var(--blue-border)', background: 'var(--blue-bg)', color: 'var(--blue)' }}>Save</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* EDIT PLANT MODAL */}
+      {editingPlantId && (
+        <div
+          onMouseDown={() => setEditingPlantId(null)}
+          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', zIndex: 300, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}
+        >
+          <div
+            onMouseDown={e => e.stopPropagation()}
+            style={{ background: 'var(--surface)', border: '0.5px solid var(--border)', borderRadius: 14, padding: '1.5rem', width: 400, maxWidth: '100%', boxShadow: '0 12px 40px rgba(0,0,0,0.22)' }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+              <p style={{ margin: 0, fontWeight: 600, fontSize: 15, color: 'var(--text)' }}>Edit Plant</p>
+              <button onClick={() => setEditingPlantId(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-2)', lineHeight: 0 }}><X size={18} /></button>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '80px 1fr', gap: 10, marginBottom: 12 }}>
+              <div>
+                <FieldLabel>Quantity</FieldLabel>
+                <input type="number" min="1" value={editPlantQty} onChange={e => setEditPlantQty(e.target.value)} style={{ width: '100%', boxSizing: 'border-box' }} />
+              </div>
+              <div>
+                <FieldLabel>Status</FieldLabel>
+                <select value={editPlantStatus} onChange={e => setEditPlantStatus(e.target.value)} style={{ width: '100%', boxSizing: 'border-box' }}>
+                  <option value="planned">Planned</option>
+                  <option value="planted">Planted</option>
+                  <option value="removed">Removed</option>
+                </select>
+              </div>
+            </div>
+            <div style={{ marginBottom: 16 }}>
+              <FieldLabel>Notes</FieldLabel>
+              <input value={editPlantNotes} onChange={e => setEditPlantNotes(e.target.value)} placeholder="Optional notes…" style={{ width: '100%', boxSizing: 'border-box' }} />
+            </div>
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+              <button onClick={() => setEditingPlantId(null)} style={{ padding: '7px 16px', borderRadius: 8, fontSize: 13, cursor: 'pointer', border: '0.5px solid var(--btn-border)', background: 'transparent', color: 'var(--text)' }}>Cancel</button>
+              <button
+                onClick={async () => {
+                  await api.plants.update(id!, editingPlantId, {
+                    quantity: Number(editPlantQty),
+                    plant_status: editPlantStatus,
+                    notes: editPlantNotes || null,
+                  })
+                  setEditingPlantId(null)
+                  plants.reload()
+                }}
+                style={{ padding: '7px 16px', borderRadius: 8, fontSize: 13, fontWeight: 500, cursor: 'pointer', border: '0.5px solid var(--green-border)', background: 'var(--green-bg)', color: 'var(--green)' }}
+              >
+                Save
+              </button>
             </div>
           </div>
         </div>
