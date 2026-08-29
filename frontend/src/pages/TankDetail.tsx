@@ -2461,22 +2461,46 @@ ${taskRows ? `<h2>Pending Maintenance</h2>
               )}
               {todayTasks.map((task: any, i: number) => {
                 const c = task.color ?? '#1e88e5'
+                const dayLabels = task.days.split(',').map((d: string) => DAY_ABBR[Number(d)]).join(', ')
                 return (
-                  <div key={task.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 0', borderBottom: i === todayTasks.length - 1 ? 'none' : '0.5px solid var(--border-sub)' }}>
-                    <span style={{ width: 6, height: 6, borderRadius: '50%', background: c, flexShrink: 0 }} />
-                    <span style={{ fontSize: 12, color: 'var(--text-3)', fontVariantNumeric: 'tabular-nums', flexShrink: 0, minWidth: 36 }}>
-                      {String(task.hour).padStart(2, '0')}:{String(task.minute).padStart(2, '0')}
-                    </span>
-                    <span style={{ fontSize: 13, color: 'var(--text)', flex: 1 }}>{task.name}</span>
-                    <span style={{ fontSize: 11, color: 'var(--text-3)', flexShrink: 0 }}>
-                      {task.days.split(',').map((d: string) => DAY_ABBR[Number(d)]).join(', ')}
-                    </span>
-                    <button onClick={() => startEditDailyTask(task)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-3)', lineHeight: 0, padding: 2, flexShrink: 0 }}>
-                      <Pencil size={12} />
-                    </button>
-                    <button onClick={() => removeDailyTask(task.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-3)', lineHeight: 0, padding: 2, flexShrink: 0 }}>
-                      <X size={13} />
-                    </button>
+                  <div key={task.id} style={{ padding: '8px 0', borderBottom: i === todayTasks.length - 1 ? 'none' : '0.5px solid var(--border-sub)' }}>
+                    {isMobile ? (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <span style={{ width: 6, height: 6, borderRadius: '50%', background: c, flexShrink: 0 }} />
+                          <span style={{ fontSize: 12, color: 'var(--text-3)', fontVariantNumeric: 'tabular-nums', flexShrink: 0 }}>
+                            {String(task.hour).padStart(2, '0')}:{String(task.minute).padStart(2, '0')}
+                          </span>
+                          <span style={{ fontSize: 13, color: 'var(--text)', flex: 1, minWidth: 0 }}>{task.name}</span>
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+                          <span style={{ fontSize: 11, color: 'var(--text-3)' }}>{dayLabels}</span>
+                          <div style={{ display: 'flex', gap: 10, flexShrink: 0 }}>
+                            <button onClick={() => startEditDailyTask(task)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-3)', lineHeight: 0, padding: 2 }}>
+                              <Pencil size={14} />
+                            </button>
+                            <button onClick={() => removeDailyTask(task.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-3)', lineHeight: 0, padding: 2 }}>
+                              <X size={15} />
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                        <span style={{ width: 6, height: 6, borderRadius: '50%', background: c, flexShrink: 0 }} />
+                        <span style={{ fontSize: 12, color: 'var(--text-3)', fontVariantNumeric: 'tabular-nums', flexShrink: 0, minWidth: 36 }}>
+                          {String(task.hour).padStart(2, '0')}:{String(task.minute).padStart(2, '0')}
+                        </span>
+                        <span style={{ fontSize: 13, color: 'var(--text)', flex: 1 }}>{task.name}</span>
+                        <span style={{ fontSize: 11, color: 'var(--text-3)', flexShrink: 0 }}>{dayLabels}</span>
+                        <button onClick={() => startEditDailyTask(task)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-3)', lineHeight: 0, padding: 2, flexShrink: 0 }}>
+                          <Pencil size={12} />
+                        </button>
+                        <button onClick={() => removeDailyTask(task.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-3)', lineHeight: 0, padding: 2, flexShrink: 0 }}>
+                          <X size={13} />
+                        </button>
+                      </div>
+                    )}
                   </div>
                 )
               })}
@@ -2492,22 +2516,46 @@ ${taskRows ? `<h2>Pending Maintenance</h2>
                     .sort((a: any, b: any) => a.hour !== b.hour ? a.hour - b.hour : a.minute - b.minute)
                   return otherTasks.map((task: any, i: number) => {
                     const c = task.color ?? '#1e88e5'
+                    const dayLabels = task.days.split(',').map((d: string) => DAY_ABBR[Number(d)]).join(', ')
                     return (
-                      <div key={task.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 0', borderBottom: i === otherTasks.length - 1 ? 'none' : '0.5px solid var(--border-sub)' }}>
-                        <span style={{ width: 6, height: 6, borderRadius: '50%', background: c, flexShrink: 0 }} />
-                        <span style={{ fontSize: 12, color: 'var(--text-3)', fontVariantNumeric: 'tabular-nums', flexShrink: 0, minWidth: 36 }}>
-                          {String(task.hour).padStart(2, '0')}:{String(task.minute).padStart(2, '0')}
-                        </span>
-                        <span style={{ fontSize: 13, color: 'var(--text)', flex: 1 }}>{task.name}</span>
-                        <span style={{ fontSize: 11, color: 'var(--text-3)', flexShrink: 0 }}>
-                          {task.days.split(',').map((d: string) => DAY_ABBR[Number(d)]).join(', ')}
-                        </span>
-                        <button onClick={() => startEditDailyTask(task)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-3)', lineHeight: 0, padding: 2, flexShrink: 0 }}>
-                          <Pencil size={12} />
-                        </button>
-                        <button onClick={() => removeDailyTask(task.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-3)', lineHeight: 0, padding: 2, flexShrink: 0 }}>
-                          <X size={13} />
-                        </button>
+                      <div key={task.id} style={{ padding: '8px 0', borderBottom: i === otherTasks.length - 1 ? 'none' : '0.5px solid var(--border-sub)' }}>
+                        {isMobile ? (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                              <span style={{ width: 6, height: 6, borderRadius: '50%', background: c, flexShrink: 0 }} />
+                              <span style={{ fontSize: 12, color: 'var(--text-3)', fontVariantNumeric: 'tabular-nums', flexShrink: 0 }}>
+                                {String(task.hour).padStart(2, '0')}:{String(task.minute).padStart(2, '0')}
+                              </span>
+                              <span style={{ fontSize: 13, color: 'var(--text)', flex: 1, minWidth: 0 }}>{task.name}</span>
+                            </div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+                              <span style={{ fontSize: 11, color: 'var(--text-3)' }}>{dayLabels}</span>
+                              <div style={{ display: 'flex', gap: 10, flexShrink: 0 }}>
+                                <button onClick={() => startEditDailyTask(task)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-3)', lineHeight: 0, padding: 2 }}>
+                                  <Pencil size={14} />
+                                </button>
+                                <button onClick={() => removeDailyTask(task.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-3)', lineHeight: 0, padding: 2 }}>
+                                  <X size={15} />
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        ) : (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                            <span style={{ width: 6, height: 6, borderRadius: '50%', background: c, flexShrink: 0 }} />
+                            <span style={{ fontSize: 12, color: 'var(--text-3)', fontVariantNumeric: 'tabular-nums', flexShrink: 0, minWidth: 36 }}>
+                              {String(task.hour).padStart(2, '0')}:{String(task.minute).padStart(2, '0')}
+                            </span>
+                            <span style={{ fontSize: 13, color: 'var(--text)', flex: 1 }}>{task.name}</span>
+                            <span style={{ fontSize: 11, color: 'var(--text-3)', flexShrink: 0 }}>{dayLabels}</span>
+                            <button onClick={() => startEditDailyTask(task)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-3)', lineHeight: 0, padding: 2, flexShrink: 0 }}>
+                              <Pencil size={12} />
+                            </button>
+                            <button onClick={() => removeDailyTask(task.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-3)', lineHeight: 0, padding: 2, flexShrink: 0 }}>
+                              <X size={13} />
+                            </button>
+                          </div>
+                        )}
                       </div>
                     )
                   })
