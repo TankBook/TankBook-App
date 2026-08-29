@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Layers, Fish, Leaf, Bug, Waves, Bell, Clock, Plus, AlertTriangle, Timer, Thermometer, FlaskConical, GripVertical, Filter, Droplets, X } from 'lucide-react'
+import { Layers, Fish, Leaf, Bug, Waves, Bell, Clock, Plus, AlertTriangle, Timer, Thermometer, FlaskConical, GripVertical, Filter, Droplets, X, ChevronUp, ChevronDown } from 'lucide-react'
 import { useTanks } from '../hooks'
 import { api, type TapWaterTest } from '../api/client'
 import { useSettings, formatDate, toMM, dimInputProps } from '../context/SettingsContext'
@@ -65,6 +65,10 @@ type DragProps = {
   onDragOver: (e: React.DragEvent) => void
   onDrop: (e: React.DragEvent) => void
   onDragEnd: () => void
+  onMoveUp: () => void
+  onMoveDown: () => void
+  isFirst: boolean
+  isLast: boolean
 }
 
 function TankOverviewCard({ tank, drag }: { tank: DashboardStats['tanks'][0]; drag: DragProps }) {
@@ -120,6 +124,26 @@ function TankOverviewCard({ tank, drag }: { tank: DashboardStats['tanks'][0]; dr
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
           <WaterTypeBadge type={tank.water_type} />
+          <div style={{ display: 'flex', flexDirection: 'column', flexShrink: 0 }}>
+            <button
+              type="button"
+              aria-label="Move tank earlier"
+              disabled={drag.isFirst}
+              onClick={e => { e.stopPropagation(); drag.onMoveUp() }}
+              style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 26, height: 22, padding: 0, border: 'none', background: 'none', color: drag.isFirst ? 'var(--text-4)' : 'var(--text-2)', cursor: drag.isFirst ? 'default' : 'pointer' }}
+            >
+              <ChevronUp size={13} />
+            </button>
+            <button
+              type="button"
+              aria-label="Move tank later"
+              disabled={drag.isLast}
+              onClick={e => { e.stopPropagation(); drag.onMoveDown() }}
+              style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 26, height: 22, padding: 0, border: 'none', background: 'none', color: drag.isLast ? 'var(--text-4)' : 'var(--text-2)', cursor: drag.isLast ? 'default' : 'pointer' }}
+            >
+              <ChevronDown size={13} />
+            </button>
+          </div>
           <GripVertical size={14} style={{ color: 'var(--text-4)', flexShrink: 0 }} />
         </div>
       </div>
@@ -342,6 +366,19 @@ export default function Dashboard() {
     await loadStats()
   }
 
+  function moveTank(tankId: string, direction: -1 | 1) {
+    setOrderedTanks(prev => {
+      const from = prev.findIndex(t => t.id === tankId)
+      const to = from + direction
+      if (from === -1 || to < 0 || to >= prev.length) return prev
+      const next = [...prev]
+      const [moved] = next.splice(from, 1)
+      next.splice(to, 0, moved)
+      api.tanks.reorder(next.map((t, i) => ({ id: t.id, sort_order: i })))
+      return next
+    })
+  }
+
   if (loading || !stats) return <p style={{ color: 'var(--text-2)' }}>Loading dashboard…</p>
 
   const hasAnyTwValue = [twPh, twGh, twKh, twChlorine, twNitrate, twTds].some(v => v.trim() !== '')
@@ -451,13 +488,17 @@ export default function Dashboard() {
         <div style={{ flex: 1, minWidth: 0 }}>
           <p style={{ fontWeight: 500, fontSize: 15, margin: '0 0 12px', color: 'var(--text)' }}>Your Tanks</p>
           <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(2, 1fr)', gap: 16 }}>
-            {orderedTanks.map(t => (
+            {orderedTanks.map((t, i) => (
               <TankOverviewCard
                 key={t.id}
                 tank={t}
                 drag={{
                   isDragging: dragId === t.id,
                   isDragOver: dragOverId === t.id,
+                  isFirst: i === 0,
+                  isLast: i === orderedTanks.length - 1,
+                  onMoveUp: () => moveTank(t.id, -1),
+                  onMoveDown: () => moveTank(t.id, 1),
                   onDragStart: (e) => { e.dataTransfer.effectAllowed = 'move'; setDragId(t.id) },
                   onDragOver: (e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; if (dragId && dragId !== t.id) setDragOverId(t.id) },
                   onDrop: (e) => {
