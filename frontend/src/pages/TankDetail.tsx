@@ -2982,8 +2982,8 @@ ${taskRows ? `<h2>Pending Maintenance</h2>
         <Card>
           <SectionTitle>Alerts</SectionTitle>
           {alerts.data?.length === 0 && <p style={{ fontSize: 13, color: 'var(--text-2)' }}>No alerts.</p>}
-          {alerts.data?.map(a => (
-            <div key={a.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', padding: '10px 0', borderBottom: '0.5px solid var(--border-sub)', opacity: a.acknowledged ? 0.5 : 1 }}>
+          {alerts.data?.map((a, i, arr) => (
+            <div key={a.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', padding: '10px 0', borderBottom: i === arr.length - 1 ? 'none' : '0.5px solid var(--border-sub)', opacity: a.acknowledged ? 0.5 : 1 }}>
               <div>
                 <Tag bg={a.severity === 'danger' ? 'var(--red-bg)' : 'var(--amber-bg)'} color={a.severity === 'danger' ? 'var(--red)' : 'var(--amber)'} style={{ marginRight: 8 }}>
                   {a.severity}
