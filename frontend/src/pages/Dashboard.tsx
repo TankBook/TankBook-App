@@ -403,12 +403,18 @@ export default function Dashboard() {
           const tank = stats.tanks.find(tk => tk.id === t.tank_id)
           const skipping = skipTaskId === t.id
           const isLast = i === stats.upcoming_tasks.length - 1
+          const today = new Date(); today.setHours(0, 0, 0, 0)
+          const due = new Date(t.due_at); due.setHours(0, 0, 0, 0)
+          const dueToday = due.getTime() === today.getTime()
           return (
             <div key={t.id} style={{ padding: '8px 0', borderBottom: !isLast || skipping ? '0.5px solid var(--border-sub)' : 'none' }}>
               {isMobile ? (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 6 }}>
-                    <p style={{ fontSize: 12, fontWeight: 500, color: 'var(--text)', margin: 0, minWidth: 0 }}>{t.task_type}</p>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
+                      <p style={{ fontSize: 12, fontWeight: 500, color: 'var(--text)', margin: 0, minWidth: 0 }}>{t.task_type}</p>
+                      {dueToday && <Tag compact bg="var(--amber-bg)" color="var(--amber)">Due today</Tag>}
+                    </div>
                     <span style={{ fontSize: 11, color: 'var(--text-3)', flexShrink: 0 }}>{formatDate(t.due_at, dateFormat)}</span>
                   </div>
                   <p style={{ fontSize: 11, color: 'var(--text-2)', margin: 0 }}>
@@ -431,7 +437,10 @@ export default function Dashboard() {
               ) : (
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 6 }}>
                   <div style={{ minWidth: 0 }}>
-                    <p style={{ fontSize: 12, fontWeight: 500, color: 'var(--text)', margin: '0 0 2px' }}>{t.task_type}</p>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <p style={{ fontSize: 12, fontWeight: 500, color: 'var(--text)', margin: '0 0 2px' }}>{t.task_type}</p>
+                      {dueToday && <Tag compact bg="var(--amber-bg)" color="var(--amber)">Due today</Tag>}
+                    </div>
                     <p style={{ fontSize: 11, color: 'var(--text-2)', margin: 0 }}>
                       {tank?.name}{t.is_recurring ? ' ↻' : ''}{t.description ? ` · ${t.description}` : ''}
                     </p>
