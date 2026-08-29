@@ -110,6 +110,36 @@
         box-shadow: 0 0 0 2px var(--focus-ring);
       }
 
+      .unit-field {
+        display: flex;
+        align-items: center;
+        border-radius: 8px;
+        border: 0.5px solid var(--btn-border);
+        background: var(--surface);
+        overflow: hidden;
+      }
+      .unit-field:focus-within {
+        border-color: var(--blue-border);
+        box-shadow: 0 0 0 2px var(--focus-ring);
+      }
+      .unit-field input {
+        flex: 1;
+        min-width: 0;
+        border: none;
+        border-radius: 0;
+        background: transparent;
+        box-shadow: none;
+      }
+      .unit-field input:focus {
+        box-shadow: none;
+      }
+      .unit-field span {
+        padding: 0 10px 0 0;
+        color: var(--text-2);
+        font-size: 13px;
+        flex-shrink: 0;
+      }
+
 
       button {
         font-family: inherit;

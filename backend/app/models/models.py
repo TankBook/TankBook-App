@@ -19,15 +19,22 @@ class Tank(Base):
     volume_litres: Mapped[int] = mapped_column(Integer, nullable=False)
     substrate: Mapped[str | None] = mapped_column(String)
     lighting: Mapped[str | None] = mapped_column(String)
+    has_filter: Mapped[bool] = mapped_column(Boolean, default=False)
     filter_flow_lph: Mapped[int | None] = mapped_column(Integer)
     width_mm: Mapped[int | None] = mapped_column(Integer)
     height_mm: Mapped[int | None] = mapped_column(Integer)
     depth_mm: Mapped[int | None] = mapped_column(Integer)
     water_type: Mapped[str] = mapped_column(String, default="freshwater")
     co2_injection: Mapped[bool] = mapped_column(Boolean, default=False)
+    co2_source: Mapped[str | None] = mapped_column(String)
+    co2_method: Mapped[str | None] = mapped_column(String)
     has_heater: Mapped[bool] = mapped_column(Boolean, default=False)
     sort_order: Mapped[int] = mapped_column(Integer, default=0)
     heater_watts: Mapped[int | None] = mapped_column(Integer)
+    has_lighting: Mapped[bool] = mapped_column(Boolean, default=False)
+    light_intensity: Mapped[str | None] = mapped_column(String)
+    light_watts: Mapped[int | None] = mapped_column(Integer)
+    light_technology: Mapped[str | None] = mapped_column(String)
     setup_date: Mapped[datetime | None] = mapped_column(DateTime)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
@@ -93,6 +100,21 @@ class WaterParameter(Base):
 
     tank: Mapped["Tank"] = relationship(back_populates="parameters")
     alerts: Mapped[list["Alert"]] = relationship(back_populates="parameter_log")
+
+
+class TapWaterTest(Base):
+    """Readings for the household tap water source, not tied to any one tank."""
+    __tablename__ = "tap_water_tests"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=new_uuid)
+    ph: Mapped[float | None] = mapped_column(Float)
+    gh_dgh: Mapped[float | None] = mapped_column(Float)
+    kh_dkh: Mapped[float | None] = mapped_column(Float)
+    chlorine_ppm: Mapped[float | None] = mapped_column(Float)
+    nitrate_ppm: Mapped[float | None] = mapped_column(Float)
+    tds_ppm: Mapped[float | None] = mapped_column(Float)
+    recorded_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    notes: Mapped[str | None] = mapped_column(Text)
 
 
 class MaintenanceTask(Base):

@@ -1,14 +1,15 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
 import { useParams, Link, useNavigate, useSearchParams } from 'react-router-dom'
-import { Fish, Leaf, Droplets, CalendarCheck, Bell, Pencil, Trash2, Plus, ChevronLeft, ChevronDown, ListChecks, Camera, X, Utensils, BookOpen, FlaskConical, Home, Clock, Calendar, ChevronLeft as Prev, ChevronRight as Next, type LucideIcon } from 'lucide-react'
+import { Fish, Leaf, Droplets, CalendarCheck, Bell, Pencil, Trash2, Plus, ChevronLeft, ChevronDown, ListChecks, Camera, X, Utensils, BookOpen, FlaskConical, Thermometer, Lightbulb, Filter, Home, Clock, Calendar, ChevronLeft as Prev, ChevronRight as Next, Save, Target, Info, type LucideIcon } from 'lucide-react'
 import {
-  LineChart, Line, XAxis, YAxis, Tooltip,
+  LineChart, Line, XAxis, YAxis, Tooltip, ReferenceLine,
   ResponsiveContainer,
 } from 'recharts'
 import { useTank, useFish, usePlants, useParameters, useAlerts } from '../hooks'
 import { api, type Tank } from '../api/client'
 import { useSettings, formatDate, formatDateTime, fromMM, toMM, fmtDim, dimInputProps } from '../context/SettingsContext'
 import { Card, FieldLabel, Tag, SectionTitle, tabStyle } from '../components/ui'
+import { type Species, SpeciesDetailModal } from '../components/SpeciesDetail'
 
 type Tab = 'home' | 'inhabitants' | 'plants' | 'parameters' | 'weekly' | 'daily' | 'alerts' | 'gallery' | 'edit'
 
@@ -437,12 +438,18 @@ function EditTankPanel({ tank, onSave }: { tank: any; onSave: () => void }) {
   const [volume, setVolume] = useState(String(tank.volume_litres))
   const [waterType, setWaterType] = useState(tank.water_type ?? 'freshwater')
   const [substrate, setSubstrate] = useState(tank.substrate ?? '')
-  const [lighting, setLighting] = useState(tank.lighting ?? '')
+  const [hasLighting, setHasLighting] = useState(tank.has_lighting)
+  const [lightIntensity, setLightIntensity] = useState(tank.light_intensity ?? '')
+  const [lightWatts, setLightWatts] = useState(tank.light_watts != null ? String(tank.light_watts) : '')
+  const [lightTechnology, setLightTechnology] = useState(tank.light_technology ?? '')
   const [filterFlow, setFilterFlow] = useState(tank.filter_flow_lph != null ? String(tank.filter_flow_lph) : '')
+  const [hasFilter, setHasFilter] = useState(tank.has_filter)
   const [width, setWidth] = useState(tank.width_mm != null ? String(fromMM(tank.width_mm, unitSystem)) : '')
   const [height, setHeight] = useState(tank.height_mm != null ? String(fromMM(tank.height_mm, unitSystem)) : '')
   const [depth, setDepth] = useState(tank.depth_mm != null ? String(fromMM(tank.depth_mm, unitSystem)) : '')
   const [co2, setCo2] = useState(tank.co2_injection)
+  const [co2Source, setCo2Source] = useState(tank.co2_source ?? '')
+  const [co2Method, setCo2Method] = useState(tank.co2_method ?? '')
   const [hasHeater, setHasHeater] = useState(tank.has_heater)
   const [heaterWatts, setHeaterWatts] = useState(tank.heater_watts != null ? String(tank.heater_watts) : '')
   const [saved, setSaved] = useState(false)
@@ -464,14 +471,21 @@ function EditTankPanel({ tank, onSave }: { tank: any; onSave: () => void }) {
       body: JSON.stringify({
         name, volume_litres: Number(volume),
         water_type: waterType,
-        substrate: substrate || null, lighting: lighting || null,
-        filter_flow_lph: filterFlow ? Number(filterFlow) : null,
+        substrate: substrate || null,
+        has_filter: hasFilter,
+        filter_flow_lph: hasFilter && filterFlow ? Number(filterFlow) : null,
         width_mm: width ? toMM(Number(width), unitSystem) : null,
         height_mm: height ? toMM(Number(height), unitSystem) : null,
         depth_mm: depth ? toMM(Number(depth), unitSystem) : null,
         co2_injection: co2,
+        co2_source: co2 && co2Source ? co2Source : null,
+        co2_method: co2 && co2Method ? co2Method : null,
         has_heater: hasHeater,
         heater_watts: hasHeater && heaterWatts ? Number(heaterWatts) : null,
+        has_lighting: hasLighting,
+        light_intensity: hasLighting && lightIntensity ? lightIntensity : null,
+        light_watts: hasLighting && lightWatts ? Number(lightWatts) : null,
+        light_technology: hasLighting && lightTechnology ? lightTechnology : null,
         setup_date: tank.setup_date,
       }),
     })
@@ -483,18 +497,24 @@ function EditTankPanel({ tank, onSave }: { tank: any; onSave: () => void }) {
   return (
     <Card>
       <SectionTitle>Edit Tank</SectionTitle>
-      {[
-        ['Tank Name', name, setName],
-        ['Volume (Litres)', volume, setVolume],
-        ['Substrate', substrate, setSubstrate],
-        ['Lighting', lighting, setLighting],
-        ['Filter Flow (L/h)', filterFlow, setFilterFlow],
-      ].map(([lbl, val, set]) => (
-        <div key={lbl as string} style={{ marginBottom: 12 }}>
-          <FieldLabel>{lbl as string}</FieldLabel>
-          <input value={val as string} onChange={e => (set as any)(e.target.value)} style={{ width: '100%', boxSizing: 'border-box' }} />
+      <div style={{ marginBottom: 12 }}>
+        <FieldLabel>Tank Name</FieldLabel>
+        <input value={name} onChange={e => setName(e.target.value)} style={{ width: '100%', boxSizing: 'border-box' }} />
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(4, minmax(0, 1fr))', gap: 10, marginBottom: 12 }}>
+        {([['Width', width, setWidth], ['Height', height, setHeight], ['Depth', depth, setDepth]] as [string, string, (v: string) => void][]).map(([lbl, val, set]) => (
+          <div key={lbl}>
+            <FieldLabel>{lbl} ({unitSystem})</FieldLabel>
+            <input type="number" min="0" step={dp.step} placeholder={dp.placeholder}
+              value={val} onChange={e => set(e.target.value)} style={{ width: '100%', boxSizing: 'border-box' }} />
+          </div>
+        ))}
+        <div>
+          <FieldLabel>Volume (Litres)</FieldLabel>
+          <input type="number" min="0"
+            value={volume} onChange={e => setVolume(e.target.value)} style={{ width: '100%', boxSizing: 'border-box' }} />
         </div>
-      ))}
+      </div>
       <div style={{ marginBottom: 12 }}>
         <FieldLabel>Water Type</FieldLabel>
         <select value={waterType} onChange={e => setWaterType(e.target.value)} style={{ width: '100%', boxSizing: 'border-box' }}>
@@ -503,47 +523,142 @@ function EditTankPanel({ tank, onSave }: { tank: any; onSave: () => void }) {
           <option value="brackish">Brackish</option>
         </select>
       </div>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10, marginBottom: 12 }}>
-        {([['Width', width, setWidth], ['Height', height, setHeight], ['Depth', depth, setDepth]] as [string, string, (v: string) => void][]).map(([lbl, val, set]) => (
-          <div key={lbl}>
-            <FieldLabel>{lbl} ({unitSystem})</FieldLabel>
-            <input type="number" min="0" step={dp.step} placeholder={dp.placeholder}
-              value={val} onChange={e => set(e.target.value)} style={{ width: '100%', boxSizing: 'border-box' }} />
-          </div>
-        ))}
+      <div style={{ marginBottom: 12 }}>
+        <FieldLabel>Substrate</FieldLabel>
+        <input value={substrate} onChange={e => setSubstrate(e.target.value)} style={{ width: '100%', boxSizing: 'border-box' }} />
       </div>
-      <div style={{ display: 'flex', gap: 20, marginBottom: 16, flexWrap: 'wrap' }}>
-        <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: 'var(--text-label)' }}>
-          <input type="checkbox" checked={co2} onChange={e => setCo2(e.target.checked)} /> CO₂ Injection
-        </label>
-        <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: 'var(--text-label)' }}>
-          <input type="checkbox" checked={hasHeater} onChange={e => { setHasHeater(e.target.checked); if (!e.target.checked) setHeaterWatts('') }} /> Heater
-        </label>
-        {hasHeater && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(4, minmax(0, 1fr))', gap: 10, marginBottom: 12 }}>
+        <button
+          type="button"
+          onClick={() => { const next = !hasFilter; setHasFilter(next); if (!next) setFilterFlow('') }}
+          style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '7px 10px', borderRadius: 8,
+            fontSize: 13, fontWeight: 500, cursor: 'pointer',
+            border: `0.5px solid ${hasFilter ? 'var(--blue-border)' : 'var(--btn-border)'}`,
+            background: hasFilter ? 'var(--blue-bg)' : 'transparent',
+            color: hasFilter ? 'var(--blue)' : 'var(--text-3)',
+            opacity: hasFilter ? 1 : 0.55,
+          }}
+        >
+          <Filter size={14} /> Filter
+        </button>
+        <button
+          type="button"
+          onClick={() => { const next = !co2; setCo2(next); if (!next) { setCo2Source(''); setCo2Method('') } }}
+          style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '7px 10px', borderRadius: 8,
+            fontSize: 13, fontWeight: 500, cursor: 'pointer',
+            border: `0.5px solid ${co2 ? 'var(--green-border)' : 'var(--btn-border)'}`,
+            background: co2 ? 'var(--green-bg)' : 'transparent',
+            color: co2 ? 'var(--green)' : 'var(--text-3)',
+            opacity: co2 ? 1 : 0.55,
+          }}
+        >
+          <FlaskConical size={14} /> CO₂ Injection
+        </button>
+        <button
+          type="button"
+          onClick={() => { const next = !hasHeater; setHasHeater(next); if (!next) setHeaterWatts('') }}
+          style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '7px 10px', borderRadius: 8,
+            fontSize: 13, fontWeight: 500, cursor: 'pointer',
+            border: `0.5px solid ${hasHeater ? 'var(--orange-border, color-mix(in srgb, var(--orange, #ef6c00) 30%, transparent))' : 'var(--btn-border)'}`,
+            background: hasHeater ? 'var(--orange-bg)' : 'transparent',
+            color: hasHeater ? 'var(--orange, #ef6c00)' : 'var(--text-3)',
+            opacity: hasHeater ? 1 : 0.55,
+          }}
+        >
+          <Thermometer size={14} /> Heater
+        </button>
+        <button
+          type="button"
+          onClick={() => { const next = !hasLighting; setHasLighting(next); if (!next) { setLightIntensity(''); setLightWatts(''); setLightTechnology('') } }}
+          style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '7px 10px', borderRadius: 8,
+            fontSize: 13, fontWeight: 500, cursor: 'pointer',
+            border: `0.5px solid ${hasLighting ? 'var(--amber-border)' : 'var(--btn-border)'}`,
+            background: hasLighting ? 'var(--amber-bg)' : 'transparent',
+            color: hasLighting ? 'var(--amber)' : 'var(--text-3)',
+            opacity: hasLighting ? 1 : 0.55,
+          }}
+        >
+          <Lightbulb size={14} /> Lighting
+        </button>
+      </div>
+      {hasFilter && (
+        <div className="unit-field" style={{ marginBottom: 12 }}>
+          <input
+            type="number" min="1" placeholder="Flow rate"
+            value={filterFlow} onChange={e => setFilterFlow(e.target.value)}
+          />
+          <span>L/h</span>
+        </div>
+      )}
+      {co2 && (
+        <div style={{ display: 'flex', gap: 10, marginBottom: 12, alignItems: 'center' }}>
+          <select value={co2Source} onChange={e => setCo2Source(e.target.value)} style={{ flex: 1, minWidth: 0 }}>
+            <option value="">Source</option>
+            <option value="Pressurized CO2">Pressurized CO2</option>
+            <option value="Yeast">Yeast</option>
+            <option value="Chemical">Chemical</option>
+            <option value="Liquid Carbon">Liquid Carbon</option>
+          </select>
+          <select value={co2Method} onChange={e => setCo2Method(e.target.value)} style={{ flex: 1, minWidth: 0 }}>
+            <option value="">Injection method</option>
+            <option value="In-line with Filter">In-line with Filter</option>
+            <option value="CO2 Diffuser">CO2 Diffuser</option>
+          </select>
+        </div>
+      )}
+      {hasHeater && (
+        <div className="unit-field" style={{ marginBottom: 12 }}>
+          <input
+            type="number" min="1" placeholder="Watts"
+            value={heaterWatts} onChange={e => setHeaterWatts(e.target.value)}
+          />
+          <span>W</span>
+        </div>
+      )}
+      {hasLighting && (
+        <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', gap: 10, marginBottom: 12, alignItems: isMobile ? 'stretch' : 'center' }}>
+          <select value={lightIntensity} onChange={e => setLightIntensity(e.target.value)} style={{ flex: 1, minWidth: 0 }}>
+            <option value="">Intensity</option>
+            <option value="low">Low</option>
+            <option value="medium">Medium</option>
+            <option value="high">High</option>
+          </select>
+          <div className="unit-field" style={{ flex: 1 }}>
             <input
               type="number" min="1" placeholder="Watts"
-              value={heaterWatts} onChange={e => setHeaterWatts(e.target.value)}
-              style={{ width: 80 }}
+              value={lightWatts} onChange={e => setLightWatts(e.target.value)}
             />
-            <span style={{ fontSize: 13, color: 'var(--text-2)' }}>W</span>
+            <span>W</span>
           </div>
-        )}
-      </div>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-        <button onClick={save} style={{ padding: '7px 16px', borderRadius: 8, border: '0.5px solid var(--blue-border)', background: 'var(--blue-bg)', color: 'var(--blue)', fontSize: 13, fontWeight: 500, cursor: 'pointer', width: isMobile ? '100%' : undefined, boxSizing: 'border-box' }}>Save changes</button>
-        {saved && <span style={{ fontSize: 12, color: 'var(--green)' }}>Saved ✓</span>}
-      </div>
-
+          <select value={lightTechnology} onChange={e => setLightTechnology(e.target.value)} style={{ flex: 1, minWidth: 0 }}>
+            <option value="">Technology</option>
+            <option value="LED">LED</option>
+            <option value="T5">T5 Fluorescent</option>
+            <option value="T8">T8 Fluorescent</option>
+            <option value="Metal Halide">Metal Halide</option>
+            <option value="CFL">CFL</option>
+            <option value="Other">Other</option>
+          </select>
+        </div>
+      )}
       <div style={{ marginTop: 28, paddingTop: 20, borderTop: '0.5px solid var(--border)' }}>
-        <p style={{ margin: '0 0 10px', fontSize: 12, fontWeight: 600, color: 'var(--red)', letterSpacing: '0.06em', textTransform: 'uppercase' }}>Danger Zone</p>
         {!showDeleteConfirm ? (
-          <button
-            onClick={() => setShowDeleteConfirm(true)}
-            style={{ padding: '7px 16px', borderRadius: 8, border: '0.5px solid var(--red-border)', background: 'transparent', color: 'var(--red)', fontSize: 13, cursor: 'pointer', width: isMobile ? '100%' : undefined, boxSizing: 'border-box' }}
-          >
-            Delete Tank…
-          </button>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>
+            <button
+              onClick={() => setShowDeleteConfirm(true)}
+              style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '7px 16px', borderRadius: 8, border: '0.5px solid var(--red-border)', background: 'transparent', color: 'var(--red)', fontSize: 13, cursor: 'pointer', width: isMobile ? '100%' : undefined, boxSizing: 'border-box' }}
+            >
+              <Trash2 size={14} /> Delete Tank
+            </button>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, width: isMobile ? '100%' : undefined }}>
+              <button onClick={save} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '7px 16px', borderRadius: 8, border: '0.5px solid var(--blue-border)', background: 'var(--blue-bg)', color: 'var(--blue)', fontSize: 13, fontWeight: 500, cursor: 'pointer', width: isMobile ? '100%' : undefined, boxSizing: 'border-box' }}><Save size={14} /> Save changes</button>
+              {saved && <span style={{ fontSize: 12, color: 'var(--green)' }}>Saved ✓</span>}
+            </div>
+          </div>
         ) : (
           <div style={{ background: 'var(--red-bg)', border: '0.5px solid var(--red-border)', borderRadius: 10, padding: '14px 16px' }}>
             <p style={{ margin: '0 0 4px', fontSize: 13, fontWeight: 500, color: 'var(--red)' }}>Delete "{tank.name}"?</p>
@@ -804,6 +919,146 @@ function TankGraphic({ fishCount, plantCount, co2 }: { fishCount: number; plantC
   )
 }
 
+function DailyTaskFormFields({
+  name, setName, hour, setHour, minute, setMinute, days, setDays, color, setColor,
+  timePickerOpen, setTimePickerOpen, isMobile, onNameEnter,
+}: {
+  name: string; setName: (v: string) => void
+  hour: string; setHour: (v: string) => void
+  minute: string; setMinute: (v: string) => void
+  days: number[]; setDays: React.Dispatch<React.SetStateAction<number[]>>
+  color: string; setColor: (v: string) => void
+  timePickerOpen: boolean; setTimePickerOpen: React.Dispatch<React.SetStateAction<boolean>>
+  isMobile: boolean
+  onNameEnter?: () => void
+}) {
+  const hour24 = Number(hour)
+  const h12 = (hour24 % 12) || 12
+  const ampm = hour24 < 12 ? 'AM' : 'PM'
+  const setHourFrom12 = (newH12: number) => {
+    const newHour24 = ampm === 'AM' ? newH12 % 12 : (newH12 % 12) + 12
+    setHour(String(newHour24))
+  }
+  const setAmPm = (period: 'AM' | 'PM') => {
+    const newHour24 = period === 'AM' ? h12 % 12 : (h12 % 12) + 12
+    setHour(String(newHour24))
+  }
+  const pillStyle = (on: boolean): React.CSSProperties => ({
+    padding: '6px 0', borderRadius: 6, fontSize: 12, cursor: 'pointer',
+    border: on ? '0.5px solid var(--blue-border)' : '0.5px solid var(--btn-border)',
+    background: on ? 'var(--blue-bg)' : 'transparent',
+    color: on ? 'var(--blue)' : 'var(--text-2)',
+    fontWeight: on ? 500 : 400,
+  })
+  return (
+    <>
+      <div style={{ display: 'flex', gap: 10, marginBottom: 12, flexWrap: 'wrap' }}>
+        <div style={{ flex: 1, minWidth: 160 }}>
+          <FieldLabel>Task Name</FieldLabel>
+          <input
+            value={name} onChange={e => setName(e.target.value)}
+            placeholder="e.g. CO2 on, Lights on, Dose ferts"
+            style={{ width: '100%', boxSizing: 'border-box' }}
+            onKeyDown={e => e.key === 'Enter' && onNameEnter?.()}
+          />
+        </div>
+        <div style={{ position: 'relative', width: isMobile ? '100%' : undefined }}>
+          <FieldLabel>Time</FieldLabel>
+          <button
+            type="button"
+            onClick={() => setTimePickerOpen(o => !o)}
+            style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10,
+              width: isMobile ? '100%' : 120, boxSizing: 'border-box',
+              padding: '6px 10px', borderRadius: 8, border: '0.5px solid var(--btn-border)',
+              background: 'var(--surface)', color: 'var(--text)', fontSize: 13, cursor: 'pointer',
+            }}
+          >
+            <span>{h12}:{String(Number(minute)).padStart(2, '0')} {ampm}</span>
+            <Clock size={14} style={{ color: 'var(--text-3)', flexShrink: 0 }} />
+          </button>
+
+          {timePickerOpen && (
+            <>
+              <div onClick={() => setTimePickerOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 90 }} />
+              <div style={{
+                position: 'absolute', top: 'calc(100% + 4px)', left: 0, right: isMobile ? 0 : 'auto', zIndex: 100,
+                width: isMobile ? '100%' : 250,
+                background: 'var(--surface)', border: '0.5px solid var(--border)', borderRadius: 10,
+                boxShadow: '0 8px 24px rgba(0,0,0,0.16)', padding: 12,
+              }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 4, marginBottom: 10 }}>
+                  {Array.from({ length: 12 }, (_, i) => i + 1).map(h => (
+                    <button key={h} type="button" onClick={() => setHourFrom12(h)} style={pillStyle(h === h12)}>{h}</button>
+                  ))}
+                </div>
+                <div style={{ display: 'flex', gap: 4, marginBottom: 10 }}>
+                  {[0, 15, 30, 45].map(m => (
+                    <button key={m} type="button" onClick={() => setMinute(String(m))} style={{ ...pillStyle(m === Number(minute)), flex: 1 }}>
+                      {String(m).padStart(2, '0')}
+                    </button>
+                  ))}
+                </div>
+                <div style={{ display: 'flex', gap: 4 }}>
+                  {(['AM', 'PM'] as const).map(period => (
+                    <button key={period} type="button" onClick={() => setAmPm(period)} style={{ ...pillStyle(period === ampm), flex: 1 }}>
+                      {period}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+
+      <div style={{ marginBottom: 12 }}>
+        <FieldLabel>Days</FieldLabel>
+        <div style={{ display: 'flex', gap: isMobile ? 3 : 6, width: '100%' }}>
+          {DAY_NAMES.map((dayName, i) => {
+            const on = days.includes(i)
+            return (
+              <button key={dayName} onClick={() => setDays(prev => on ? prev.filter(x => x !== i) : [...prev, i].sort())}
+                style={{
+                  flex: 1, minWidth: 0, padding: isMobile ? '7px 1px' : '4px 6px', borderRadius: 6,
+                  fontSize: 12, cursor: 'pointer',
+                  border: on ? '0.5px solid var(--blue-border)' : '0.5px solid var(--btn-border)',
+                  background: on ? 'var(--blue-bg)' : 'transparent',
+                  color: on ? 'var(--blue)' : 'var(--text-2)',
+                  fontWeight: on ? 500 : 400,
+                  whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'clip',
+                }}
+              >{isMobile ? dayName[0] : dayName}</button>
+            )
+          })}
+          <button onClick={() => setDays(prev => prev.length === 7 ? [] : [0, 1, 2, 3, 4, 5, 6])}
+            style={{
+              flex: isMobile ? 1.4 : 1.2, minWidth: 0, padding: isMobile ? '7px 1px' : '4px 6px', borderRadius: 6,
+              fontSize: 11, cursor: 'pointer', border: '0.5px solid var(--btn-border)',
+              background: 'transparent', color: 'var(--text-3)',
+              whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'clip',
+            }}>
+            {days.length === 7 ? 'None' : (isMobile ? 'All' : 'Every day')}
+          </button>
+        </div>
+      </div>
+
+      <div style={{ marginBottom: 14 }}>
+        <FieldLabel>Colour</FieldLabel>
+        <div style={{ display: 'flex', gap: isMobile ? 3 : 6, width: '100%' }}>
+          {DAILY_COLORS.map(c => (
+            <button key={c} onClick={() => setColor(c)} style={{
+              flex: 1, minWidth: 0, height: 32, borderRadius: 6, background: c, cursor: 'pointer',
+              border: color === c ? `2.5px solid var(--text)` : '2px solid transparent',
+              padding: 0,
+            }} />
+          ))}
+        </div>
+      </div>
+    </>
+  )
+}
+
 export default function TankDetail() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
@@ -871,6 +1126,14 @@ export default function TankDetail() {
   const [sg, setSg] = useState('')
   const [stripModal, setStripModal] = useState<{ label: string; setter: (v: string) => void } | null>(null)
   const [stripKit, setStripKit] = useState<'master' | '5in1'>('master')
+  const [hiddenOptimumLines, setHiddenOptimumLines] = useState<Record<string, boolean>>({})
+  const [mobileChartEndOffset, setMobileChartEndOffset] = useState(0)
+  const [speciesList, setSpeciesList] = useState<Species[]>([])
+  const [speciesInfoTarget, setSpeciesInfoTarget] = useState<Species | null>(null)
+
+  useEffect(() => {
+    fetch('/api/species/').then(r => r.json()).then(setSpeciesList).catch(() => {})
+  }, [])
 
   const [dailyTasks, setDailyTasks] = useState<any[]>([])
   const [dtName, setDtName] = useState('')
@@ -879,6 +1142,13 @@ export default function TankDetail() {
   const [dtDays, setDtDays] = useState<number[]>([0, 1, 2, 3, 4, 5, 6])
   const [dtTimePickerOpen, setDtTimePickerOpen] = useState(false)
   const [dtColor, setDtColor] = useState(DAILY_COLORS[0])
+  const [editingDailyTaskId, setEditingDailyTaskId] = useState<string | null>(null)
+  const [editDtName, setEditDtName] = useState('')
+  const [editDtHour, setEditDtHour] = useState('8')
+  const [editDtMinute, setEditDtMinute] = useState('0')
+  const [editDtDays, setEditDtDays] = useState<number[]>([])
+  const [editDtTimePickerOpen, setEditDtTimePickerOpen] = useState(false)
+  const [editDtColor, setEditDtColor] = useState(DAILY_COLORS[0])
 
   const [isMobile, setIsMobile] = useState(() => window.matchMedia('(max-width: 768px)').matches)
   const [isCompactTabs, setIsCompactTabs] = useState(() => window.matchMedia('(max-width: 900px)').matches)
@@ -970,6 +1240,28 @@ export default function TankDetail() {
 
   async function removeDailyTask(taskId: string) {
     await api.dailyTasks.delete(id!, taskId)
+    loadDailyTasks()
+  }
+
+  function startEditDailyTask(task: { id: string; name: string; hour: number; minute: number; days: string; color: string | null }) {
+    setEditingDailyTaskId(task.id)
+    setEditDtName(task.name)
+    setEditDtHour(String(task.hour))
+    setEditDtMinute(String(task.minute))
+    setEditDtDays(task.days.split(',').map(Number))
+    setEditDtColor(task.color ?? DAILY_COLORS[0])
+  }
+
+  async function saveEditDailyTask() {
+    if (!editingDailyTaskId || !editDtName.trim() || editDtDays.length === 0) return
+    await api.dailyTasks.update(id!, editingDailyTaskId, {
+      name: editDtName.trim(),
+      hour: Number(editDtHour),
+      minute: Number(editDtMinute),
+      days: editDtDays.join(','),
+      color: editDtColor,
+    })
+    setEditingDailyTaskId(null)
     loadDailyTasks()
   }
 
@@ -1188,14 +1480,20 @@ ${taskRows ? `<h2>Pending Maintenance</h2>
   if (!tank) return <p style={{ color: 'var(--text-2)' }}>Loading…</p>
 
   const unackAlerts = alerts.data?.filter(a => !a.acknowledged) ?? []
-  const chartData = [...(params.data ?? [])].reverse()
+  const allChartData = [...(params.data ?? [])].reverse()
+  const mobileChartMaxOffset = Math.max(0, allChartData.length - 3)
+  const mobileChartOffset = Math.min(mobileChartEndOffset, mobileChartMaxOffset)
+  const mobileChartEnd = allChartData.length - mobileChartOffset
+  const mobileChartStart = Math.max(0, mobileChartEnd - 3)
+  const chartData = isMobile ? allChartData.slice(mobileChartStart, mobileChartEnd) : allChartData
+  const hasParamInput = [ph, temp, ammonia, nitrite, nitrate, gh, kh, salinity, sg].some(v => v.trim() !== '')
 
   const pendingTasks = tasks.filter(t => t.status === 'pending')
   const doneTasks = tasks.filter(t => t.status === 'done')
   const inhabitantCounts = {
-    fish: (fish.data ?? []).filter(f => f.organism_type === 'fish').reduce((sum, f) => sum + f.quantity, 0),
-    invertebrate: (fish.data ?? []).filter(f => f.organism_type === 'invertebrate').reduce((sum, f) => sum + f.quantity, 0),
-    amphibian: (fish.data ?? []).filter(f => f.organism_type === 'amphibian').reduce((sum, f) => sum + f.quantity, 0),
+    fish: (fish.data ?? []).filter(f => f.organism_type === 'fish' && f.fish_status === 'added').reduce((sum, f) => sum + f.quantity, 0),
+    invertebrate: (fish.data ?? []).filter(f => f.organism_type === 'invertebrate' && f.fish_status === 'added').reduce((sum, f) => sum + f.quantity, 0),
+    amphibian: (fish.data ?? []).filter(f => f.organism_type === 'amphibian' && f.fish_status === 'added').reduce((sum, f) => sum + f.quantity, 0),
   }
   const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0)
   const overdueTasks = pendingTasks.filter(t => { const d = new Date(t.due_at); d.setHours(0, 0, 0, 0); return d < todayStart })
@@ -1226,33 +1524,12 @@ ${taskRows ? `<h2>Pending Maintenance</h2>
             </button>
           </div>
         </div>
-        <div style={{ marginTop: 8 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
-            {tank.water_type && tank.water_type !== 'freshwater' && (() => {
-              const styles: Record<string, { bg: string; color: string; label: string }> = {
-                saltwater: { bg: 'var(--blue-bg)',  color: 'var(--blue)',  label: 'Saltwater' },
-                brackish:  { bg: 'var(--green-bg)', color: 'var(--green)', label: 'Brackish'  },
-              }
-              const s = styles[tank.water_type]
-              return s ? <Tag bg={s.bg} color={s.color}>{s.label}</Tag> : null
-            })()}
-          </div>
-          {tank.co2_injection && (
-            <div style={{ display: 'flex', gap: 6, marginTop: 8, flexWrap: 'wrap' }}>
-              {tank.co2_injection && (
-                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11, fontWeight: 500, padding: '3px 8px', borderRadius: 6, background: 'var(--green-bg)', color: 'var(--green)', border: '0.5px solid var(--green-border)' }}>
-                  <FlaskConical size={11} />CO₂
-                </span>
-              )}
-            </div>
-          )}
-        </div>
       </div>
 
       <div style={{ marginBottom: 20 }}>
         <TankGraphic
-          fishCount={(fish.data ?? []).reduce((s, f) => s + f.quantity, 0)}
-          plantCount={(plants.data ?? []).reduce((s, p) => s + p.quantity, 0)}
+          fishCount={(fish.data ?? []).filter(f => f.fish_status === 'added').reduce((s, f) => s + f.quantity, 0)}
+          plantCount={(plants.data ?? []).filter(p => p.plant_status === 'planted').reduce((s, p) => s + p.quantity, 0)}
           co2={tank.co2_injection}
         />
       </div>
@@ -1500,47 +1777,102 @@ ${taskRows ? `<h2>Pending Maintenance</h2>
               .map(({ type: oType, label: oLabel }) => ({ oType, oLabel, ofType: (fish.data ?? []).filter(f => f.organism_type === oType) }))
               .filter(s => s.ofType.length > 0)
             return visibleSections.map(({ oType, oLabel, ofType }, sectionIndex) => {
-              const grouped = new Map<string, FishEntry[]>()
+              // Group by species, then by status within each species — so a species
+              // with entries in more than one status (e.g. Added and Planned) shows
+              // as separate lines, but collapses back to one line once every entry
+              // for that species shares the same status again.
+              const grouped = new Map<string, Map<string, FishEntry[]>>()
               for (const f of ofType) {
-                const key = f.species_slug
-                if (!grouped.has(key)) grouped.set(key, [])
-                grouped.get(key)!.push(f)
+                if (!grouped.has(f.species_slug)) grouped.set(f.species_slug, new Map())
+                const byStatus = grouped.get(f.species_slug)!
+                if (!byStatus.has(f.fish_status)) byStatus.set(f.fish_status, [])
+                byStatus.get(f.fish_status)!.push(f)
               }
               return (
                 <div key={oType} style={{ marginBottom: 16, paddingTop: sectionIndex > 0 ? 16 : 0, borderTop: sectionIndex > 0 ? '0.5px solid var(--border-sub)' : 'none' }}>
                   <p style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.06em', margin: '0 0 8px' }}>{oLabel}</p>
-                  {[...grouped.entries()].map(([, entries]) => {
+                  {[...grouped.entries()].map(([slug, byStatus]) => [...byStatus.entries()].map(([status, entries]) => {
                     const first = entries[0]
                     const totalQuantity = entries.reduce((sum, entry) => sum + entry.quantity, 0)
-                    const statusTotals = new Map<string, number>()
-                    entries.forEach(entry => statusTotals.set(entry.fish_status, (statusTotals.get(entry.fish_status) ?? 0) + entry.quantity))
+                    const sc = FISH_STATUS_COLORS[status] ?? FISH_STATUS_COLORS.added
+                    const notesText = [...new Set(entries.map(entry => entry.notes).filter(Boolean))].join(' · ')
+                    const hasSpeciesInfo = speciesList.some(sp => sp.slug === slug)
                     return (
-                      <div key={first.species_slug} style={{ padding: '10px 0' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 0, flexWrap: 'wrap', minWidth: 0 }}>
-                            <span style={{ fontSize: 13, color: 'var(--text)', fontWeight: 500 }}>{first.common_name ?? first.species_slug}</span>
-                            <span style={{ fontSize: 12, color: 'var(--text-2)', marginLeft: 8 }}>×{totalQuantity}</span>
-                            {first.latin_name && <span style={{ fontSize: 11, color: 'var(--text-3)', fontStyle: 'italic', marginLeft: 8 }}>{first.latin_name}</span>}
+                      <div key={`${slug}-${status}`}>
+                        {isMobile ? (
+                          <div style={{ padding: '10px 0' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
+                              <div style={{ minWidth: 0 }}>
+                                <span style={{ fontSize: 13, color: 'var(--text)', fontWeight: 500 }}>{first.common_name ?? first.species_slug}</span>
+                                <span style={{ fontSize: 12, color: 'var(--text-2)', marginLeft: 8 }}>×{totalQuantity}</span>
+                                {first.latin_name && (
+                                  <p style={{ margin: '1px 0 0', fontSize: 11, color: 'var(--text-3)', fontStyle: 'italic' }}>{first.latin_name}</p>
+                                )}
+                                {notesText && (
+                                  <p style={{ margin: '2px 0 0', fontSize: 11, color: 'var(--text-2)' }}>{notesText}</p>
+                                )}
+                              </div>
+                              <Tag bg={sc.bg} color={sc.color} style={{ flexShrink: 0 }}>{cap(status)} ×{totalQuantity}</Tag>
+                            </div>
+                            <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
+                              {hasSpeciesInfo && (
+                                <button
+                                  onClick={() => setSpeciesInfoTarget(speciesList.find(sp => sp.slug === slug) ?? null)}
+                                  title="View species info"
+                                  style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-2)', background: 'none', border: '0.5px solid var(--btn-border)', borderRadius: 6, padding: '6px 8px', cursor: 'pointer' }}
+                                >
+                                  <Info size={13} />
+                                </button>
+                              )}
+                              {entries.map(f => (
+                                <button key={f.id} onClick={() => startEditFish(f)} title="Edit" style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-2)', background: 'none', border: '0.5px solid var(--btn-border)', borderRadius: 6, padding: '6px 8px', cursor: 'pointer' }}>
+                                  <Pencil size={13} />
+                                </button>
+                              ))}
+                              {entries.map(f => (
+                                <button key={`remove-${f.id}`} aria-label={`Remove ${f.quantity} ${f.common_name ?? f.species_slug}`} title="Remove" onClick={async () => { await api.fish.remove(id!, f.id); fish.reload() }} style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--red)', background: 'none', border: '0.5px solid var(--red-border)', borderRadius: 6, padding: '6px 8px', cursor: 'pointer' }}>
+                                  <Trash2 size={13} />
+                                </button>
+                              ))}
+                            </div>
                           </div>
-                          <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', justifyContent: 'flex-end', alignItems: 'center' }}>
-                            {[...statusTotals.entries()].map(([status, quantity]) => {
-                              const sc = FISH_STATUS_COLORS[status] ?? FISH_STATUS_COLORS.added
-                              return <Tag key={status} compact bg={sc.bg} color={sc.color}>{cap(status)} ×{quantity}</Tag>
-                            })}
-                            {entries.map(f => (
-                              <button key={f.id} onClick={() => startEditFish(f)} style={{ fontSize: 11, color: 'var(--text-2)', background: 'none', border: '0.5px solid var(--btn-border)', borderRadius: 6, padding: '2px 8px', cursor: 'pointer' }}>Edit {cap(f.fish_status)}</button>
-                            ))}
-                            {entries.map(f => (
-                              <button key={`remove-${f.id}`} aria-label={`Remove ${f.quantity} ${f.common_name ?? f.species_slug}`} onClick={async () => { await api.fish.remove(id!, f.id); fish.reload() }} style={{ display: 'flex', alignItems: 'center', gap: 3, fontSize: 11, color: 'var(--red)', background: 'none', border: 'none', cursor: 'pointer' }}>
-                                <Trash2 size={11} />
-                              </button>
-                            ))}
+                        ) : (
+                          <div style={{ padding: '10px 0' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 0, flexWrap: 'wrap', minWidth: 0 }}>
+                                <span style={{ fontSize: 13, color: 'var(--text)', fontWeight: 500 }}>{first.common_name ?? first.species_slug}</span>
+                                <span style={{ fontSize: 12, color: 'var(--text-2)', marginLeft: 8 }}>×{totalQuantity}</span>
+                                {first.latin_name && <span style={{ fontSize: 11, color: 'var(--text-3)', fontStyle: 'italic', marginLeft: 8 }}>{first.latin_name}</span>}
+                              </div>
+                              <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', justifyContent: 'flex-end', alignItems: 'center' }}>
+                                <Tag bg={sc.bg} color={sc.color}>{cap(status)} ×{totalQuantity}</Tag>
+                                {hasSpeciesInfo && (
+                                  <button
+                                    onClick={() => setSpeciesInfoTarget(speciesList.find(sp => sp.slug === slug) ?? null)}
+                                    title="View species info"
+                                    style={{ display: 'flex', alignItems: 'center', color: 'var(--text-2)', background: 'none', border: '0.5px solid var(--btn-border)', borderRadius: 6, padding: '3px', cursor: 'pointer' }}
+                                  >
+                                    <Info size={12} />
+                                  </button>
+                                )}
+                                {entries.map(f => (
+                                  <button key={f.id} onClick={() => startEditFish(f)} title="Edit" style={{ display: 'flex', alignItems: 'center', color: 'var(--text-2)', background: 'none', border: '0.5px solid var(--btn-border)', borderRadius: 6, padding: '3px', cursor: 'pointer' }}>
+                                    <Pencil size={12} />
+                                  </button>
+                                ))}
+                                {entries.map(f => (
+                                  <button key={`remove-${f.id}`} aria-label={`Remove ${f.quantity} ${f.common_name ?? f.species_slug}`} title="Remove" onClick={async () => { await api.fish.remove(id!, f.id); fish.reload() }} style={{ display: 'flex', alignItems: 'center', color: 'var(--red)', background: 'none', border: 'none', cursor: 'pointer' }}>
+                                    <Trash2 size={12} />
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+                            {notesText && <p style={{ margin: '6px 0 0', fontSize: 11, color: 'var(--text-3)' }}>{notesText}</p>}
                           </div>
-                        </div>
-                        {[...new Set(entries.map(entry => entry.notes).filter(Boolean))].join(' · ') && <p style={{ margin: '6px 0 0', fontSize: 11, color: 'var(--text-3)' }}>{[...new Set(entries.map(entry => entry.notes).filter(Boolean))].join(' · ')}</p>}
+                        )}
                       </div>
                     )
-                  })}
+                  }))}
                 </div>
               )
             })
@@ -1563,84 +1895,107 @@ ${taskRows ? `<h2>Pending Maintenance</h2>
           {plants.data?.length === 0 && <p style={{ fontSize: 13, color: 'var(--text-2)' }}>No plants added yet.</p>}
           {plants.data?.map(p => {
             const sc = PLANT_STATUS_COLORS[p.plant_status] ?? PLANT_STATUS_COLORS.planted
-            const isEditing = editingPlantId === p.id
             return (
               <div key={p.id} style={{ borderBottom: '0.5px solid var(--border-sub)' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap', padding: '10px 0' }}>
-                  <div style={{ minWidth: 0 }}>
-                    <span style={{ fontSize: 13, color: 'var(--text)', fontWeight: 500 }}>
-                      {p.common_name ?? p.species_slug}
-                    </span>
-                    <span style={{ fontSize: 12, color: 'var(--text-2)', marginLeft: 8 }}>×{p.quantity}</span>
-                    {p.latin_name && (
-                      <p style={{ margin: '1px 0 0', fontSize: 11, color: 'var(--text-3)', fontStyle: 'italic' }}>{p.latin_name}</p>
-                    )}
-                    {p.notes && (
-                      <p style={{ margin: '2px 0 0', fontSize: 11, color: 'var(--text-2)' }}>{p.notes}</p>
-                    )}
-                  </div>
-                  <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-                    <Tag bg={sc.bg} color={sc.color}>{cap(p.plant_status)}</Tag>
-                    <button
-                      onClick={() => {
-                        if (isEditing) { setEditingPlantId(null); return }
-                        setEditingPlantId(p.id)
-                        setEditPlantQty(String(p.quantity))
-                        setEditPlantStatus(p.plant_status)
-                        setEditPlantNotes(p.notes ?? '')
-                      }}
-                      style={{ fontSize: 11, color: 'var(--text-2)', background: 'none', border: '0.5px solid var(--btn-border)', borderRadius: 6, padding: '2px 8px', cursor: 'pointer' }}
-                    >
-                      {isEditing ? 'Cancel' : 'Edit'}
-                    </button>
-                    <button
-                      onClick={async () => { await api.plants.remove(id!, p.id); plants.reload() }}
-                      style={{ display: 'flex', alignItems: 'center', gap: 3, fontSize: 11, color: 'var(--red)', background: 'none', border: 'none', cursor: 'pointer' }}
-                    >
-                      <Trash2 size={11} />Remove
-                    </button>
-                  </div>
-                </div>
-                {isEditing && (
-                  <div style={{ background: 'var(--surface-2)', borderRadius: 8, padding: '12px 14px', marginBottom: 10 }}>
-                    <div style={{ display: 'grid', gridTemplateColumns: '80px 1fr', gap: 10, marginBottom: 10 }}>
-                      <div>
-                        <FieldLabel>Quantity</FieldLabel>
-                        <input type="number" min="1" value={editPlantQty} onChange={e => setEditPlantQty(e.target.value)} style={{ width: '100%', boxSizing: 'border-box' }} />
+                {isMobile ? (
+                  <div style={{ padding: '10px 0' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
+                      <div style={{ minWidth: 0 }}>
+                        <span style={{ fontSize: 13, color: 'var(--text)', fontWeight: 500 }}>
+                          {p.common_name ?? p.species_slug}
+                        </span>
+                        <span style={{ fontSize: 12, color: 'var(--text-2)', marginLeft: 8 }}>×{p.quantity}</span>
+                        {p.latin_name && (
+                          <p style={{ margin: '1px 0 0', fontSize: 11, color: 'var(--text-3)', fontStyle: 'italic' }}>{p.latin_name}</p>
+                        )}
+                        {p.notes && (
+                          <p style={{ margin: '2px 0 0', fontSize: 11, color: 'var(--text-2)' }}>{p.notes}</p>
+                        )}
                       </div>
-                      <div>
-                        <FieldLabel>Status</FieldLabel>
-                        <select value={editPlantStatus} onChange={e => setEditPlantStatus(e.target.value)} style={{ width: '100%' }}>
-                          <option value="planned">Planned</option>
-                          <option value="planted">Planted</option>
-                          <option value="removed">Removed</option>
-                        </select>
-                      </div>
+                      <Tag bg={sc.bg} color={sc.color} style={{ flexShrink: 0 }}>{cap(p.plant_status)}</Tag>
                     </div>
-                    <div style={{ marginBottom: 10 }}>
-                      <FieldLabel>Notes</FieldLabel>
-                      <input value={editPlantNotes} onChange={e => setEditPlantNotes(e.target.value)} placeholder="Optional notes…" style={{ width: '100%', boxSizing: 'border-box' }} />
+                    <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
+                      {speciesList.some(sp => sp.slug === p.species_slug) && (
+                        <button
+                          onClick={() => setSpeciesInfoTarget(speciesList.find(sp => sp.slug === p.species_slug) ?? null)}
+                          title="View species info"
+                          style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-2)', background: 'none', border: '0.5px solid var(--btn-border)', borderRadius: 6, padding: '6px 8px', cursor: 'pointer' }}
+                        >
+                          <Info size={13} />
+                        </button>
+                      )}
+                      <button
+                        onClick={() => {
+                          setEditingPlantId(p.id)
+                          setEditPlantQty(String(p.quantity))
+                          setEditPlantStatus(p.plant_status)
+                          setEditPlantNotes(p.notes ?? '')
+                        }}
+                        title="Edit"
+                        style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-2)', background: 'none', border: '0.5px solid var(--btn-border)', borderRadius: 6, padding: '6px 8px', cursor: 'pointer' }}
+                      >
+                        <Pencil size={13} />
+                      </button>
+                      <button
+                        onClick={async () => { await api.plants.remove(id!, p.id); plants.reload() }}
+                        title="Remove"
+                        style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--red)', background: 'none', border: '0.5px solid var(--red-border)', borderRadius: 6, padding: '6px 8px', cursor: 'pointer' }}
+                      >
+                        <Trash2 size={13} />
+                      </button>
                     </div>
-                    <button
-                      onClick={async () => {
-                        await api.plants.update(id!, p.id, {
-                          quantity: Number(editPlantQty),
-                          plant_status: editPlantStatus,
-                          notes: editPlantNotes || null,
-                        })
-                        setEditingPlantId(null)
-                        plants.reload()
-                      }}
-                      style={{ padding: '6px 16px', borderRadius: 8, border: '0.5px solid var(--green-border)', background: 'var(--green-bg)', color: 'var(--green)', fontSize: 13, fontWeight: 500, cursor: 'pointer' }}
-                    >
-                      Save
-                    </button>
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap', padding: '10px 0' }}>
+                    <div style={{ minWidth: 0 }}>
+                      <span style={{ fontSize: 13, color: 'var(--text)', fontWeight: 500 }}>
+                        {p.common_name ?? p.species_slug}
+                      </span>
+                      <span style={{ fontSize: 12, color: 'var(--text-2)', marginLeft: 8 }}>×{p.quantity}</span>
+                      {p.latin_name && (
+                        <p style={{ margin: '1px 0 0', fontSize: 11, color: 'var(--text-3)', fontStyle: 'italic' }}>{p.latin_name}</p>
+                      )}
+                      {p.notes && (
+                        <p style={{ margin: '2px 0 0', fontSize: 11, color: 'var(--text-2)' }}>{p.notes}</p>
+                      )}
+                    </div>
+                    <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                      <Tag bg={sc.bg} color={sc.color}>{cap(p.plant_status)}</Tag>
+                      {speciesList.some(sp => sp.slug === p.species_slug) && (
+                        <button
+                          onClick={() => setSpeciesInfoTarget(speciesList.find(sp => sp.slug === p.species_slug) ?? null)}
+                          title="View species info"
+                          style={{ display: 'flex', alignItems: 'center', color: 'var(--text-2)', background: 'none', border: '0.5px solid var(--btn-border)', borderRadius: 6, padding: '3px', cursor: 'pointer' }}
+                        >
+                          <Info size={12} />
+                        </button>
+                      )}
+                      <button
+                        onClick={() => {
+                          setEditingPlantId(p.id)
+                          setEditPlantQty(String(p.quantity))
+                          setEditPlantStatus(p.plant_status)
+                          setEditPlantNotes(p.notes ?? '')
+                        }}
+                        title="Edit"
+                        style={{ display: 'flex', alignItems: 'center', color: 'var(--text-2)', background: 'none', border: '0.5px solid var(--btn-border)', borderRadius: 6, padding: '3px', cursor: 'pointer' }}
+                      >
+                        <Pencil size={12} />
+                      </button>
+                      <button
+                        onClick={async () => { await api.plants.remove(id!, p.id); plants.reload() }}
+                        title="Remove"
+                        style={{ display: 'flex', alignItems: 'center', color: 'var(--red)', background: 'none', border: 'none', cursor: 'pointer' }}
+                      >
+                        <Trash2 size={12} />
+                      </button>
+                    </div>
                   </div>
                 )}
               </div>
             )
           })}
-          <div style={{ marginTop: 16, borderTop: '0.5px solid var(--border-sub)', paddingTop: 14 }}>
+          <div style={{ marginTop: 16 }}>
             <button
               onClick={() => setShowAddPlant(true)}
               style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6, fontSize: 13, padding: '7px 16px', borderRadius: 8, fontWeight: 500, cursor: 'pointer', border: '0.5px solid var(--green-border)', background: 'var(--green-bg)', color: 'var(--green)', width: isMobile ? '100%' : undefined, boxSizing: 'border-box' }}
@@ -1658,8 +2013,8 @@ ${taskRows ? `<h2>Pending Maintenance</h2>
             <SectionTitle>Log Parameters</SectionTitle>
             <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fill, minmax(110px, 1fr))', gap: 10 }}>
               {([
-                ['pH', ph, setPh],
                 ['Temp (°C)', temp, setTemp],
+                ['pH', ph, setPh],
                 ['Ammonia', ammonia, setAmmonia],
                 ['Nitrite', nitrite, setNitrite],
                 ['Nitrate', nitrate, setNitrate],
@@ -1686,13 +2041,16 @@ ${taskRows ? `<h2>Pending Maintenance</h2>
               ))}
             </div>
             <button
+              disabled={!hasParamInput}
               style={{
-                marginTop: 12, padding: '7px 18px', borderRadius: 8, fontSize: 13, fontWeight: 500, cursor: 'pointer',
+                marginTop: 12, padding: '7px 18px', borderRadius: 8, fontSize: 13, fontWeight: 500,
+                cursor: hasParamInput ? 'pointer' : 'not-allowed',
                 border: '0.5px solid var(--blue-border)', background: 'var(--blue-bg)', color: 'var(--blue)',
+                opacity: hasParamInput ? 1 : 0.45,
                 transition: 'background 0.15s, color 0.15s',
                 width: isMobile ? '100%' : undefined, boxSizing: 'border-box',
               }}
-              onMouseEnter={e => { e.currentTarget.style.background = 'var(--blue)'; e.currentTarget.style.color = '#fff' }}
+              onMouseEnter={e => { if (!e.currentTarget.disabled) { e.currentTarget.style.background = 'var(--blue)'; e.currentTarget.style.color = '#fff' } }}
               onMouseLeave={e => { e.currentTarget.style.background = 'var(--blue-bg)'; e.currentTarget.style.color = 'var(--blue)' }}
               onClick={async () => {
                 await api.parameters.log(id!, {
@@ -1714,8 +2072,29 @@ ${taskRows ? `<h2>Pending Maintenance</h2>
             >Save Reading</button>
           </Card>
 
-          {chartData.length > 0 && (
+          {allChartData.length > 0 && (
             <>
+              {isMobile && allChartData.length > 3 && (
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, padding: '2px 2px' }}>
+                  <button
+                    onClick={() => setMobileChartEndOffset(o => Math.min(mobileChartMaxOffset, o + 3))}
+                    disabled={mobileChartOffset >= mobileChartMaxOffset}
+                    style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, padding: '6px 10px', borderRadius: 8, border: '0.5px solid var(--btn-border)', background: 'var(--surface)', color: mobileChartOffset >= mobileChartMaxOffset ? 'var(--text-4)' : 'var(--text-2)', cursor: mobileChartOffset >= mobileChartMaxOffset ? 'default' : 'pointer' }}
+                  >
+                    <Prev size={13} />Older
+                  </button>
+                  <span style={{ fontSize: 11, color: 'var(--text-3)' }}>
+                    {formatDate(allChartData[mobileChartStart].recorded_at, dateFormat)} – {formatDate(allChartData[mobileChartEnd - 1].recorded_at, dateFormat)}
+                  </span>
+                  <button
+                    onClick={() => setMobileChartEndOffset(o => Math.max(0, o - 3))}
+                    disabled={mobileChartOffset <= 0}
+                    style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, padding: '6px 10px', borderRadius: 8, border: '0.5px solid var(--btn-border)', background: 'var(--surface)', color: mobileChartOffset <= 0 ? 'var(--text-4)' : 'var(--text-2)', cursor: mobileChartOffset <= 0 ? 'default' : 'pointer' }}
+                  >
+                    Newer<Next size={13} />
+                  </button>
+                </div>
+              )}
               {[
                 { key: 'ph', label: 'pH', color: '#378add', domain: [5, 9] },
                 { key: 'temperature_c', label: 'Temperature (°C)', color: '#e07b3a', domain: [15, 35] },
@@ -1726,23 +2105,56 @@ ${taskRows ? `<h2>Pending Maintenance</h2>
                   { key: 'salinity_ppt', label: 'Salinity (ppt)', color: '#1abc9c', domain: [0, 45] },
                   { key: 'specific_gravity', label: 'Specific Gravity', color: '#16a085', domain: [1.000, 1.035] },
                 ] : []),
-              ].filter(({ key }) => chartData.some((d: any) => d[key] != null)).map(({ key, label: lbl, color, domain }) => (
-                <Card key={key}>
-                  <SectionTitle>{lbl}</SectionTitle>
-                  <ResponsiveContainer width="100%" height={160}>
-                    <LineChart data={chartData} margin={{ top: 4, right: 8, left: -20, bottom: 0 }}>
-                      <XAxis dataKey="recorded_at" tickFormatter={v => formatDate(v, dateFormat)} tick={{ fontSize: 11, fill: 'var(--text-2)' }} />
-                      <YAxis domain={domain as [number, number]} tick={{ fontSize: 11, fill: 'var(--text-2)' }} />
-                      <Tooltip
-                        formatter={(v: number) => v.toFixed(2)}
-                        labelFormatter={v => formatDateTime(v, dateFormat)}
-                        contentStyle={{ background: 'var(--surface)', border: '0.5px solid var(--border)', borderRadius: 8, fontSize: 12, color: 'var(--text)' }}
-                      />
-                      <Line type="monotone" dataKey={key} stroke={color} dot={chartData.length < 15} strokeWidth={1.5} />
-                    </LineChart>
-                  </ResponsiveContainer>
-                </Card>
-              ))}
+              ].filter(({ key }) => allChartData.some((d: any) => d[key] != null)).map(({ key, label: lbl, color, domain }) => {
+                const range = getParamRange(key, tank.water_type)
+                const optimum = range ? (range.idealMin + range.idealMax) / 2 : null
+                const showOptimum = optimum != null && !hiddenOptimumLines[key]
+                return (
+                  <Card key={key}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginBottom: 12 }}>
+                      <p style={{ fontWeight: 500, fontSize: 14, margin: 0, color: 'var(--text)' }}>
+                        {lbl}
+                        {showOptimum && (
+                          <span style={{ fontSize: 12, fontWeight: 400, color: 'var(--text-3)', marginLeft: 8 }}>
+                            Optimum: {optimum!.toFixed(2)}
+                          </span>
+                        )}
+                      </p>
+                      {optimum != null && (
+                        <button
+                          type="button"
+                          title={showOptimum ? 'Hide optimum line' : 'Show optimum line'}
+                          onClick={() => setHiddenOptimumLines(prev => ({ ...prev, [key]: !prev[key] }))}
+                          style={{
+                            display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '4px 8px', borderRadius: 6,
+                            border: `0.5px solid ${showOptimum ? 'var(--blue-border)' : 'var(--btn-border)'}`,
+                            background: showOptimum ? 'var(--blue-bg)' : 'transparent',
+                            color: showOptimum ? 'var(--blue)' : 'var(--text-3)',
+                            cursor: 'pointer', flexShrink: 0,
+                          }}
+                        >
+                          <Target size={13} />
+                        </button>
+                      )}
+                    </div>
+                    <ResponsiveContainer width="100%" height={160}>
+                      <LineChart data={chartData} margin={{ top: 4, right: 8, left: -20, bottom: 0 }}>
+                        <XAxis dataKey="recorded_at" tickFormatter={v => formatDate(v, dateFormat)} tick={{ fontSize: 11, fill: 'var(--text-2)' }} interval={0} />
+                        <YAxis domain={domain as [number, number]} tick={{ fontSize: 11, fill: 'var(--text-2)' }} />
+                        <Tooltip
+                          formatter={(v: number) => v.toFixed(2)}
+                          labelFormatter={v => formatDateTime(v, dateFormat)}
+                          contentStyle={{ background: 'var(--surface)', border: '0.5px solid var(--border)', borderRadius: 8, fontSize: 12, color: 'var(--text)' }}
+                        />
+                        {showOptimum && (
+                          <ReferenceLine y={optimum!} stroke="var(--text-3)" strokeDasharray="4 4" strokeWidth={1} />
+                        )}
+                        <Line type="monotone" dataKey={key} stroke={color} dot={chartData.length < 15} strokeWidth={1.5} />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </Card>
+                )
+              })}
             </>
           )}
         </div>
@@ -1994,131 +2406,16 @@ ${taskRows ? `<h2>Pending Maintenance</h2>
             {/* Add task form */}
             <Card>
               <SectionTitle>Add Daily Task</SectionTitle>
-              <div style={{ display: 'flex', gap: 10, marginBottom: 12, flexWrap: 'wrap' }}>
-                <div style={{ flex: 1, minWidth: 160 }}>
-                  <FieldLabel>Task Name</FieldLabel>
-                  <input
-                    value={dtName} onChange={e => setDtName(e.target.value)}
-                    placeholder="e.g. CO2 on, Lights on, Dose ferts"
-                    style={{ width: '100%', boxSizing: 'border-box' }}
-                    onKeyDown={e => e.key === 'Enter' && addDailyTask()}
-                  />
-                </div>
-                {(() => {
-                  const hour24 = Number(dtHour)
-                  const h12 = (hour24 % 12) || 12
-                  const ampm = hour24 < 12 ? 'AM' : 'PM'
-                  const setHourFrom12 = (newH12: number) => {
-                    const newHour24 = ampm === 'AM' ? newH12 % 12 : (newH12 % 12) + 12
-                    setDtHour(String(newHour24))
-                  }
-                  const setAmPm = (period: 'AM' | 'PM') => {
-                    const newHour24 = period === 'AM' ? h12 % 12 : (h12 % 12) + 12
-                    setDtHour(String(newHour24))
-                  }
-                  const pillStyle = (on: boolean): React.CSSProperties => ({
-                    padding: '6px 0', borderRadius: 6, fontSize: 12, cursor: 'pointer',
-                    border: on ? '0.5px solid var(--blue-border)' : '0.5px solid var(--btn-border)',
-                    background: on ? 'var(--blue-bg)' : 'transparent',
-                    color: on ? 'var(--blue)' : 'var(--text-2)',
-                    fontWeight: on ? 500 : 400,
-                  })
-                  return (
-                    <div style={{ position: 'relative', width: isMobile ? '100%' : undefined }}>
-                      <FieldLabel>Time</FieldLabel>
-                      <button
-                        type="button"
-                        onClick={() => setDtTimePickerOpen(o => !o)}
-                        style={{
-                          display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10,
-                          width: isMobile ? '100%' : 120, boxSizing: 'border-box',
-                          padding: '6px 10px', borderRadius: 8, border: '0.5px solid var(--btn-border)',
-                          background: 'var(--surface)', color: 'var(--text)', fontSize: 13, cursor: 'pointer',
-                        }}
-                      >
-                        <span>{h12}:{String(Number(dtMinute)).padStart(2, '0')} {ampm}</span>
-                        <Clock size={14} style={{ color: 'var(--text-3)', flexShrink: 0 }} />
-                      </button>
-
-                      {dtTimePickerOpen && (
-                        <>
-                          <div onClick={() => setDtTimePickerOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 90 }} />
-                          <div style={{
-                            position: 'absolute', top: 'calc(100% + 4px)', left: 0, right: isMobile ? 0 : 'auto', zIndex: 100,
-                            width: isMobile ? '100%' : 250,
-                            background: 'var(--surface)', border: '0.5px solid var(--border)', borderRadius: 10,
-                            boxShadow: '0 8px 24px rgba(0,0,0,0.16)', padding: 12,
-                          }}>
-                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 4, marginBottom: 10 }}>
-                              {Array.from({ length: 12 }, (_, i) => i + 1).map(h => (
-                                <button key={h} type="button" onClick={() => setHourFrom12(h)} style={pillStyle(h === h12)}>{h}</button>
-                              ))}
-                            </div>
-                            <div style={{ display: 'flex', gap: 4, marginBottom: 10 }}>
-                              {[0, 15, 30, 45].map(m => (
-                                <button key={m} type="button" onClick={() => setDtMinute(String(m))} style={{ ...pillStyle(m === Number(dtMinute)), flex: 1 }}>
-                                  {String(m).padStart(2, '0')}
-                                </button>
-                              ))}
-                            </div>
-                            <div style={{ display: 'flex', gap: 4 }}>
-                              {(['AM', 'PM'] as const).map(period => (
-                                <button key={period} type="button" onClick={() => setAmPm(period)} style={{ ...pillStyle(period === ampm), flex: 1 }}>
-                                  {period}
-                                </button>
-                              ))}
-                            </div>
-                          </div>
-                        </>
-                      )}
-                    </div>
-                  )
-                })()}
-              </div>
-
-              <div style={{ marginBottom: 12 }}>
-                <FieldLabel>Days</FieldLabel>
-                <div style={{ display: 'flex', gap: isMobile ? 3 : 6, width: '100%' }}>
-                  {DAY_NAMES.map((name, i) => {
-                    const on = dtDays.includes(i)
-                    return (
-                      <button key={name} onClick={() => setDtDays(prev => on ? prev.filter(x => x !== i) : [...prev, i].sort())}
-                        style={{
-                          flex: 1, minWidth: 0, padding: isMobile ? '7px 1px' : '4px 6px', borderRadius: 6,
-                          fontSize: isMobile ? 12 : 12, cursor: 'pointer',
-                          border: on ? '0.5px solid var(--blue-border)' : '0.5px solid var(--btn-border)',
-                          background: on ? 'var(--blue-bg)' : 'transparent',
-                          color: on ? 'var(--blue)' : 'var(--text-2)',
-                          fontWeight: on ? 500 : 400,
-                          whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'clip',
-                        }}
-                      >{isMobile ? name[0] : name}</button>
-                    )
-                  })}
-                  <button onClick={() => setDtDays(dtDays.length === 7 ? [] : [0, 1, 2, 3, 4, 5, 6])}
-                    style={{
-                      flex: isMobile ? 1.4 : 1.2, minWidth: 0, padding: isMobile ? '7px 1px' : '4px 6px', borderRadius: 6,
-                      fontSize: isMobile ? 11 : 11, cursor: 'pointer', border: '0.5px solid var(--btn-border)',
-                      background: 'transparent', color: 'var(--text-3)',
-                      whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'clip',
-                    }}>
-                    {dtDays.length === 7 ? 'None' : (isMobile ? 'All' : 'Every day')}
-                  </button>
-                </div>
-              </div>
-
-              <div style={{ marginBottom: 14 }}>
-                <FieldLabel>Colour</FieldLabel>
-                <div style={{ display: 'flex', gap: isMobile ? 3 : 6, width: '100%' }}>
-                  {DAILY_COLORS.map(c => (
-                    <button key={c} onClick={() => setDtColor(c)} style={{
-                      flex: 1, minWidth: 0, height: 32, borderRadius: 6, background: c, cursor: 'pointer',
-                      border: dtColor === c ? `2.5px solid var(--text)` : '2px solid transparent',
-                      padding: 0,
-                    }} />
-                  ))}
-                </div>
-              </div>
+              <DailyTaskFormFields
+                name={dtName} setName={setDtName}
+                hour={dtHour} setHour={setDtHour}
+                minute={dtMinute} setMinute={setDtMinute}
+                days={dtDays} setDays={setDtDays}
+                color={dtColor} setColor={setDtColor}
+                timePickerOpen={dtTimePickerOpen} setTimePickerOpen={setDtTimePickerOpen}
+                isMobile={isMobile}
+                onNameEnter={addDailyTask}
+              />
 
               <button
                 onClick={addDailyTask}
@@ -2164,19 +2461,46 @@ ${taskRows ? `<h2>Pending Maintenance</h2>
               )}
               {todayTasks.map((task: any, i: number) => {
                 const c = task.color ?? '#1e88e5'
+                const dayLabels = task.days.split(',').map((d: string) => DAY_ABBR[Number(d)]).join(', ')
                 return (
-                  <div key={task.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 0', borderBottom: i === todayTasks.length - 1 ? 'none' : '0.5px solid var(--border-sub)' }}>
-                    <span style={{ width: 6, height: 6, borderRadius: '50%', background: c, flexShrink: 0 }} />
-                    <span style={{ fontSize: 12, color: 'var(--text-3)', fontVariantNumeric: 'tabular-nums', flexShrink: 0, minWidth: 36 }}>
-                      {String(task.hour).padStart(2, '0')}:{String(task.minute).padStart(2, '0')}
-                    </span>
-                    <span style={{ fontSize: 13, color: 'var(--text)', flex: 1 }}>{task.name}</span>
-                    <span style={{ fontSize: 11, color: 'var(--text-3)', flexShrink: 0 }}>
-                      {task.days.split(',').map((d: string) => DAY_ABBR[Number(d)]).join(', ')}
-                    </span>
-                    <button onClick={() => removeDailyTask(task.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-3)', lineHeight: 0, padding: 2, flexShrink: 0 }}>
-                      <X size={13} />
-                    </button>
+                  <div key={task.id} style={{ padding: '8px 0', borderBottom: i === todayTasks.length - 1 ? 'none' : '0.5px solid var(--border-sub)' }}>
+                    {isMobile ? (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <span style={{ width: 6, height: 6, borderRadius: '50%', background: c, flexShrink: 0 }} />
+                          <span style={{ fontSize: 12, color: 'var(--text-3)', fontVariantNumeric: 'tabular-nums', flexShrink: 0 }}>
+                            {String(task.hour).padStart(2, '0')}:{String(task.minute).padStart(2, '0')}
+                          </span>
+                          <span style={{ fontSize: 13, color: 'var(--text)', flex: 1, minWidth: 0 }}>{task.name}</span>
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+                          <span style={{ fontSize: 11, color: 'var(--text-3)' }}>{dayLabels}</span>
+                          <div style={{ display: 'flex', gap: 10, flexShrink: 0 }}>
+                            <button onClick={() => startEditDailyTask(task)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-3)', lineHeight: 0, padding: 2 }}>
+                              <Pencil size={14} />
+                            </button>
+                            <button onClick={() => removeDailyTask(task.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-3)', lineHeight: 0, padding: 2 }}>
+                              <X size={15} />
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                        <span style={{ width: 6, height: 6, borderRadius: '50%', background: c, flexShrink: 0 }} />
+                        <span style={{ fontSize: 12, color: 'var(--text-3)', fontVariantNumeric: 'tabular-nums', flexShrink: 0, minWidth: 36 }}>
+                          {String(task.hour).padStart(2, '0')}:{String(task.minute).padStart(2, '0')}
+                        </span>
+                        <span style={{ fontSize: 13, color: 'var(--text)', flex: 1 }}>{task.name}</span>
+                        <span style={{ fontSize: 11, color: 'var(--text-3)', flexShrink: 0 }}>{dayLabels}</span>
+                        <button onClick={() => startEditDailyTask(task)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-3)', lineHeight: 0, padding: 2, flexShrink: 0 }}>
+                          <Pencil size={12} />
+                        </button>
+                        <button onClick={() => removeDailyTask(task.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-3)', lineHeight: 0, padding: 2, flexShrink: 0 }}>
+                          <X size={13} />
+                        </button>
+                      </div>
+                    )}
                   </div>
                 )
               })}
@@ -2192,19 +2516,46 @@ ${taskRows ? `<h2>Pending Maintenance</h2>
                     .sort((a: any, b: any) => a.hour !== b.hour ? a.hour - b.hour : a.minute - b.minute)
                   return otherTasks.map((task: any, i: number) => {
                     const c = task.color ?? '#1e88e5'
+                    const dayLabels = task.days.split(',').map((d: string) => DAY_ABBR[Number(d)]).join(', ')
                     return (
-                      <div key={task.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 0', borderBottom: i === otherTasks.length - 1 ? 'none' : '0.5px solid var(--border-sub)' }}>
-                        <span style={{ width: 6, height: 6, borderRadius: '50%', background: c, flexShrink: 0 }} />
-                        <span style={{ fontSize: 12, color: 'var(--text-3)', fontVariantNumeric: 'tabular-nums', flexShrink: 0, minWidth: 36 }}>
-                          {String(task.hour).padStart(2, '0')}:{String(task.minute).padStart(2, '0')}
-                        </span>
-                        <span style={{ fontSize: 13, color: 'var(--text)', flex: 1 }}>{task.name}</span>
-                        <span style={{ fontSize: 11, color: 'var(--text-3)', flexShrink: 0 }}>
-                          {task.days.split(',').map((d: string) => DAY_ABBR[Number(d)]).join(', ')}
-                        </span>
-                        <button onClick={() => removeDailyTask(task.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-3)', lineHeight: 0, padding: 2, flexShrink: 0 }}>
-                          <X size={13} />
-                        </button>
+                      <div key={task.id} style={{ padding: '8px 0', borderBottom: i === otherTasks.length - 1 ? 'none' : '0.5px solid var(--border-sub)' }}>
+                        {isMobile ? (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                              <span style={{ width: 6, height: 6, borderRadius: '50%', background: c, flexShrink: 0 }} />
+                              <span style={{ fontSize: 12, color: 'var(--text-3)', fontVariantNumeric: 'tabular-nums', flexShrink: 0 }}>
+                                {String(task.hour).padStart(2, '0')}:{String(task.minute).padStart(2, '0')}
+                              </span>
+                              <span style={{ fontSize: 13, color: 'var(--text)', flex: 1, minWidth: 0 }}>{task.name}</span>
+                            </div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+                              <span style={{ fontSize: 11, color: 'var(--text-3)' }}>{dayLabels}</span>
+                              <div style={{ display: 'flex', gap: 10, flexShrink: 0 }}>
+                                <button onClick={() => startEditDailyTask(task)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-3)', lineHeight: 0, padding: 2 }}>
+                                  <Pencil size={14} />
+                                </button>
+                                <button onClick={() => removeDailyTask(task.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-3)', lineHeight: 0, padding: 2 }}>
+                                  <X size={15} />
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        ) : (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                            <span style={{ width: 6, height: 6, borderRadius: '50%', background: c, flexShrink: 0 }} />
+                            <span style={{ fontSize: 12, color: 'var(--text-3)', fontVariantNumeric: 'tabular-nums', flexShrink: 0, minWidth: 36 }}>
+                              {String(task.hour).padStart(2, '0')}:{String(task.minute).padStart(2, '0')}
+                            </span>
+                            <span style={{ fontSize: 13, color: 'var(--text)', flex: 1 }}>{task.name}</span>
+                            <span style={{ fontSize: 11, color: 'var(--text-3)', flexShrink: 0 }}>{dayLabels}</span>
+                            <button onClick={() => startEditDailyTask(task)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-3)', lineHeight: 0, padding: 2, flexShrink: 0 }}>
+                              <Pencil size={12} />
+                            </button>
+                            <button onClick={() => removeDailyTask(task.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-3)', lineHeight: 0, padding: 2, flexShrink: 0 }}>
+                              <X size={13} />
+                            </button>
+                          </div>
+                        )}
                       </div>
                     )
                   })
@@ -2311,7 +2662,7 @@ ${taskRows ? `<h2>Pending Maintenance</h2>
               <p style={{ margin: 0, fontWeight: 600, fontSize: 15, color: 'var(--text)' }}>Edit Inhabitant</p>
               <button onClick={() => setEditingFishId(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-2)', lineHeight: 0 }}><X size={18} /></button>
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: editFishStatus === 'added' ? '80px 1fr 1fr' : '80px 1fr', gap: 10, marginBottom: 12 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: !isMobile && editFishStatus === 'added' ? '80px 1fr 1fr' : '80px 1fr', gap: 10, marginBottom: 12 }}>
               <div>
                 <FieldLabel>Quantity</FieldLabel>
                 <input type="number" min="1" max="10" value={editQty} onChange={e => setEditQty(String(Math.min(10, Number(e.target.value) || 1)))} style={{ width: '100%', boxSizing: 'border-box' }} />
@@ -2323,7 +2674,7 @@ ${taskRows ? `<h2>Pending Maintenance</h2>
                 </select>
               </div>
               {editFishStatus === 'added' && (
-                <div>
+                <div style={{ gridColumn: isMobile ? '1 / -1' : undefined }}>
                   <FieldLabel>Health Status</FieldLabel>
                   <select value={editHealth} onChange={e => setEditHealth(e.target.value)} style={{ width: '100%', boxSizing: 'border-box' }}>
                     {HEALTH_STATUSES.map(s => <option key={s} value={s}>{cap(s)}</option>)}
@@ -2366,6 +2717,107 @@ ${taskRows ? `<h2>Pending Maintenance</h2>
             </div>
           </div>
         </div>
+      )}
+
+      {/* EDIT PLANT MODAL */}
+      {editingPlantId && (
+        <div
+          onMouseDown={() => setEditingPlantId(null)}
+          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', zIndex: 300, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}
+        >
+          <div
+            onMouseDown={e => e.stopPropagation()}
+            style={{ background: 'var(--surface)', border: '0.5px solid var(--border)', borderRadius: 14, padding: '1.5rem', width: 400, maxWidth: '100%', boxShadow: '0 12px 40px rgba(0,0,0,0.22)' }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+              <p style={{ margin: 0, fontWeight: 600, fontSize: 15, color: 'var(--text)' }}>Edit Plant</p>
+              <button onClick={() => setEditingPlantId(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-2)', lineHeight: 0 }}><X size={18} /></button>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '80px 1fr', gap: 10, marginBottom: 12 }}>
+              <div>
+                <FieldLabel>Quantity</FieldLabel>
+                <input type="number" min="1" value={editPlantQty} onChange={e => setEditPlantQty(e.target.value)} style={{ width: '100%', boxSizing: 'border-box' }} />
+              </div>
+              <div>
+                <FieldLabel>Status</FieldLabel>
+                <select value={editPlantStatus} onChange={e => setEditPlantStatus(e.target.value)} style={{ width: '100%', boxSizing: 'border-box' }}>
+                  <option value="planned">Planned</option>
+                  <option value="planted">Planted</option>
+                  <option value="removed">Removed</option>
+                </select>
+              </div>
+            </div>
+            <div style={{ marginBottom: 16 }}>
+              <FieldLabel>Notes</FieldLabel>
+              <input value={editPlantNotes} onChange={e => setEditPlantNotes(e.target.value)} placeholder="Optional notes…" style={{ width: '100%', boxSizing: 'border-box' }} />
+            </div>
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+              <button onClick={() => setEditingPlantId(null)} style={{ padding: '7px 16px', borderRadius: 8, fontSize: 13, cursor: 'pointer', border: '0.5px solid var(--btn-border)', background: 'transparent', color: 'var(--text)' }}>Cancel</button>
+              <button
+                onClick={async () => {
+                  await api.plants.update(id!, editingPlantId, {
+                    quantity: Number(editPlantQty),
+                    plant_status: editPlantStatus,
+                    notes: editPlantNotes || null,
+                  })
+                  setEditingPlantId(null)
+                  plants.reload()
+                }}
+                style={{ padding: '7px 16px', borderRadius: 8, fontSize: 13, fontWeight: 500, cursor: 'pointer', border: '0.5px solid var(--green-border)', background: 'var(--green-bg)', color: 'var(--green)' }}
+              >
+                Save
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* EDIT DAILY TASK MODAL */}
+      {editingDailyTaskId && (
+        <div
+          onMouseDown={() => setEditingDailyTaskId(null)}
+          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', zIndex: 300, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}
+        >
+          <div
+            onMouseDown={e => e.stopPropagation()}
+            style={{ background: 'var(--surface)', border: '0.5px solid var(--border)', borderRadius: 14, padding: '1.5rem', width: 420, maxWidth: '100%', boxShadow: '0 12px 40px rgba(0,0,0,0.22)' }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+              <p style={{ margin: 0, fontWeight: 600, fontSize: 15, color: 'var(--text)' }}>Edit Daily Task</p>
+              <button onClick={() => setEditingDailyTaskId(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-2)', lineHeight: 0 }}><X size={18} /></button>
+            </div>
+            <DailyTaskFormFields
+              name={editDtName} setName={setEditDtName}
+              hour={editDtHour} setHour={setEditDtHour}
+              minute={editDtMinute} setMinute={setEditDtMinute}
+              days={editDtDays} setDays={setEditDtDays}
+              color={editDtColor} setColor={setEditDtColor}
+              timePickerOpen={editDtTimePickerOpen} setTimePickerOpen={setEditDtTimePickerOpen}
+              isMobile={isMobile}
+              onNameEnter={saveEditDailyTask}
+            />
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+              <button onClick={() => setEditingDailyTaskId(null)} style={{ padding: '7px 16px', borderRadius: 8, fontSize: 13, cursor: 'pointer', border: '0.5px solid var(--btn-border)', background: 'transparent', color: 'var(--text)' }}>Cancel</button>
+              <button
+                disabled={!editDtName.trim() || editDtDays.length === 0}
+                onClick={saveEditDailyTask}
+                style={{
+                  padding: '7px 16px', borderRadius: 8, fontSize: 13, fontWeight: 500,
+                  cursor: editDtName.trim() && editDtDays.length > 0 ? 'pointer' : 'not-allowed',
+                  border: '0.5px solid var(--green-border)', background: 'var(--green-bg)', color: 'var(--green)',
+                  opacity: editDtName.trim() && editDtDays.length > 0 ? 1 : 0.45,
+                }}
+              >
+                Save
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* SPECIES INFO MODAL */}
+      {speciesInfoTarget && (
+        <SpeciesDetailModal s={speciesInfoTarget} onClose={() => setSpeciesInfoTarget(null)} />
       )}
 
       {/* ADD INHABITANT MODAL */}
@@ -2530,8 +2982,8 @@ ${taskRows ? `<h2>Pending Maintenance</h2>
         <Card>
           <SectionTitle>Alerts</SectionTitle>
           {alerts.data?.length === 0 && <p style={{ fontSize: 13, color: 'var(--text-2)' }}>No alerts.</p>}
-          {alerts.data?.map(a => (
-            <div key={a.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', padding: '10px 0', borderBottom: '0.5px solid var(--border-sub)', opacity: a.acknowledged ? 0.5 : 1 }}>
+          {alerts.data?.map((a, i, arr) => (
+            <div key={a.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', padding: '10px 0', borderBottom: i === arr.length - 1 ? 'none' : '0.5px solid var(--border-sub)', opacity: a.acknowledged ? 0.5 : 1 }}>
               <div>
                 <Tag bg={a.severity === 'danger' ? 'var(--red-bg)' : 'var(--amber-bg)'} color={a.severity === 'danger' ? 'var(--red)' : 'var(--amber)'} style={{ marginRight: 8 }}>
                   {a.severity}

@@ -6,7 +6,7 @@ from fastapi import FastAPI, Depends
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 
-from app.routers import tanks, fish, plants, parameters, alerts, species, maintenance, settings, daily_tasks, journal, backup, images, spending, inventory, rooms
+from app.routers import tanks, fish, plants, parameters, alerts, species, maintenance, settings, daily_tasks, journal, backup, images, spending, inventory, rooms, tap_water
 from app.services.species import species_service
 from app.database import get_db
 
@@ -19,7 +19,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="TankBook API",
-    version="0.7.1",
+    version="0.7.2",
     lifespan=lifespan,
     docs_url="/api/docs",
     redoc_url="/api/redoc",
@@ -41,6 +41,7 @@ app.include_router(images.router, prefix="/api/images", tags=["images"])
 app.include_router(spending.router, prefix="/api", tags=["spending"])
 app.include_router(inventory.router, prefix="/api/inventory", tags=["inventory"])
 app.include_router(rooms.router, prefix="/api/rooms", tags=["rooms"])
+app.include_router(tap_water.router, prefix="/api/tap-water", tags=["tap_water"])
 
 
 @app.get("/api/tanks/{tank_id}/compatibility")
@@ -96,7 +97,7 @@ def dashboard_stats(db=Depends(get_db)):
     upcoming_tasks = db.query(MaintenanceTask).filter(
         MaintenanceTask.tank_id.in_(tank_ids),
         MaintenanceTask.status == "pending",
-        MaintenanceTask.due_at >= datetime.utcnow()
+        MaintenanceTask.due_at >= today_start
     ).order_by(MaintenanceTask.due_at.asc()).limit(5).all()
 
     tank_summaries = []

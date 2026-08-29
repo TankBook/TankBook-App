@@ -35,6 +35,7 @@ import LivestockJournal from './pages/LivestockJournal'
 import CompatibilityChecker from './pages/CompatibilityChecker'
 import Calculators from './pages/Calculators'
 import Inventory from './pages/Inventory'
+import UpdateToast from './components/UpdateToast'
 import { SettingsProvider, useSettings } from './context/SettingsContext'
 
 const QA_CATEGORIES = ['Equipment', 'Livestock', 'Plants', 'Food', 'Chemicals', 'Medication', 'Decor', 'Subscription', 'Other']
@@ -104,7 +105,7 @@ function QuickAdd() {
     if (!qaName || !qaVolume) return
     setSaving(true)
     try {
-      await api.tanks.create({ name: qaName, volume_litres: Number(qaVolume), water_type: qaWaterType, co2_injection: false, has_heater: false, heater_watts: null, setup_date: null, substrate: null, lighting: null, filter_flow_lph: null, width_mm: null, height_mm: null, depth_mm: null })
+      await api.tanks.create({ name: qaName, volume_litres: Number(qaVolume), water_type: qaWaterType, co2_injection: false, co2_source: null, co2_method: null, has_heater: false, heater_watts: null, has_lighting: false, light_intensity: null, light_watts: null, light_technology: null, setup_date: null, substrate: null, lighting: null, has_filter: false, filter_flow_lph: null, width_mm: null, height_mm: null, depth_mm: null })
       close()
     } finally { setSaving(false) }
   }
@@ -318,9 +319,9 @@ function QuickAdd() {
       <button
         onClick={() => setOpen(true)}
         title="Quick add"
-        style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 30, height: 30, border: '0.5px solid var(--border)', borderRadius: 8, background: 'transparent', color: 'var(--text-2)', cursor: 'pointer', marginRight: 6 }}
+        style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 30, height: 30, border: '0.5px solid var(--blue-border)', borderRadius: 8, background: 'var(--blue-bg)', color: 'var(--blue)', cursor: 'pointer', marginRight: 6 }}
       >
-        <Plus size={15} />
+        <Plus size={17} strokeWidth={2.5} />
       </button>
 
       {open && (
@@ -503,6 +504,7 @@ export default function App() {
           </div>
           <Footer />
         </div>
+        <UpdateToast />
       </BrowserRouter>
     </SettingsProvider>
   )

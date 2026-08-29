@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models.models import DailyTask
-from app.schemas.schemas import DailyTaskCreate, DailyTaskOut
+from app.schemas.schemas import DailyTaskCreate, DailyTaskOut, DailyTaskUpdate
 
 router = APIRouter()
 
@@ -17,6 +17,18 @@ def list_daily_tasks(tank_id: str, db: Session = Depends(get_db)):
 def create_daily_task(tank_id: str, body: DailyTaskCreate, db: Session = Depends(get_db)):
     task = DailyTask(tank_id=tank_id, **body.model_dump())
     db.add(task)
+    db.commit()
+    db.refresh(task)
+    return task
+
+
+@router.patch("/{tank_id}/daily/{task_id}", response_model=DailyTaskOut)
+def update_daily_task(tank_id: str, task_id: str, body: DailyTaskUpdate, db: Session = Depends(get_db)):
+    task = db.query(DailyTask).filter_by(id=task_id, tank_id=tank_id).first()
+    if not task:
+        raise HTTPException(404, "Task not found")
+    for k, v in body.model_dump(exclude_unset=True).items():
+        setattr(task, k, v)
     db.commit()
     db.refresh(task)
     return task

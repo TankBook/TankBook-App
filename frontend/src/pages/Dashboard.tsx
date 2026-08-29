@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Layers, Fish, Leaf, Bug, Waves, Bell, Clock, Plus, AlertTriangle, Timer, Thermometer, FlaskConical, GripVertical, Filter } from 'lucide-react'
+import { Layers, Fish, Leaf, Bug, Waves, Bell, Clock, Plus, AlertTriangle, Timer, Thermometer, FlaskConical, GripVertical, Filter, Droplets, X, ChevronUp, ChevronDown } from 'lucide-react'
 import { useTanks } from '../hooks'
-import { api } from '../api/client'
+import { api, type TapWaterTest } from '../api/client'
 import { useSettings, formatDate, toMM, dimInputProps } from '../context/SettingsContext'
 import { Card, FieldLabel, StatCard, Tag } from '../components/ui'
 
@@ -49,6 +49,15 @@ const PARAMS = [
   { key: 'latest_nitrate', label: 'NO₃',  color: 'var(--green)',             fmt: (v: number) => v.toFixed(0) },
 ] as const
 
+const TAP_WATER_PARAMS = [
+  { key: 'ph',           label: 'pH',       color: 'var(--blue)',               fmt: (v: number) => v.toFixed(1) },
+  { key: 'gh_dgh',       label: 'GH',       color: 'var(--cyan)',               fmt: (v: number) => v.toFixed(0) },
+  { key: 'kh_dkh',       label: 'KH',       color: 'var(--teal, #00897b)',      fmt: (v: number) => v.toFixed(0) },
+  { key: 'chlorine_ppm', label: 'Chlorine', color: 'var(--amber)',              fmt: (v: number) => v.toFixed(2) },
+  { key: 'nitrate_ppm',  label: 'NO₃',      color: 'var(--green)',              fmt: (v: number) => v.toFixed(0) },
+  { key: 'tds_ppm',      label: 'TDS',      color: 'var(--violet, #7c4dff)',    fmt: (v: number) => v.toFixed(0) },
+] as const
+
 type DragProps = {
   isDragging: boolean
   isDragOver: boolean
@@ -56,6 +65,10 @@ type DragProps = {
   onDragOver: (e: React.DragEvent) => void
   onDrop: (e: React.DragEvent) => void
   onDragEnd: () => void
+  onMoveUp: () => void
+  onMoveDown: () => void
+  isFirst: boolean
+  isLast: boolean
 }
 
 function TankOverviewCard({ tank, drag }: { tank: DashboardStats['tanks'][0]; drag: DragProps }) {
@@ -111,6 +124,26 @@ function TankOverviewCard({ tank, drag }: { tank: DashboardStats['tanks'][0]; dr
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
           <WaterTypeBadge type={tank.water_type} />
+          <div style={{ display: 'flex', flexDirection: 'column', flexShrink: 0 }}>
+            <button
+              type="button"
+              aria-label="Move tank earlier"
+              disabled={drag.isFirst}
+              onClick={e => { e.stopPropagation(); drag.onMoveUp() }}
+              style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 26, height: 22, padding: 0, border: 'none', background: 'none', color: drag.isFirst ? 'var(--text-4)' : 'var(--text-2)', cursor: drag.isFirst ? 'default' : 'pointer' }}
+            >
+              <ChevronUp size={13} />
+            </button>
+            <button
+              type="button"
+              aria-label="Move tank later"
+              disabled={drag.isLast}
+              onClick={e => { e.stopPropagation(); drag.onMoveDown() }}
+              style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 26, height: 22, padding: 0, border: 'none', background: 'none', color: drag.isLast ? 'var(--text-4)' : 'var(--text-2)', cursor: drag.isLast ? 'default' : 'pointer' }}
+            >
+              <ChevronDown size={13} />
+            </button>
+          </div>
           <GripVertical size={14} style={{ color: 'var(--text-4)', flexShrink: 0 }} />
         </div>
       </div>
@@ -236,12 +269,41 @@ export default function Dashboard() {
   const [height, setHeight] = useState('')
   const [depth, setDepth] = useState('')
 
+  const [tapWaterTests, setTapWaterTests] = useState<TapWaterTest[]>([])
+  const [showTapWaterModal, setShowTapWaterModal] = useState(false)
+  const [twPh, setTwPh] = useState('')
+  const [twGh, setTwGh] = useState('')
+  const [twKh, setTwKh] = useState('')
+  const [twChlorine, setTwChlorine] = useState('')
+  const [twNitrate, setTwNitrate] = useState('')
+  const [twTds, setTwTds] = useState('')
+  const [twNotes, setTwNotes] = useState('')
+
   async function loadStats() {
     const r = await fetch('/api/dashboard')
     setStats(await r.json())
   }
 
-  useEffect(() => { loadStats() }, [])
+  async function loadTapWaterTests() {
+    setTapWaterTests(await api.tapWater.list(1))
+  }
+
+  useEffect(() => { loadStats(); loadTapWaterTests() }, [])
+
+  async function logTapWaterTest() {
+    await api.tapWater.log({
+      ph: twPh ? Number(twPh) : null,
+      gh_dgh: twGh ? Number(twGh) : null,
+      kh_dkh: twKh ? Number(twKh) : null,
+      chlorine_ppm: twChlorine ? Number(twChlorine) : null,
+      nitrate_ppm: twNitrate ? Number(twNitrate) : null,
+      tds_ppm: twTds ? Number(twTds) : null,
+      notes: twNotes || null,
+    })
+    setTwPh(''); setTwGh(''); setTwKh(''); setTwChlorine(''); setTwNitrate(''); setTwTds(''); setTwNotes('')
+    setShowTapWaterModal(false)
+    loadTapWaterTests()
+  }
 
   useEffect(() => {
     if (!stats) return
@@ -262,14 +324,21 @@ export default function Dashboard() {
       volume_litres: Number(volume),
       water_type: waterType,
       co2_injection: co2,
+      co2_source: null,
+      co2_method: null,
       substrate: substrate || null,
       lighting: lighting || null,
+      has_filter: !!filterFlow,
       filter_flow_lph: filterFlow ? Number(filterFlow) : null,
       width_mm: width ? toMM(Number(width), unitSystem) : null,
       height_mm: height ? toMM(Number(height), unitSystem) : null,
       depth_mm: depth ? toMM(Number(depth), unitSystem) : null,
       has_heater: false,
       heater_watts: null,
+      has_lighting: false,
+      light_intensity: null,
+      light_watts: null,
+      light_technology: null,
       setup_date: null,
     })
     setName(''); setVolume(''); setWaterType('freshwater'); setCo2(false)
@@ -297,7 +366,23 @@ export default function Dashboard() {
     await loadStats()
   }
 
+  function moveTank(tankId: string, direction: -1 | 1) {
+    setOrderedTanks(prev => {
+      const from = prev.findIndex(t => t.id === tankId)
+      const to = from + direction
+      if (from === -1 || to < 0 || to >= prev.length) return prev
+      const next = [...prev]
+      const [moved] = next.splice(from, 1)
+      next.splice(to, 0, moved)
+      api.tanks.reorder(next.map((t, i) => ({ id: t.id, sort_order: i })))
+      return next
+    })
+  }
+
   if (loading || !stats) return <p style={{ color: 'var(--text-2)' }}>Loading dashboard…</p>
+
+  const hasAnyTwValue = [twPh, twGh, twKh, twChlorine, twNitrate, twTds].some(v => v.trim() !== '')
+  const latestTapWater = tapWaterTests[0]
 
   const statsRow = (
     <div style={{ display: 'grid', gridTemplateColumns: `repeat(${isMobile ? 2 : isTabletWidth ? 3 : 6}, 1fr)`, gap: 10, marginBottom: 24 }}>
@@ -318,12 +403,18 @@ export default function Dashboard() {
           const tank = stats.tanks.find(tk => tk.id === t.tank_id)
           const skipping = skipTaskId === t.id
           const isLast = i === stats.upcoming_tasks.length - 1
+          const today = new Date(); today.setHours(0, 0, 0, 0)
+          const due = new Date(t.due_at); due.setHours(0, 0, 0, 0)
+          const dueToday = due.getTime() === today.getTime()
           return (
             <div key={t.id} style={{ padding: '8px 0', borderBottom: !isLast || skipping ? '0.5px solid var(--border-sub)' : 'none' }}>
               {isMobile ? (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 6 }}>
-                    <p style={{ fontSize: 12, fontWeight: 500, color: 'var(--text)', margin: 0, minWidth: 0 }}>{t.task_type}</p>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
+                      <p style={{ fontSize: 12, fontWeight: 500, color: 'var(--text)', margin: 0, minWidth: 0 }}>{t.task_type}</p>
+                      {dueToday && <Tag compact bg="var(--amber-bg)" color="var(--amber)">Due today</Tag>}
+                    </div>
                     <span style={{ fontSize: 11, color: 'var(--text-3)', flexShrink: 0 }}>{formatDate(t.due_at, dateFormat)}</span>
                   </div>
                   <p style={{ fontSize: 11, color: 'var(--text-2)', margin: 0 }}>
@@ -346,7 +437,10 @@ export default function Dashboard() {
               ) : (
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 6 }}>
                   <div style={{ minWidth: 0 }}>
-                    <p style={{ fontSize: 12, fontWeight: 500, color: 'var(--text)', margin: '0 0 2px' }}>{t.task_type}</p>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <p style={{ fontSize: 12, fontWeight: 500, color: 'var(--text)', margin: '0 0 2px' }}>{t.task_type}</p>
+                      {dueToday && <Tag compact bg="var(--amber-bg)" color="var(--amber)">Due today</Tag>}
+                    </div>
                     <p style={{ fontSize: 11, color: 'var(--text-2)', margin: 0 }}>
                       {tank?.name}{t.is_recurring ? ' ↻' : ''}{t.description ? ` · ${t.description}` : ''}
                     </p>
@@ -403,13 +497,17 @@ export default function Dashboard() {
         <div style={{ flex: 1, minWidth: 0 }}>
           <p style={{ fontWeight: 500, fontSize: 15, margin: '0 0 12px', color: 'var(--text)' }}>Your Tanks</p>
           <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(2, 1fr)', gap: 16 }}>
-            {orderedTanks.map(t => (
+            {orderedTanks.map((t, i) => (
               <TankOverviewCard
                 key={t.id}
                 tank={t}
                 drag={{
                   isDragging: dragId === t.id,
                   isDragOver: dragOverId === t.id,
+                  isFirst: i === 0,
+                  isLast: i === orderedTanks.length - 1,
+                  onMoveUp: () => moveTank(t.id, -1),
+                  onMoveDown: () => moveTank(t.id, 1),
                   onDragStart: (e) => { e.dataTransfer.effectAllowed = 'move'; setDragId(t.id) },
                   onDragOver: (e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; if (dragId && dragId !== t.id) setDragOverId(t.id) },
                   onDrop: (e) => {
@@ -449,6 +547,103 @@ export default function Dashboard() {
           {upcomingTasks}
         </div>
       </div>
+
+      <div style={{ marginTop: 24 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+          <p style={{ fontWeight: 500, fontSize: 15, margin: 0, color: 'var(--text)' }}>Tap Water</p>
+          <button
+            onClick={() => setShowTapWaterModal(true)}
+            style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 12, padding: '5px 12px', borderRadius: 8, border: '0.5px solid var(--blue-border)', background: 'var(--blue-bg)', color: 'var(--blue)', cursor: 'pointer', fontWeight: 500 }}
+          >
+            <Plus size={13} />Log Test
+          </button>
+        </div>
+        <Card>
+          {!latestTapWater ? (
+            <p style={{ fontSize: 13, color: 'var(--text-2)', margin: 0 }}>No tap water tests logged yet.</p>
+          ) : (
+            <>
+              <div style={{ display: 'grid', gridTemplateColumns: `repeat(${isMobile ? 3 : 6}, 1fr)`, gap: 8 }}>
+                {TAP_WATER_PARAMS.map(({ key, label, color, fmt }) => {
+                  const val = latestTapWater[key]
+                  return (
+                    <div key={key} style={{ textAlign: 'center', background: 'var(--surface-2)', borderRadius: 8, padding: '8px 2px', border: '0.5px solid var(--border-sub)' }}>
+                      <p style={{ fontSize: 9, fontWeight: 600, color: 'var(--text-3)', margin: '0 0 5px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                        {label}
+                      </p>
+                      <p style={{ fontSize: 14, fontWeight: 500, margin: 0, color: val != null ? color : 'var(--text-4)' }}>
+                        {val != null ? fmt(val) : '—'}
+                      </p>
+                    </div>
+                  )
+                })}
+              </div>
+              <p style={{ fontSize: 11, color: 'var(--text-3)', margin: '10px 0 0' }}>
+                Last tested {formatDate(latestTapWater.recorded_at, dateFormat)}
+                {latestTapWater.notes && ` · ${latestTapWater.notes}`}
+              </p>
+            </>
+          )}
+        </Card>
+      </div>
+
+      {showTapWaterModal && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}
+          onClick={e => { if (e.target === e.currentTarget) setShowTapWaterModal(false) }}>
+          <div style={{ background: 'var(--surface)', borderRadius: 12, border: '0.5px solid var(--border)', width: '100%', maxWidth: 420, maxHeight: '90vh', display: 'flex', flexDirection: 'column' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 20px', borderBottom: '0.5px solid var(--border)' }}>
+              <span style={{ fontWeight: 600, fontSize: 15, color: 'var(--text)' }}>Log Tap Water Test</span>
+              <button onClick={() => setShowTapWaterModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-2)', lineHeight: 0 }}><X size={18} /></button>
+            </div>
+            <div style={{ padding: '16px 20px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
+                <div>
+                  <FieldLabel>pH</FieldLabel>
+                  <input type="number" step="0.01" value={twPh} onChange={e => setTwPh(e.target.value)} style={{ width: '100%', boxSizing: 'border-box' }} />
+                </div>
+                <div>
+                  <FieldLabel>GH (dGH)</FieldLabel>
+                  <input type="number" step="0.1" value={twGh} onChange={e => setTwGh(e.target.value)} style={{ width: '100%', boxSizing: 'border-box' }} />
+                </div>
+                <div>
+                  <FieldLabel>KH (dKH)</FieldLabel>
+                  <input type="number" step="0.1" value={twKh} onChange={e => setTwKh(e.target.value)} style={{ width: '100%', boxSizing: 'border-box' }} />
+                </div>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
+                <div>
+                  <FieldLabel>Chlorine (ppm)</FieldLabel>
+                  <input type="number" step="0.01" value={twChlorine} onChange={e => setTwChlorine(e.target.value)} style={{ width: '100%', boxSizing: 'border-box' }} />
+                </div>
+                <div>
+                  <FieldLabel>Nitrate (ppm)</FieldLabel>
+                  <input type="number" step="1" value={twNitrate} onChange={e => setTwNitrate(e.target.value)} style={{ width: '100%', boxSizing: 'border-box' }} />
+                </div>
+                <div>
+                  <FieldLabel>TDS (ppm)</FieldLabel>
+                  <input type="number" step="1" value={twTds} onChange={e => setTwTds(e.target.value)} style={{ width: '100%', boxSizing: 'border-box' }} />
+                </div>
+              </div>
+              <div>
+                <FieldLabel>Notes</FieldLabel>
+                <input value={twNotes} onChange={e => setTwNotes(e.target.value)} placeholder="Optional notes…" style={{ width: '100%', boxSizing: 'border-box' }} />
+              </div>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, padding: '12px 20px', borderTop: '0.5px solid var(--border)' }}>
+              <button onClick={() => setShowTapWaterModal(false)} style={{ fontSize: 13, padding: '7px 16px', borderRadius: 8, border: '0.5px solid var(--border)', background: 'transparent', cursor: 'pointer', color: 'var(--text-2)' }}>
+                Cancel
+              </button>
+              <button
+                onClick={logTapWaterTest}
+                disabled={!hasAnyTwValue}
+                style={{ fontSize: 13, padding: '7px 18px', borderRadius: 8, border: '0.5px solid var(--blue-border)', background: hasAnyTwValue ? 'var(--blue-bg)' : 'var(--surface-2)', cursor: hasAnyTwValue ? 'pointer' : 'default', color: hasAnyTwValue ? 'var(--blue)' : 'var(--text-3)', fontWeight: 500 }}
+              >
+                Save
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {showForm && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}

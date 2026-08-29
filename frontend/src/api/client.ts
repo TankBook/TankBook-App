@@ -7,13 +7,20 @@ export interface Tank {
   water_type: string
   substrate: string | null
   lighting: string | null
+  has_filter: boolean
   filter_flow_lph: number | null
   width_mm: number | null
   height_mm: number | null
   depth_mm: number | null
   co2_injection: boolean
+  co2_source: string | null
+  co2_method: string | null
   has_heater: boolean
   heater_watts: number | null
+  has_lighting: boolean
+  light_intensity: string | null
+  light_watts: number | null
+  light_technology: string | null
   setup_date: string | null
   created_at: string
 }
@@ -82,6 +89,18 @@ export interface WaterParameter {
   kh_dkh: number | null
   salinity_ppt: number | null
   specific_gravity: number | null
+  recorded_at: string
+  notes: string | null
+}
+
+export interface TapWaterTest {
+  id: string
+  ph: number | null
+  gh_dgh: number | null
+  kh_dkh: number | null
+  chlorine_ppm: number | null
+  nitrate_ppm: number | null
+  tds_ppm: number | null
   recorded_at: string
   notes: string | null
 }
@@ -251,6 +270,10 @@ export const api = {
     log: (tankId: string, body: Omit<WaterParameter, 'id' | 'tank_id' | 'recorded_at'>) =>
       post<WaterParameter>(`/parameters/${tankId}/parameters`, body),
   },
+  tapWater: {
+    list: (limit = 50) => get<TapWaterTest[]>(`/tap-water/?limit=${limit}`),
+    log: (body: Omit<TapWaterTest, 'id' | 'recorded_at'>) => post<TapWaterTest>('/tap-water/', body),
+  },
   alerts: {
     list: (tankId: string, unacknowledgedOnly = false) =>
       get<Alert[]>(`/alerts/${tankId}/alerts?unacknowledged_only=${unacknowledgedOnly}`),
@@ -275,6 +298,8 @@ export const api = {
     list: (tankId: string) => get<DailyTask[]>(`/tanks/${tankId}/daily`),
     create: (tankId: string, body: Omit<DailyTask, 'id' | 'tank_id'>) =>
       post<DailyTask>(`/tanks/${tankId}/daily`, body),
+    update: (tankId: string, taskId: string, body: Partial<Omit<DailyTask, 'id' | 'tank_id'>>) =>
+      patch<DailyTask>(`/tanks/${tankId}/daily/${taskId}`, body),
     delete: (tankId: string, taskId: string) => del(`/tanks/${tankId}/daily/${taskId}`),
   },
   backup: {
