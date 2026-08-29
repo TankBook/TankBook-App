@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useNavigate, useParams, Link } from 'react-router-dom'
-import { ChevronLeft, ExternalLink, Pencil, Trash2, X } from 'lucide-react'
+import { ChevronLeft, ExternalLink, Pencil, Plus, Trash2, X } from 'lucide-react'
 import { useRoomLayoutState, defaultTankPosition, tankFootprintPercent } from '../hooks/useRoomLayout'
 import { Card, FieldLabel, Tag } from '../components/ui'
 
@@ -199,7 +199,16 @@ export default function RoomDetail() {
                   {tank.co2_injection && <span>CO₂</span>}
                   {tank.filter_flow_lph != null && <span>{tank.filter_flow_lph} L/h filter</span>}
                 </div>
-                <p style={{ margin: 0, fontSize: 12, color: 'var(--text-3)' }}>Drag me into the room above to assign this tank.</p>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+                  <p style={{ margin: 0, fontSize: 12, color: 'var(--text-3)' }}>Drag into the room above, or tap to add.</p>
+                  <button
+                    type="button"
+                    onClick={() => moveTankToRoom(tank.id, room.id)}
+                    style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '6px 10px', borderRadius: 8, border: '0.5px solid var(--blue-border)', background: 'var(--blue-bg)', color: 'var(--blue)', cursor: 'pointer', fontSize: 12, fontWeight: 500, flexShrink: 0, whiteSpace: 'nowrap' }}
+                  >
+                    <Plus size={13} /> Add
+                  </button>
+                </div>
               </div>
             ))}
           </div>
