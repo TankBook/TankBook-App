@@ -2614,7 +2614,7 @@ ${taskRows ? `<h2>Pending Maintenance</h2>
               <p style={{ margin: 0, fontWeight: 600, fontSize: 15, color: 'var(--text)' }}>Edit Inhabitant</p>
               <button onClick={() => setEditingFishId(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-2)', lineHeight: 0 }}><X size={18} /></button>
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: editFishStatus === 'added' ? '80px 1fr 1fr' : '80px 1fr', gap: 10, marginBottom: 12 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: !isMobile && editFishStatus === 'added' ? '80px 1fr 1fr' : '80px 1fr', gap: 10, marginBottom: 12 }}>
               <div>
                 <FieldLabel>Quantity</FieldLabel>
                 <input type="number" min="1" max="10" value={editQty} onChange={e => setEditQty(String(Math.min(10, Number(e.target.value) || 1)))} style={{ width: '100%', boxSizing: 'border-box' }} />
@@ -2626,7 +2626,7 @@ ${taskRows ? `<h2>Pending Maintenance</h2>
                 </select>
               </div>
               {editFishStatus === 'added' && (
-                <div>
+                <div style={{ gridColumn: isMobile ? '1 / -1' : undefined }}>
                   <FieldLabel>Health Status</FieldLabel>
                   <select value={editHealth} onChange={e => setEditHealth(e.target.value)} style={{ width: '100%', boxSizing: 'border-box' }}>
                     {HEALTH_STATUSES.map(s => <option key={s} value={s}>{cap(s)}</option>)}
