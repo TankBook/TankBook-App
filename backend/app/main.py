@@ -97,7 +97,7 @@ def dashboard_stats(db=Depends(get_db)):
     upcoming_tasks = db.query(MaintenanceTask).filter(
         MaintenanceTask.tank_id.in_(tank_ids),
         MaintenanceTask.status == "pending",
-        MaintenanceTask.due_at >= datetime.utcnow()
+        MaintenanceTask.due_at >= today_start
     ).order_by(MaintenanceTask.due_at.asc()).limit(5).all()
 
     tank_summaries = []
