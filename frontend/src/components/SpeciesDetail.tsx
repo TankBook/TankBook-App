@@ -154,29 +154,32 @@ export function SpeciesDetailModal({ s, onClose, onEdit }: { s: Species; onClose
         </div>
 
         {/* Footer */}
-        <div style={{ padding: '14px 20px', borderTop: '0.5px solid var(--border)', flexShrink: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
-          <a
-            href={yamlUrl}
-            download={`${s.slug}.yaml`}
-            style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, padding: '6px 12px', borderRadius: 7, border: '0.5px solid var(--btn-border)', background: 'transparent', color: 'var(--text-2)', textDecoration: 'none' }}
-          >
-            <Download size={13} />YAML
-          </a>
-          <button
-            onClick={() => { navigator.clipboard.writeText(hostedUrl); setCopied(true); setTimeout(() => setCopied(false), 2000) }}
-            style={{ fontSize: 12, padding: '6px 12px', borderRadius: 7, border: '0.5px solid var(--btn-border)', background: copied ? 'var(--green-bg)' : 'transparent', color: copied ? 'var(--green)' : 'var(--text-2)', cursor: 'pointer' }}
-          >
-            {copied ? '✓ Copied URL' : 'Copy URL'}
-          </button>
-          <span style={{ flex: 1 }} />
-          <button onClick={onClose} style={{ padding: '7px 16px', borderRadius: 8, fontSize: 13, cursor: 'pointer', border: '0.5px solid var(--btn-border)', background: 'transparent', color: 'var(--text)' }}>
-            Close
-          </button>
-          {onEdit && (
-            <button onClick={onEdit} style={{ padding: '7px 18px', borderRadius: 8, fontSize: 13, fontWeight: 500, cursor: 'pointer', border: '0.5px solid var(--blue-border)', background: 'var(--blue-bg)', color: 'var(--blue)' }}>
-              Edit species
+        <div style={{ padding: '14px 20px', borderTop: '0.5px solid var(--border)', flexShrink: 0, display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+            <a
+              href={yamlUrl}
+              download={`${s.slug}.yaml`}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, padding: '6px 12px', borderRadius: 7, border: '0.5px solid var(--btn-border)', background: 'transparent', color: 'var(--text-2)', textDecoration: 'none' }}
+            >
+              <Download size={13} />YAML
+            </a>
+            <button
+              onClick={() => { navigator.clipboard.writeText(hostedUrl); setCopied(true); setTimeout(() => setCopied(false), 2000) }}
+              style={{ fontSize: 12, padding: '6px 12px', borderRadius: 7, border: '0.5px solid var(--btn-border)', background: copied ? 'var(--green-bg)' : 'transparent', color: copied ? 'var(--green)' : 'var(--text-2)', cursor: 'pointer' }}
+            >
+              {copied ? '✓ Copied URL' : 'Copy URL'}
+            </button>
+          </div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+            <button onClick={onClose} style={{ padding: '7px 16px', borderRadius: 8, fontSize: 13, cursor: 'pointer', border: '0.5px solid var(--btn-border)', background: 'transparent', color: 'var(--text)' }}>
+              Close
+            </button>
+            {onEdit && (
+              <button onClick={onEdit} style={{ padding: '7px 18px', borderRadius: 8, fontSize: 13, fontWeight: 500, cursor: 'pointer', border: '0.5px solid var(--blue-border)', background: 'var(--blue-bg)', color: 'var(--blue)' }}>
+                Edit species
             </button>
           )}
+          </div>
         </div>
       </div>
     </div>

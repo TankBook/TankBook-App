@@ -1127,6 +1127,7 @@ export default function TankDetail() {
   const [stripModal, setStripModal] = useState<{ label: string; setter: (v: string) => void } | null>(null)
   const [stripKit, setStripKit] = useState<'master' | '5in1'>('master')
   const [hiddenOptimumLines, setHiddenOptimumLines] = useState<Record<string, boolean>>({})
+  const [mobileChartEndOffset, setMobileChartEndOffset] = useState(0)
   const [speciesList, setSpeciesList] = useState<Species[]>([])
   const [speciesInfoTarget, setSpeciesInfoTarget] = useState<Species | null>(null)
 
@@ -1479,7 +1480,12 @@ ${taskRows ? `<h2>Pending Maintenance</h2>
   if (!tank) return <p style={{ color: 'var(--text-2)' }}>Loading…</p>
 
   const unackAlerts = alerts.data?.filter(a => !a.acknowledged) ?? []
-  const chartData = [...(params.data ?? [])].reverse()
+  const allChartData = [...(params.data ?? [])].reverse()
+  const mobileChartMaxOffset = Math.max(0, allChartData.length - 3)
+  const mobileChartOffset = Math.min(mobileChartEndOffset, mobileChartMaxOffset)
+  const mobileChartEnd = allChartData.length - mobileChartOffset
+  const mobileChartStart = Math.max(0, mobileChartEnd - 3)
+  const chartData = isMobile ? allChartData.slice(mobileChartStart, mobileChartEnd) : allChartData
   const hasParamInput = [ph, temp, ammonia, nitrite, nitrate, gh, kh, salinity, sg].some(v => v.trim() !== '')
 
   const pendingTasks = tasks.filter(t => t.status === 'pending')
@@ -1789,38 +1795,81 @@ ${taskRows ? `<h2>Pending Maintenance</h2>
                     const first = entries[0]
                     const totalQuantity = entries.reduce((sum, entry) => sum + entry.quantity, 0)
                     const sc = FISH_STATUS_COLORS[status] ?? FISH_STATUS_COLORS.added
+                    const notesText = [...new Set(entries.map(entry => entry.notes).filter(Boolean))].join(' · ')
+                    const hasSpeciesInfo = speciesList.some(sp => sp.slug === slug)
                     return (
-                      <div key={`${slug}-${status}`} style={{ padding: '10px 0' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 0, flexWrap: 'wrap', minWidth: 0 }}>
-                            <span style={{ fontSize: 13, color: 'var(--text)', fontWeight: 500 }}>{first.common_name ?? first.species_slug}</span>
-                            <span style={{ fontSize: 12, color: 'var(--text-2)', marginLeft: 8 }}>×{totalQuantity}</span>
-                            {first.latin_name && <span style={{ fontSize: 11, color: 'var(--text-3)', fontStyle: 'italic', marginLeft: 8 }}>{first.latin_name}</span>}
+                      <div key={`${slug}-${status}`}>
+                        {isMobile ? (
+                          <div style={{ padding: '10px 0' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
+                              <div style={{ minWidth: 0 }}>
+                                <span style={{ fontSize: 13, color: 'var(--text)', fontWeight: 500 }}>{first.common_name ?? first.species_slug}</span>
+                                <span style={{ fontSize: 12, color: 'var(--text-2)', marginLeft: 8 }}>×{totalQuantity}</span>
+                                {first.latin_name && (
+                                  <p style={{ margin: '1px 0 0', fontSize: 11, color: 'var(--text-3)', fontStyle: 'italic' }}>{first.latin_name}</p>
+                                )}
+                                {notesText && (
+                                  <p style={{ margin: '2px 0 0', fontSize: 11, color: 'var(--text-2)' }}>{notesText}</p>
+                                )}
+                              </div>
+                              <Tag bg={sc.bg} color={sc.color} style={{ flexShrink: 0 }}>{cap(status)} ×{totalQuantity}</Tag>
+                            </div>
+                            <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
+                              {hasSpeciesInfo && (
+                                <button
+                                  onClick={() => setSpeciesInfoTarget(speciesList.find(sp => sp.slug === slug) ?? null)}
+                                  title="View species info"
+                                  style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-2)', background: 'none', border: '0.5px solid var(--btn-border)', borderRadius: 6, padding: '6px 8px', cursor: 'pointer' }}
+                                >
+                                  <Info size={13} />
+                                </button>
+                              )}
+                              {entries.map(f => (
+                                <button key={f.id} onClick={() => startEditFish(f)} title="Edit" style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-2)', background: 'none', border: '0.5px solid var(--btn-border)', borderRadius: 6, padding: '6px 8px', cursor: 'pointer' }}>
+                                  <Pencil size={13} />
+                                </button>
+                              ))}
+                              {entries.map(f => (
+                                <button key={`remove-${f.id}`} aria-label={`Remove ${f.quantity} ${f.common_name ?? f.species_slug}`} title="Remove" onClick={async () => { await api.fish.remove(id!, f.id); fish.reload() }} style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--red)', background: 'none', border: '0.5px solid var(--red-border)', borderRadius: 6, padding: '6px 8px', cursor: 'pointer' }}>
+                                  <Trash2 size={13} />
+                                </button>
+                              ))}
+                            </div>
                           </div>
-                          <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', justifyContent: 'flex-end', alignItems: 'center' }}>
-                            <Tag compact bg={sc.bg} color={sc.color}>{cap(status)} ×{totalQuantity}</Tag>
-                            {speciesList.some(sp => sp.slug === slug) && (
-                              <button
-                                onClick={() => setSpeciesInfoTarget(speciesList.find(sp => sp.slug === slug) ?? null)}
-                                title="View species info"
-                                style={{ display: 'flex', alignItems: 'center', color: 'var(--text-2)', background: 'none', border: '0.5px solid var(--btn-border)', borderRadius: 6, padding: '3px', cursor: 'pointer' }}
-                              >
-                                <Info size={12} />
-                              </button>
-                            )}
-                            {entries.map(f => (
-                              <button key={f.id} onClick={() => startEditFish(f)} title="Edit" style={{ display: 'flex', alignItems: 'center', color: 'var(--text-2)', background: 'none', border: '0.5px solid var(--btn-border)', borderRadius: 6, padding: '3px', cursor: 'pointer' }}>
-                                <Pencil size={12} />
-                              </button>
-                            ))}
-                            {entries.map(f => (
-                              <button key={`remove-${f.id}`} aria-label={`Remove ${f.quantity} ${f.common_name ?? f.species_slug}`} title="Remove" onClick={async () => { await api.fish.remove(id!, f.id); fish.reload() }} style={{ display: 'flex', alignItems: 'center', color: 'var(--red)', background: 'none', border: 'none', cursor: 'pointer' }}>
-                                <Trash2 size={12} />
-                              </button>
-                            ))}
+                        ) : (
+                          <div style={{ padding: '10px 0' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 0, flexWrap: 'wrap', minWidth: 0 }}>
+                                <span style={{ fontSize: 13, color: 'var(--text)', fontWeight: 500 }}>{first.common_name ?? first.species_slug}</span>
+                                <span style={{ fontSize: 12, color: 'var(--text-2)', marginLeft: 8 }}>×{totalQuantity}</span>
+                                {first.latin_name && <span style={{ fontSize: 11, color: 'var(--text-3)', fontStyle: 'italic', marginLeft: 8 }}>{first.latin_name}</span>}
+                              </div>
+                              <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', justifyContent: 'flex-end', alignItems: 'center' }}>
+                                <Tag bg={sc.bg} color={sc.color}>{cap(status)} ×{totalQuantity}</Tag>
+                                {hasSpeciesInfo && (
+                                  <button
+                                    onClick={() => setSpeciesInfoTarget(speciesList.find(sp => sp.slug === slug) ?? null)}
+                                    title="View species info"
+                                    style={{ display: 'flex', alignItems: 'center', color: 'var(--text-2)', background: 'none', border: '0.5px solid var(--btn-border)', borderRadius: 6, padding: '3px', cursor: 'pointer' }}
+                                  >
+                                    <Info size={12} />
+                                  </button>
+                                )}
+                                {entries.map(f => (
+                                  <button key={f.id} onClick={() => startEditFish(f)} title="Edit" style={{ display: 'flex', alignItems: 'center', color: 'var(--text-2)', background: 'none', border: '0.5px solid var(--btn-border)', borderRadius: 6, padding: '3px', cursor: 'pointer' }}>
+                                    <Pencil size={12} />
+                                  </button>
+                                ))}
+                                {entries.map(f => (
+                                  <button key={`remove-${f.id}`} aria-label={`Remove ${f.quantity} ${f.common_name ?? f.species_slug}`} title="Remove" onClick={async () => { await api.fish.remove(id!, f.id); fish.reload() }} style={{ display: 'flex', alignItems: 'center', color: 'var(--red)', background: 'none', border: 'none', cursor: 'pointer' }}>
+                                    <Trash2 size={12} />
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+                            {notesText && <p style={{ margin: '6px 0 0', fontSize: 11, color: 'var(--text-3)' }}>{notesText}</p>}
                           </div>
-                        </div>
-                        {[...new Set(entries.map(entry => entry.notes).filter(Boolean))].join(' · ') && <p style={{ margin: '6px 0 0', fontSize: 11, color: 'var(--text-3)' }}>{[...new Set(entries.map(entry => entry.notes).filter(Boolean))].join(' · ')}</p>}
+                        )}
                       </div>
                     )
                   }))}
@@ -1863,20 +1912,18 @@ ${taskRows ? `<h2>Pending Maintenance</h2>
                           <p style={{ margin: '2px 0 0', fontSize: 11, color: 'var(--text-2)' }}>{p.notes}</p>
                         )}
                       </div>
-                      <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexShrink: 0 }}>
-                        {speciesList.some(sp => sp.slug === p.species_slug) && (
-                          <button
-                            onClick={() => setSpeciesInfoTarget(speciesList.find(sp => sp.slug === p.species_slug) ?? null)}
-                            title="View species info"
-                            style={{ display: 'flex', alignItems: 'center', color: 'var(--text-2)', background: 'none', border: '0.5px solid var(--btn-border)', borderRadius: 6, padding: '3px', cursor: 'pointer' }}
-                          >
-                            <Info size={12} />
-                          </button>
-                        )}
-                        <Tag bg={sc.bg} color={sc.color}>{cap(p.plant_status)}</Tag>
-                      </div>
+                      <Tag bg={sc.bg} color={sc.color} style={{ flexShrink: 0 }}>{cap(p.plant_status)}</Tag>
                     </div>
                     <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
+                      {speciesList.some(sp => sp.slug === p.species_slug) && (
+                        <button
+                          onClick={() => setSpeciesInfoTarget(speciesList.find(sp => sp.slug === p.species_slug) ?? null)}
+                          title="View species info"
+                          style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-2)', background: 'none', border: '0.5px solid var(--btn-border)', borderRadius: 6, padding: '6px 8px', cursor: 'pointer' }}
+                        >
+                          <Info size={13} />
+                        </button>
+                      )}
                       <button
                         onClick={() => {
                           setEditingPlantId(p.id)
@@ -2025,8 +2072,29 @@ ${taskRows ? `<h2>Pending Maintenance</h2>
             >Save Reading</button>
           </Card>
 
-          {chartData.length > 0 && (
+          {allChartData.length > 0 && (
             <>
+              {isMobile && allChartData.length > 3 && (
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, padding: '2px 2px' }}>
+                  <button
+                    onClick={() => setMobileChartEndOffset(o => Math.min(mobileChartMaxOffset, o + 3))}
+                    disabled={mobileChartOffset >= mobileChartMaxOffset}
+                    style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, padding: '6px 10px', borderRadius: 8, border: '0.5px solid var(--btn-border)', background: 'var(--surface)', color: mobileChartOffset >= mobileChartMaxOffset ? 'var(--text-4)' : 'var(--text-2)', cursor: mobileChartOffset >= mobileChartMaxOffset ? 'default' : 'pointer' }}
+                  >
+                    <Prev size={13} />Older
+                  </button>
+                  <span style={{ fontSize: 11, color: 'var(--text-3)' }}>
+                    {formatDate(allChartData[mobileChartStart].recorded_at, dateFormat)} – {formatDate(allChartData[mobileChartEnd - 1].recorded_at, dateFormat)}
+                  </span>
+                  <button
+                    onClick={() => setMobileChartEndOffset(o => Math.max(0, o - 3))}
+                    disabled={mobileChartOffset <= 0}
+                    style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, padding: '6px 10px', borderRadius: 8, border: '0.5px solid var(--btn-border)', background: 'var(--surface)', color: mobileChartOffset <= 0 ? 'var(--text-4)' : 'var(--text-2)', cursor: mobileChartOffset <= 0 ? 'default' : 'pointer' }}
+                  >
+                    Newer<Next size={13} />
+                  </button>
+                </div>
+              )}
               {[
                 { key: 'ph', label: 'pH', color: '#378add', domain: [5, 9] },
                 { key: 'temperature_c', label: 'Temperature (°C)', color: '#e07b3a', domain: [15, 35] },
@@ -2037,7 +2105,7 @@ ${taskRows ? `<h2>Pending Maintenance</h2>
                   { key: 'salinity_ppt', label: 'Salinity (ppt)', color: '#1abc9c', domain: [0, 45] },
                   { key: 'specific_gravity', label: 'Specific Gravity', color: '#16a085', domain: [1.000, 1.035] },
                 ] : []),
-              ].filter(({ key }) => chartData.some((d: any) => d[key] != null)).map(({ key, label: lbl, color, domain }) => {
+              ].filter(({ key }) => allChartData.some((d: any) => d[key] != null)).map(({ key, label: lbl, color, domain }) => {
                 const range = getParamRange(key, tank.water_type)
                 const optimum = range ? (range.idealMin + range.idealMax) / 2 : null
                 const showOptimum = optimum != null && !hiddenOptimumLines[key]
@@ -2393,22 +2461,46 @@ ${taskRows ? `<h2>Pending Maintenance</h2>
               )}
               {todayTasks.map((task: any, i: number) => {
                 const c = task.color ?? '#1e88e5'
+                const dayLabels = task.days.split(',').map((d: string) => DAY_ABBR[Number(d)]).join(', ')
                 return (
-                  <div key={task.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 0', borderBottom: i === todayTasks.length - 1 ? 'none' : '0.5px solid var(--border-sub)' }}>
-                    <span style={{ width: 6, height: 6, borderRadius: '50%', background: c, flexShrink: 0 }} />
-                    <span style={{ fontSize: 12, color: 'var(--text-3)', fontVariantNumeric: 'tabular-nums', flexShrink: 0, minWidth: 36 }}>
-                      {String(task.hour).padStart(2, '0')}:{String(task.minute).padStart(2, '0')}
-                    </span>
-                    <span style={{ fontSize: 13, color: 'var(--text)', flex: 1 }}>{task.name}</span>
-                    <span style={{ fontSize: 11, color: 'var(--text-3)', flexShrink: 0 }}>
-                      {task.days.split(',').map((d: string) => DAY_ABBR[Number(d)]).join(', ')}
-                    </span>
-                    <button onClick={() => startEditDailyTask(task)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-3)', lineHeight: 0, padding: 2, flexShrink: 0 }}>
-                      <Pencil size={12} />
-                    </button>
-                    <button onClick={() => removeDailyTask(task.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-3)', lineHeight: 0, padding: 2, flexShrink: 0 }}>
-                      <X size={13} />
-                    </button>
+                  <div key={task.id} style={{ padding: '8px 0', borderBottom: i === todayTasks.length - 1 ? 'none' : '0.5px solid var(--border-sub)' }}>
+                    {isMobile ? (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <span style={{ width: 6, height: 6, borderRadius: '50%', background: c, flexShrink: 0 }} />
+                          <span style={{ fontSize: 12, color: 'var(--text-3)', fontVariantNumeric: 'tabular-nums', flexShrink: 0 }}>
+                            {String(task.hour).padStart(2, '0')}:{String(task.minute).padStart(2, '0')}
+                          </span>
+                          <span style={{ fontSize: 13, color: 'var(--text)', flex: 1, minWidth: 0 }}>{task.name}</span>
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+                          <span style={{ fontSize: 11, color: 'var(--text-3)' }}>{dayLabels}</span>
+                          <div style={{ display: 'flex', gap: 10, flexShrink: 0 }}>
+                            <button onClick={() => startEditDailyTask(task)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-3)', lineHeight: 0, padding: 2 }}>
+                              <Pencil size={14} />
+                            </button>
+                            <button onClick={() => removeDailyTask(task.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-3)', lineHeight: 0, padding: 2 }}>
+                              <X size={15} />
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                        <span style={{ width: 6, height: 6, borderRadius: '50%', background: c, flexShrink: 0 }} />
+                        <span style={{ fontSize: 12, color: 'var(--text-3)', fontVariantNumeric: 'tabular-nums', flexShrink: 0, minWidth: 36 }}>
+                          {String(task.hour).padStart(2, '0')}:{String(task.minute).padStart(2, '0')}
+                        </span>
+                        <span style={{ fontSize: 13, color: 'var(--text)', flex: 1 }}>{task.name}</span>
+                        <span style={{ fontSize: 11, color: 'var(--text-3)', flexShrink: 0 }}>{dayLabels}</span>
+                        <button onClick={() => startEditDailyTask(task)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-3)', lineHeight: 0, padding: 2, flexShrink: 0 }}>
+                          <Pencil size={12} />
+                        </button>
+                        <button onClick={() => removeDailyTask(task.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-3)', lineHeight: 0, padding: 2, flexShrink: 0 }}>
+                          <X size={13} />
+                        </button>
+                      </div>
+                    )}
                   </div>
                 )
               })}
@@ -2424,22 +2516,46 @@ ${taskRows ? `<h2>Pending Maintenance</h2>
                     .sort((a: any, b: any) => a.hour !== b.hour ? a.hour - b.hour : a.minute - b.minute)
                   return otherTasks.map((task: any, i: number) => {
                     const c = task.color ?? '#1e88e5'
+                    const dayLabels = task.days.split(',').map((d: string) => DAY_ABBR[Number(d)]).join(', ')
                     return (
-                      <div key={task.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 0', borderBottom: i === otherTasks.length - 1 ? 'none' : '0.5px solid var(--border-sub)' }}>
-                        <span style={{ width: 6, height: 6, borderRadius: '50%', background: c, flexShrink: 0 }} />
-                        <span style={{ fontSize: 12, color: 'var(--text-3)', fontVariantNumeric: 'tabular-nums', flexShrink: 0, minWidth: 36 }}>
-                          {String(task.hour).padStart(2, '0')}:{String(task.minute).padStart(2, '0')}
-                        </span>
-                        <span style={{ fontSize: 13, color: 'var(--text)', flex: 1 }}>{task.name}</span>
-                        <span style={{ fontSize: 11, color: 'var(--text-3)', flexShrink: 0 }}>
-                          {task.days.split(',').map((d: string) => DAY_ABBR[Number(d)]).join(', ')}
-                        </span>
-                        <button onClick={() => startEditDailyTask(task)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-3)', lineHeight: 0, padding: 2, flexShrink: 0 }}>
-                          <Pencil size={12} />
-                        </button>
-                        <button onClick={() => removeDailyTask(task.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-3)', lineHeight: 0, padding: 2, flexShrink: 0 }}>
-                          <X size={13} />
-                        </button>
+                      <div key={task.id} style={{ padding: '8px 0', borderBottom: i === otherTasks.length - 1 ? 'none' : '0.5px solid var(--border-sub)' }}>
+                        {isMobile ? (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                              <span style={{ width: 6, height: 6, borderRadius: '50%', background: c, flexShrink: 0 }} />
+                              <span style={{ fontSize: 12, color: 'var(--text-3)', fontVariantNumeric: 'tabular-nums', flexShrink: 0 }}>
+                                {String(task.hour).padStart(2, '0')}:{String(task.minute).padStart(2, '0')}
+                              </span>
+                              <span style={{ fontSize: 13, color: 'var(--text)', flex: 1, minWidth: 0 }}>{task.name}</span>
+                            </div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+                              <span style={{ fontSize: 11, color: 'var(--text-3)' }}>{dayLabels}</span>
+                              <div style={{ display: 'flex', gap: 10, flexShrink: 0 }}>
+                                <button onClick={() => startEditDailyTask(task)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-3)', lineHeight: 0, padding: 2 }}>
+                                  <Pencil size={14} />
+                                </button>
+                                <button onClick={() => removeDailyTask(task.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-3)', lineHeight: 0, padding: 2 }}>
+                                  <X size={15} />
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        ) : (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                            <span style={{ width: 6, height: 6, borderRadius: '50%', background: c, flexShrink: 0 }} />
+                            <span style={{ fontSize: 12, color: 'var(--text-3)', fontVariantNumeric: 'tabular-nums', flexShrink: 0, minWidth: 36 }}>
+                              {String(task.hour).padStart(2, '0')}:{String(task.minute).padStart(2, '0')}
+                            </span>
+                            <span style={{ fontSize: 13, color: 'var(--text)', flex: 1 }}>{task.name}</span>
+                            <span style={{ fontSize: 11, color: 'var(--text-3)', flexShrink: 0 }}>{dayLabels}</span>
+                            <button onClick={() => startEditDailyTask(task)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-3)', lineHeight: 0, padding: 2, flexShrink: 0 }}>
+                              <Pencil size={12} />
+                            </button>
+                            <button onClick={() => removeDailyTask(task.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-3)', lineHeight: 0, padding: 2, flexShrink: 0 }}>
+                              <X size={13} />
+                            </button>
+                          </div>
+                        )}
                       </div>
                     )
                   })
@@ -2546,7 +2662,7 @@ ${taskRows ? `<h2>Pending Maintenance</h2>
               <p style={{ margin: 0, fontWeight: 600, fontSize: 15, color: 'var(--text)' }}>Edit Inhabitant</p>
               <button onClick={() => setEditingFishId(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-2)', lineHeight: 0 }}><X size={18} /></button>
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: editFishStatus === 'added' ? '80px 1fr 1fr' : '80px 1fr', gap: 10, marginBottom: 12 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: !isMobile && editFishStatus === 'added' ? '80px 1fr 1fr' : '80px 1fr', gap: 10, marginBottom: 12 }}>
               <div>
                 <FieldLabel>Quantity</FieldLabel>
                 <input type="number" min="1" max="10" value={editQty} onChange={e => setEditQty(String(Math.min(10, Number(e.target.value) || 1)))} style={{ width: '100%', boxSizing: 'border-box' }} />
@@ -2558,7 +2674,7 @@ ${taskRows ? `<h2>Pending Maintenance</h2>
                 </select>
               </div>
               {editFishStatus === 'added' && (
-                <div>
+                <div style={{ gridColumn: isMobile ? '1 / -1' : undefined }}>
                   <FieldLabel>Health Status</FieldLabel>
                   <select value={editHealth} onChange={e => setEditHealth(e.target.value)} style={{ width: '100%', boxSizing: 'border-box' }}>
                     {HEALTH_STATUSES.map(s => <option key={s} value={s}>{cap(s)}</option>)}

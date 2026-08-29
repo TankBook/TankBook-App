@@ -524,7 +524,7 @@ function SpeciesCard({ s, onOpen, onEdit }: { s: Species; onOpen: () => void; on
         <button
           onClick={e => { e.stopPropagation(); onEdit() }}
           title="Edit species"
-          style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-3)', padding: 3, lineHeight: 0, borderRadius: 6, flexShrink: 0 }}
+          style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 32, height: 32, background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-3)', padding: 0, lineHeight: 0, borderRadius: 6, flexShrink: 0 }}
           onMouseEnter={e => (e.currentTarget.style.color = 'var(--blue)')}
           onMouseLeave={e => (e.currentTarget.style.color = 'var(--text-3)')}
         >
@@ -739,15 +739,31 @@ export default function SpeciesBrowser() {
       )}
 
 
-      <div style={{ display: 'flex', gap: 10, marginBottom: 20, flexWrap: 'wrap' }}>
-        <input value={search} onChange={e => setSearch(e.target.value)}
-          placeholder="Search by name or slug…" style={{ flex: 1, minWidth: 200 }} />
-        <button style={{ ...typeFilterStyle('all', filter === 'all'), display: 'inline-flex', alignItems: 'center', gap: 5 }} onClick={() => setFilter('all')}>All<span style={{ fontSize: 10, opacity: 0.65 }}>{counts.all}</span></button>
-        <button style={{ ...typeFilterStyle('fish', filter === 'fish'), display: 'inline-flex', alignItems: 'center', gap: 5 }} onClick={() => setFilter('fish')}><Fish size={13} />Fish<span style={{ fontSize: 10, opacity: 0.65 }}>{counts.fish}</span></button>
-        <button style={{ ...typeFilterStyle('invertebrate', filter === 'invertebrate'), display: 'inline-flex', alignItems: 'center', gap: 5 }} onClick={() => setFilter('invertebrate')}><Shrimp size={13} />Invertebrates<span style={{ fontSize: 10, opacity: 0.65 }}>{counts.invertebrate}</span></button>
-        <button style={{ ...typeFilterStyle('amphibian', filter === 'amphibian'), display: 'inline-flex', alignItems: 'center', gap: 5 }} onClick={() => setFilter('amphibian')}><Bug size={13} />Amphibians<span style={{ fontSize: 10, opacity: 0.65 }}>{counts.amphibian}</span></button>
-        <button style={{ ...typeFilterStyle('plant', filter === 'plant'), display: 'inline-flex', alignItems: 'center', gap: 5 }} onClick={() => setFilter('plant')}><Leaf size={13} />Plants<span style={{ fontSize: 10, opacity: 0.65 }}>{counts.plant}</span></button>
-      </div>
+      {isMobile ? (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 20 }}>
+          <input value={search} onChange={e => setSearch(e.target.value)}
+            placeholder="Search by name or slug…" style={{ width: '100%', boxSizing: 'border-box' }} />
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button style={{ ...typeFilterStyle('all', filter === 'all'), flex: 1, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 5 }} onClick={() => setFilter('all')}>All<span style={{ fontSize: 10, opacity: 0.65 }}>{counts.all}</span></button>
+            <button style={{ ...typeFilterStyle('fish', filter === 'fish'), flex: 1, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 5 }} onClick={() => setFilter('fish')}><Fish size={13} />Fish<span style={{ fontSize: 10, opacity: 0.65 }}>{counts.fish}</span></button>
+            <button style={{ ...typeFilterStyle('invertebrate', filter === 'invertebrate'), flex: 1, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 5 }} onClick={() => setFilter('invertebrate')}><Shrimp size={13} />Invertebrates<span style={{ fontSize: 10, opacity: 0.65 }}>{counts.invertebrate}</span></button>
+          </div>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button style={{ ...typeFilterStyle('amphibian', filter === 'amphibian'), flex: 1, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 5 }} onClick={() => setFilter('amphibian')}><Bug size={13} />Amphibians<span style={{ fontSize: 10, opacity: 0.65 }}>{counts.amphibian}</span></button>
+            <button style={{ ...typeFilterStyle('plant', filter === 'plant'), flex: 1, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 5 }} onClick={() => setFilter('plant')}><Leaf size={13} />Plants<span style={{ fontSize: 10, opacity: 0.65 }}>{counts.plant}</span></button>
+          </div>
+        </div>
+      ) : (
+        <div style={{ display: 'flex', gap: 10, marginBottom: 20, flexWrap: 'wrap' }}>
+          <input value={search} onChange={e => setSearch(e.target.value)}
+            placeholder="Search by name or slug…" style={{ flex: 1, minWidth: 200 }} />
+          <button style={{ ...typeFilterStyle('all', filter === 'all'), display: 'inline-flex', alignItems: 'center', gap: 5 }} onClick={() => setFilter('all')}>All<span style={{ fontSize: 10, opacity: 0.65 }}>{counts.all}</span></button>
+          <button style={{ ...typeFilterStyle('fish', filter === 'fish'), display: 'inline-flex', alignItems: 'center', gap: 5 }} onClick={() => setFilter('fish')}><Fish size={13} />Fish<span style={{ fontSize: 10, opacity: 0.65 }}>{counts.fish}</span></button>
+          <button style={{ ...typeFilterStyle('invertebrate', filter === 'invertebrate'), display: 'inline-flex', alignItems: 'center', gap: 5 }} onClick={() => setFilter('invertebrate')}><Shrimp size={13} />Invertebrates<span style={{ fontSize: 10, opacity: 0.65 }}>{counts.invertebrate}</span></button>
+          <button style={{ ...typeFilterStyle('amphibian', filter === 'amphibian'), display: 'inline-flex', alignItems: 'center', gap: 5 }} onClick={() => setFilter('amphibian')}><Bug size={13} />Amphibians<span style={{ fontSize: 10, opacity: 0.65 }}>{counts.amphibian}</span></button>
+          <button style={{ ...typeFilterStyle('plant', filter === 'plant'), display: 'inline-flex', alignItems: 'center', gap: 5 }} onClick={() => setFilter('plant')}><Leaf size={13} />Plants<span style={{ fontSize: 10, opacity: 0.65 }}>{counts.plant}</span></button>
+        </div>
+      )}
 
       {loading && <p style={{ color: 'var(--text-2)', fontSize: 14 }}>Loading species…</p>}
       {error && <p style={{ color: 'var(--red)', fontSize: 14 }}>Could not load species: {error}</p>}

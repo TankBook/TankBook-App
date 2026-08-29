@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Ruler, FlaskConical, type LucideIcon } from 'lucide-react'
+import { Ruler, FlaskConical, ChevronLeft, ChevronRight, type LucideIcon } from 'lucide-react'
 import { Card, FieldLabel } from '../components/ui'
 import { useSettings, dimInputProps } from '../context/SettingsContext'
 
@@ -92,7 +92,7 @@ function VolumeCalculator() {
         key={id}
         onClick={() => { setShape(id); setWidth(''); setHeight(''); setDepth(''); setDiameter('') }}
         style={{
-          padding: '6px 16px', borderRadius: 8, fontSize: 13, cursor: 'pointer', fontWeight: active ? 500 : 400,
+          flex: 1, padding: '6px 16px', borderRadius: 8, fontSize: 13, cursor: 'pointer', fontWeight: active ? 500 : 400,
           border: active ? '0.5px solid var(--blue-border)' : '0.5px solid var(--btn-border)',
           background: active ? 'var(--blue-bg)' : 'transparent',
           color: active ? 'var(--blue)' : 'var(--text-2)',
@@ -510,7 +510,10 @@ export default function Calculators() {
   }, [])
 
   const ActiveCalc = CALC_COMPONENTS[active]
-  const activeDef = CALCULATORS.find(c => c.id === active)!
+  const activeIndex = CALCULATORS.findIndex(c => c.id === active)
+  const activeDef = CALCULATORS[activeIndex]
+  const cyclePrev = () => setActive(CALCULATORS[(activeIndex - 1 + CALCULATORS.length) % CALCULATORS.length].id)
+  const cycleNext = () => setActive(CALCULATORS[(activeIndex + 1) % CALCULATORS.length].id)
 
   return (
     <div>
@@ -518,28 +521,34 @@ export default function Calculators() {
 
       <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', gap: 20, alignItems: 'flex-start' }}>
 
-        {/* Sidebar — horizontal scroll on mobile, vertical list on desktop */}
+        {/* Sidebar — full-width cycler with arrows on mobile, vertical list on desktop */}
         {isMobile ? (
-          <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 2, width: '100%' }}>
-            {CALCULATORS.map(c => {
-              const isActive = c.id === active
-              return (
-                <button
-                  key={c.id}
-                  onClick={() => setActive(c.id)}
-                  style={{
-                    display: 'inline-flex', alignItems: 'center', gap: 6,
-                    padding: '7px 14px', borderRadius: 8, fontSize: 13, cursor: 'pointer',
-                    fontWeight: isActive ? 500 : 400, flexShrink: 0,
-                    border: isActive ? '0.5px solid var(--blue-border)' : '0.5px solid var(--btn-border)',
-                    background: isActive ? 'var(--blue-bg)' : 'var(--surface)',
-                    color: isActive ? 'var(--blue)' : 'var(--text-2)',
-                  }}
-                >
-                  <c.icon size={13} />{c.label}
-                </button>
-              )
-            })}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%' }}>
+            <button
+              onClick={cyclePrev}
+              aria-label="Previous calculator"
+              disabled={CALCULATORS.length < 2}
+              style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, width: 36, height: 36, borderRadius: 8, border: '0.5px solid var(--btn-border)', background: 'var(--surface)', color: 'var(--text-2)', cursor: CALCULATORS.length < 2 ? 'default' : 'pointer' }}
+            >
+              <ChevronLeft size={16} />
+            </button>
+            <div
+              style={{
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, flex: 1,
+                padding: '9px 14px', borderRadius: 8, fontSize: 13, fontWeight: 500,
+                border: '0.5px solid var(--blue-border)', background: 'var(--blue-bg)', color: 'var(--blue)',
+              }}
+            >
+              <activeDef.icon size={14} />{activeDef.label}
+            </div>
+            <button
+              onClick={cycleNext}
+              aria-label="Next calculator"
+              disabled={CALCULATORS.length < 2}
+              style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, width: 36, height: 36, borderRadius: 8, border: '0.5px solid var(--btn-border)', background: 'var(--surface)', color: 'var(--text-2)', cursor: CALCULATORS.length < 2 ? 'default' : 'pointer' }}
+            >
+              <ChevronRight size={16} />
+            </button>
           </div>
         ) : (
           <div style={{ width: 200, flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 2 }}>
