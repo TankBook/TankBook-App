@@ -4,6 +4,32 @@ All notable changes to TankBook are documented here.
 
 ---
 
+## [0.7.2] — 2026-08-29
+
+### Improvements
+- Tank parameter graphs on mobile now show 3 readings at a time, with Older/Newer paging controls to browse the full history instead of showing every point crushed together.
+- A species with inhabitants in more than one status (e.g. Added and Planned) now shows as separate lines instead of one crowded row, and collapses back to one line once every entry shares a status again.
+- Added a species info button to the Inhabitants and Plants tabs, reusing the same detail view as the Species Browser.
+- Edit/Remove controls on the Inhabitants and Plants tabs are now icon-only, with mobile rows showing name/status stacked above full-width action buttons.
+- Species Browser's search bar and category filters redesigned for mobile: full-width search bar, filters split into two even rows.
+- Tank Journal's tank selector restyled to match the app's dropdown menu (used elsewhere for tab navigation) instead of a plain browser select.
+- Calculators page selector is full-width with cycle arrows on mobile; the Volume calculator's Tank Shape buttons are now equal width.
+- Spending page's filter dropdowns restyled to match the app's dropdown component and given equal widths.
+- Inventory's category selector shows as a dropdown at the top of the page on mobile, instead of a list rendering below the items.
+- Navbar Quick Add button now uses the app's blue accent styling instead of a faint gray outline.
+- Dashboard's Upcoming Tasks now shows a "Due today" tag, matching the tank Weekly tab.
+
+### Fixed
+- Assigning a tank to a room, and reordering tank cards on the dashboard, now work on touch devices — both were previously drag-and-drop only with no touch equivalent.
+- Species Detail modal's footer no longer overflows off the edge of the modal on narrow screens.
+- Edit Inhabitant modal's Health Status field no longer squeezes into a third column alongside Quantity and Status on mobile.
+- Daily Task rows now stack onto two lines on mobile instead of squeezing time, name, days, and actions into one row.
+- Enlarged several tap targets that were well under a comfortable touch-target size, across the Room, Species, and Journal pages and the notes formatting toolbar.
+- Dashboard's Upcoming Tasks no longer excludes tasks due earlier today — it compared against the exact current time rather than the start of the day.
+- Removed a duplicate divider that appeared under the last row on the Plants tab and the Alerts tab.
+
+---
+
 ## [0.7.1] — 2026-08-28
 
 ### Fixed
