@@ -57,8 +57,8 @@ export function RichTextarea({ value, onChange, rows = 4, placeholder }: {
   }
 
   const btn: CSSProperties = {
-    padding: '2px 8px', borderRadius: 4, border: '0.5px solid var(--btn-border)',
-    background: 'transparent', color: 'var(--text-2)', cursor: 'pointer', fontSize: 12, lineHeight: 1.5,
+    padding: '7px 10px', borderRadius: 4, border: '0.5px solid var(--btn-border)',
+    background: 'transparent', color: 'var(--text-2)', cursor: 'pointer', fontSize: 12, lineHeight: 1,
   }
 
   return (

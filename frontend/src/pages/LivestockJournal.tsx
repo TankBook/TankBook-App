@@ -515,14 +515,14 @@ export default function LivestockJournal() {
                   <button
                     onClick={() => startEdit(entry)}
                     title="Edit entry"
-                    style={{ padding: '4px 6px', borderRadius: 6, border: '0.5px solid var(--border)', background: 'transparent', cursor: 'pointer', color: 'var(--text-3)' }}
+                    style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 32, height: 32, padding: 0, borderRadius: 6, border: '0.5px solid var(--border)', background: 'transparent', cursor: 'pointer', color: 'var(--text-3)' }}
                   >
                     <Pencil size={13} />
                   </button>
                   <button
                     onClick={() => handleDelete(entry)}
                     title="Delete entry"
-                    style={{ padding: '4px 6px', borderRadius: 6, border: '0.5px solid var(--border)', background: 'transparent', cursor: 'pointer', color: 'var(--text-3)' }}
+                    style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 32, height: 32, padding: 0, borderRadius: 6, border: '0.5px solid var(--border)', background: 'transparent', cursor: 'pointer', color: 'var(--text-3)' }}
                   >
                     <Trash2 size={13} />
                   </button>

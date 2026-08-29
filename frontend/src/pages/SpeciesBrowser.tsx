@@ -524,7 +524,7 @@ function SpeciesCard({ s, onOpen, onEdit }: { s: Species; onOpen: () => void; on
         <button
           onClick={e => { e.stopPropagation(); onEdit() }}
           title="Edit species"
-          style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-3)', padding: 3, lineHeight: 0, borderRadius: 6, flexShrink: 0 }}
+          style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 32, height: 32, background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-3)', padding: 0, lineHeight: 0, borderRadius: 6, flexShrink: 0 }}
           onMouseEnter={e => (e.currentTarget.style.color = 'var(--blue)')}
           onMouseLeave={e => (e.currentTarget.style.color = 'var(--text-3)')}
         >

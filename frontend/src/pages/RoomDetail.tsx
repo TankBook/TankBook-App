@@ -146,15 +146,15 @@ export default function RoomDetail() {
                     aria-label={`View ${tank.name} details`}
                     onPointerDown={e => e.stopPropagation()}
                     onClick={() => navigate(`/tanks/${tank.id}?fromRoom=${room.id}&fromRoomName=${encodeURIComponent(room.name)}`)}
-                    style={{ position: 'absolute', top: 3, left: 3, display: 'grid', placeItems: 'center', width: 18, height: 18, padding: 0, border: 'none', borderRadius: 4, background: 'var(--surface-2)', color: 'var(--text-2)', cursor: 'pointer' }}
-                  ><ExternalLink size={11} /></button>
+                    style={{ position: 'absolute', top: 2, left: 2, display: 'grid', placeItems: 'center', width: 24, height: 24, padding: 0, border: 'none', borderRadius: 5, background: 'var(--surface-2)', color: 'var(--text-2)', cursor: 'pointer' }}
+                  ><ExternalLink size={12} /></button>
                   <button
                     type="button"
                     aria-label={`Remove ${tank.name} from ${room.name}`}
                     onPointerDown={e => e.stopPropagation()}
                     onClick={() => moveTankToRoom(tank.id, null)}
-                    style={{ position: 'absolute', top: 3, right: 3, display: 'grid', placeItems: 'center', width: 18, height: 18, padding: 0, border: 'none', borderRadius: 4, background: 'var(--surface-2)', color: 'var(--text-2)', cursor: 'pointer' }}
-                  ><X size={11} /></button>
+                    style={{ position: 'absolute', top: 2, right: 2, display: 'grid', placeItems: 'center', width: 24, height: 24, padding: 0, border: 'none', borderRadius: 5, background: 'var(--surface-2)', color: 'var(--text-2)', cursor: 'pointer' }}
+                  ><X size={12} /></button>
                   <strong style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 12, color: 'var(--text)', marginTop: 2 }}>{tank.name}</strong>
                   <span style={{ fontSize: 10, color: 'var(--text-2)' }}>{tank.volume_litres} L</span>
                 </div>
