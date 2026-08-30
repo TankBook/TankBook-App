@@ -37,6 +37,7 @@ import Calculators from './pages/Calculators'
 import Inventory from './pages/Inventory'
 import Assistant from './pages/Assistant'
 import UpdateToast from './components/UpdateToast'
+import AssistantWidget from './components/AssistantWidget'
 import { SettingsProvider, useSettings } from './context/SettingsContext'
 
 const QA_CATEGORIES = ['Equipment', 'Livestock', 'Plants', 'Food', 'Chemicals', 'Medication', 'Decor', 'Subscription', 'Other']
@@ -508,6 +509,7 @@ export default function App() {
           <Footer />
         </div>
         <UpdateToast />
+        <AssistantWidget />
       </BrowserRouter>
     </SettingsProvider>
   )
