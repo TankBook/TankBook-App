@@ -1,13 +1,16 @@
 from contextlib import asynccontextmanager
 from pathlib import Path
 import os
+import secrets
 
 from fastapi import FastAPI, Depends
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
+from starlette.middleware.sessions import SessionMiddleware
 
-from app.routers import tanks, fish, plants, parameters, alerts, species, maintenance, settings, daily_tasks, journal, backup, images, spending, inventory, rooms, tap_water, agent
+from app.routers import tanks, fish, plants, parameters, alerts, species, maintenance, settings, daily_tasks, journal, backup, images, spending, inventory, rooms, tap_water, agent, auth
 from app.services.species import species_service, check_compatibility
+from app.services.auth import get_current_user
 from app.database import get_db
 
 
@@ -26,27 +29,38 @@ app = FastAPI(
     openapi_url="/api/openapi.json",
 )
 
-app.include_router(tanks.router, prefix="/api/tanks", tags=["tanks"])
-app.include_router(fish.router, prefix="/api/fish", tags=["fish"])
-app.include_router(plants.router, prefix="/api/plants", tags=["plants"])
-app.include_router(parameters.router, prefix="/api/parameters", tags=["parameters"])
-app.include_router(alerts.router, prefix="/api/alerts", tags=["alerts"])
-app.include_router(species.router, prefix="/api/species", tags=["species"])
-app.include_router(maintenance.router, prefix="/api/tanks", tags=["maintenance"])
-app.include_router(daily_tasks.router, prefix="/api/tanks", tags=["daily_tasks"])
-app.include_router(settings.router, prefix="/api/settings", tags=["settings"])
-app.include_router(journal.router, prefix="/api/tanks", tags=["journal"])
-app.include_router(backup.router, prefix="/api/backup", tags=["backup"])
-app.include_router(images.router, prefix="/api/images", tags=["images"])
-app.include_router(spending.router, prefix="/api", tags=["spending"])
-app.include_router(inventory.router, prefix="/api/inventory", tags=["inventory"])
-app.include_router(rooms.router, prefix="/api/rooms", tags=["rooms"])
-app.include_router(tap_water.router, prefix="/api/tap-water", tags=["tap_water"])
-app.include_router(agent.router, prefix="/api/agent", tags=["agent"])
+# Only used to hold the short-lived OIDC state/nonce during the login redirect round-trip —
+# unrelated to the app's own session cookie, which is a DB-backed opaque token (see services/auth.py).
+app.add_middleware(
+    SessionMiddleware,
+    secret_key=os.environ.get("SECRET_KEY") or secrets.token_hex(32),
+    session_cookie="tankbook_oauth_state",
+)
+
+authenticated = [Depends(get_current_user)]
+
+app.include_router(auth.router, prefix="/api/auth", tags=["auth"])
+app.include_router(tanks.router, prefix="/api/tanks", tags=["tanks"], dependencies=authenticated)
+app.include_router(fish.router, prefix="/api/fish", tags=["fish"], dependencies=authenticated)
+app.include_router(plants.router, prefix="/api/plants", tags=["plants"], dependencies=authenticated)
+app.include_router(parameters.router, prefix="/api/parameters", tags=["parameters"], dependencies=authenticated)
+app.include_router(alerts.router, prefix="/api/alerts", tags=["alerts"], dependencies=authenticated)
+app.include_router(species.router, prefix="/api/species", tags=["species"], dependencies=authenticated)
+app.include_router(maintenance.router, prefix="/api/tanks", tags=["maintenance"], dependencies=authenticated)
+app.include_router(daily_tasks.router, prefix="/api/tanks", tags=["daily_tasks"], dependencies=authenticated)
+app.include_router(settings.router, prefix="/api/settings", tags=["settings"], dependencies=authenticated)
+app.include_router(journal.router, prefix="/api/tanks", tags=["journal"], dependencies=authenticated)
+app.include_router(backup.router, prefix="/api/backup", tags=["backup"], dependencies=authenticated)
+app.include_router(images.router, prefix="/api/images", tags=["images"], dependencies=authenticated)
+app.include_router(spending.router, prefix="/api", tags=["spending"], dependencies=authenticated)
+app.include_router(inventory.router, prefix="/api/inventory", tags=["inventory"], dependencies=authenticated)
+app.include_router(rooms.router, prefix="/api/rooms", tags=["rooms"], dependencies=authenticated)
+app.include_router(tap_water.router, prefix="/api/tap-water", tags=["tap_water"], dependencies=authenticated)
+app.include_router(agent.router, prefix="/api/agent", tags=["agent"], dependencies=authenticated)
 
 
 @app.get("/api/tanks/{tank_id}/compatibility")
-def get_compatibility(tank_id: str, slug: str, db=Depends(get_db)):
+def get_compatibility(tank_id: str, slug: str, db=Depends(get_db), _user=Depends(get_current_user)):
     return check_compatibility(db, tank_id, slug)
 
 
@@ -56,7 +70,7 @@ def health():
 
 
 @app.get("/api/dashboard")
-def dashboard_stats(db=Depends(get_db)):
+def dashboard_stats(db=Depends(get_db), _user=Depends(get_current_user)):
     from app.models.models import Tank, TankFish, TankPlant, WaterParameter, MaintenanceTask, Alert
     from sqlalchemy import func
     from datetime import datetime

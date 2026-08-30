@@ -299,3 +299,37 @@ class InventoryItem(Base):
     unit_label: Mapped[str | None] = mapped_column(String, nullable=True)
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
+class User(Base):
+    __tablename__ = "users"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=new_uuid)
+    email: Mapped[str] = mapped_column(String, nullable=False, unique=True)
+    display_name: Mapped[str | None] = mapped_column(String, nullable=True)
+    password_hash: Mapped[str | None] = mapped_column(String, nullable=True)
+    oidc_subject: Mapped[str | None] = mapped_column(String, nullable=True, unique=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    last_login_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+    sessions: Mapped[list["Session"]] = relationship(back_populates="user", cascade="all, delete-orphan")
+
+
+class Session(Base):
+    __tablename__ = "sessions"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    user_id: Mapped[str] = mapped_column(String, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    expires_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+
+    user: Mapped["User"] = relationship(back_populates="sessions")
+
+
+class AuthSettings(Base):
+    """Single-row table holding instance-wide auth settings (no roles yet, so no per-user permissions)."""
+    __tablename__ = "auth_settings"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: "default")
+    allow_registration: Mapped[bool] = mapped_column(Boolean, default=True)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

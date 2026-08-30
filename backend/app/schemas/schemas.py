@@ -406,3 +406,44 @@ class InventoryRestock(BaseModel):
     quantity: int
     amount: float | None = None
     purchase_date: str | None = None
+
+
+# --- Auth ---
+
+class RegisterRequest(BaseModel):
+    email: str
+    password: str
+    display_name: str | None = None
+
+
+class LoginRequest(BaseModel):
+    email: str
+    password: str
+
+
+class ChangePasswordRequest(BaseModel):
+    current_password: str | None = None
+    new_password: str
+
+
+class UserOut(BaseModel):
+    id: str
+    email: str
+    display_name: str | None = None
+    has_password: bool
+
+
+class AuthConfigOut(BaseModel):
+    allow_registration_effective: bool
+    oidc_enabled: bool
+    oidc_label: str | None = None
+
+
+class AuthSettingsOut(BaseModel):
+    allow_registration: bool
+    updated_at: datetime
+    model_config = {"from_attributes": True}
+
+
+class AuthSettingsUpdate(BaseModel):
+    allow_registration: bool | None = None
