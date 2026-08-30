@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
-import { CalendarDays, Ruler, Info, Download, Upload, Droplets, RefreshCw, Bell, Globe, Utensils, X, AlertTriangle, HardDrive, Fish, Image as ImageIcon, Bot, Lock, SlidersHorizontal, Users as UsersIcon, KeyRound, Pencil, Trash2, type LucideIcon } from 'lucide-react'
+import { CalendarDays, Ruler, Info, Download, Upload, Droplets, RefreshCw, Bell, Globe, Utensils, X, AlertTriangle, HardDrive, Fish, Image as ImageIcon, Bot, Lock, SlidersHorizontal, Users as UsersIcon, KeyRound, Pencil, Trash2, Shield, type LucideIcon } from 'lucide-react'
 import { useSettings, formatDate, formatDateTime, DateFormat, UnitSystem } from '../context/SettingsContext'
 import { Card, Modal, ConfirmDialog, StatCard, FieldLabel } from '../components/ui'
 import { api, Tank, AgentSettings, AuthSettings, UserListItem } from '../api/client'
@@ -260,6 +260,8 @@ function UsersSection() {
   const [deletingUser, setDeletingUser] = useState<UserListItem | null>(null)
   const [deleteError, setDeleteError] = useState<string | null>(null)
 
+  const [permissionsUser, setPermissionsUser] = useState<UserListItem | null>(null)
+
   const [authSettings, setAuthSettings] = useState<AuthSettings | null>(null)
   const [issuerUrl, setIssuerUrl] = useState('')
   const [clientId, setClientId] = useState('')
@@ -390,6 +392,13 @@ function UsersSection() {
                         style={{ display: 'inline-flex', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-3)', padding: 4, lineHeight: 0 }}
                       >
                         <Pencil size={14} />
+                      </button>
+                      <button
+                        onClick={() => setPermissionsUser(u)}
+                        title="Permissions"
+                        style={{ display: 'inline-flex', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-3)', padding: 4, lineHeight: 0 }}
+                      >
+                        <Shield size={14} />
                       </button>
                       <button
                         onClick={() => { setDeletingUser(u); setDeleteError(null) }}
@@ -537,6 +546,14 @@ function UsersSection() {
           onConfirm={confirmDelete}
           onCancel={() => setDeletingUser(null)}
         />
+      )}
+
+      {permissionsUser && (
+        <Modal title={`Permissions — ${permissionsUser.display_name || permissionsUser.email}`} onClose={() => setPermissionsUser(null)} width={420}>
+          <p style={{ margin: 0, fontSize: 13, color: 'var(--text-2)' }}>
+            Coming soon.
+          </p>
+        </Modal>
       )}
     </>
   )
