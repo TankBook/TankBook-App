@@ -89,6 +89,20 @@ export function RichTextarea({ value, onChange, rows = 4, placeholder }: {
   )
 }
 
+export function AquaDropIcon({ size = 26 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <path
+        d="M12 21C12 21 4.5 14 4.5 9.5C4.5 5.91 7.91 3 12 3C16.09 3 19.5 5.91 19.5 9.5C19.5 14 12 21 12 21Z"
+        fill="#26C6DA" fillOpacity="0.2" stroke="#26C6DA" strokeWidth="1.6" strokeLinejoin="round"
+      />
+      <path d="M12 17.5V11" stroke="#43A047" strokeWidth="1.6" strokeLinecap="round"/>
+      <path d="M12 15.5C12 15.5 8.5 13.5 8.5 10.5C8.5 10.5 12 11 12 15.5Z" fill="#43A047"/>
+      <path d="M12 12.5C12 12.5 15.5 10.5 15.5 7.5C15.5 7.5 12 8 12 12.5Z" fill="#43A047"/>
+    </svg>
+  )
+}
+
 export function Card({ children, style, ...rest }: { children: ReactNode; style?: CSSProperties } & React.HTMLAttributes<HTMLDivElement>) {
   return (
     <div {...rest} style={{ background: 'var(--surface)', border: '0.5px solid var(--border)', borderRadius: 12, padding: '1.25rem', ...style }}>

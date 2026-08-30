@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { BrowserRouter, Routes, Route, Link, useLocation } from 'react-router-dom'
-import { LayoutDashboard, BookOpen, Cog, NotebookPen, ShieldCheck, Calculator, Receipt, Menu, X, Plus, Fish, Droplets, ChevronLeft, Package, Building, Sun, Moon, Bot, type LucideIcon } from 'lucide-react'
+import { LayoutDashboard, BookOpen, Cog, NotebookPen, ShieldCheck, Calculator, Receipt, Menu, X, Plus, Fish, Droplets, ChevronLeft, Package, Building, Sun, Moon, Bot, LogOut, type LucideIcon } from 'lucide-react'
 import { api } from './api/client'
 import RoomLayout from './pages/RoomLayout'
 import RoomDetail from './pages/RoomDetail'
@@ -13,19 +13,7 @@ function GitHubIcon({ size = 14 }: { size?: number }) {
   )
 }
 
-function AquaDropIcon({ size = 26 }: { size?: number }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
-      <path
-        d="M12 21C12 21 4.5 14 4.5 9.5C4.5 5.91 7.91 3 12 3C16.09 3 19.5 5.91 19.5 9.5C19.5 14 12 21 12 21Z"
-        fill="#26C6DA" fillOpacity="0.2" stroke="#26C6DA" strokeWidth="1.6" strokeLinejoin="round"
-      />
-      <path d="M12 17.5V11" stroke="#43A047" strokeWidth="1.6" strokeLinecap="round"/>
-      <path d="M12 15.5C12 15.5 8.5 13.5 8.5 10.5C8.5 10.5 12 11 12 15.5Z" fill="#43A047"/>
-      <path d="M12 12.5C12 12.5 15.5 10.5 15.5 7.5C15.5 7.5 12 8 12 12.5Z" fill="#43A047"/>
-    </svg>
-  )
-}
+import { AquaDropIcon } from './components/ui'
 import Dashboard from './pages/Dashboard'
 import SpendingTracker from './pages/SpendingTracker'
 import TankDetail from './pages/TankDetail'
@@ -38,7 +26,9 @@ import Inventory from './pages/Inventory'
 import Assistant from './pages/Assistant'
 import UpdateToast from './components/UpdateToast'
 import AssistantWidget from './components/AssistantWidget'
+import Login from './pages/Login'
 import { SettingsProvider, useSettings } from './context/SettingsContext'
+import { AuthProvider, useAuth } from './context/AuthContext'
 
 const QA_CATEGORIES = ['Equipment', 'Livestock', 'Plants', 'Food', 'Chemicals', 'Medication', 'Decor', 'Subscription', 'Other']
 const QA_INV_CATEGORIES = ['Equipment', 'Plants', 'Food', 'Chemicals', 'Medication', 'Decor', 'Tanks', 'Other'] as const
@@ -356,6 +346,7 @@ const NAV_LINKS: [string, string, LucideIcon][] = [
 function Nav() {
   const { pathname } = useLocation()
   const { theme, toggleTheme } = useSettings()
+  const { logout } = useAuth()
   const [menuOpen, setMenuOpen] = useState(false)
   const [isMobile, setIsMobile] = useState(() => window.matchMedia('(max-width: 1280px)').matches)
 
@@ -413,6 +404,19 @@ function Nav() {
         }}
       >
         {theme === 'light' ? <Moon size={16} /> : <Sun size={16} />}
+      </button>
+
+      <button
+        onClick={() => logout()}
+        title="Log out"
+        style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          padding: '6px', border: '0.5px solid var(--border)', borderRadius: 8,
+          background: 'transparent', color: 'var(--text-2)',
+          cursor: 'pointer', lineHeight: 0, marginRight: 4,
+        }}
+      >
+        <LogOut size={16} />
       </button>
 
       {isMobile ? (
@@ -484,33 +488,48 @@ function Footer() {
   )
 }
 
+function AppShell() {
+  const { user, loading } = useAuth()
+
+  if (loading) return null
+  if (!user) return <Login />
+
+  return (
+    <>
+      <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', background: 'var(--bg)', fontFamily: 'system-ui, sans-serif' }}>
+        <Nav />
+        <div style={{ flex: 1, maxWidth: 960, width: '100%', margin: '0 auto', padding: '32px 24px' }}>
+          <Routes>
+            <Route path="/" element={<Dashboard />} />
+            <Route path="/rooms" element={<RoomLayout />} />
+            <Route path="/rooms/:id" element={<RoomDetail />} />
+            <Route path="/tanks/:id" element={<TankDetail />} />
+            <Route path="/species" element={<SpeciesBrowser />} />
+            <Route path="/compatibility" element={<CompatibilityChecker />} />
+            <Route path="/journal" element={<LivestockJournal />} />
+            <Route path="/calculators" element={<Calculators />} />
+            <Route path="/settings" element={<Settings />} />
+            <Route path="/spending" element={<SpendingTracker />} />
+            <Route path="/inventory" element={<Inventory />} />
+            <Route path="/assistant" element={<Assistant />} />
+          </Routes>
+        </div>
+        <Footer />
+      </div>
+      <UpdateToast />
+      <AssistantWidget />
+    </>
+  )
+}
+
 export default function App() {
   return (
-    <SettingsProvider>
-      <BrowserRouter>
-        <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', background: 'var(--bg)', fontFamily: 'system-ui, sans-serif' }}>
-          <Nav />
-          <div style={{ flex: 1, maxWidth: 960, width: '100%', margin: '0 auto', padding: '32px 24px' }}>
-            <Routes>
-              <Route path="/" element={<Dashboard />} />
-              <Route path="/rooms" element={<RoomLayout />} />
-              <Route path="/rooms/:id" element={<RoomDetail />} />
-              <Route path="/tanks/:id" element={<TankDetail />} />
-              <Route path="/species" element={<SpeciesBrowser />} />
-              <Route path="/compatibility" element={<CompatibilityChecker />} />
-              <Route path="/journal" element={<LivestockJournal />} />
-              <Route path="/calculators" element={<Calculators />} />
-              <Route path="/settings" element={<Settings />} />
-              <Route path="/spending" element={<SpendingTracker />} />
-              <Route path="/inventory" element={<Inventory />} />
-              <Route path="/assistant" element={<Assistant />} />
-            </Routes>
-          </div>
-          <Footer />
-        </div>
-        <UpdateToast />
-        <AssistantWidget />
-      </BrowserRouter>
-    </SettingsProvider>
+    <AuthProvider>
+      <SettingsProvider>
+        <BrowserRouter>
+          <AppShell />
+        </BrowserRouter>
+      </SettingsProvider>
+    </AuthProvider>
   )
 }

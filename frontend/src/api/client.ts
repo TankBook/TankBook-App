@@ -224,12 +224,39 @@ export interface ConversationDetail extends Conversation {
   messages: (ChatMessage & { created_at: string })[]
 }
 
+export interface AuthUser {
+  id: string
+  email: string
+  display_name: string | null
+  has_password: boolean
+}
+
+export interface AuthConfig {
+  allow_registration_effective: boolean
+  oidc_enabled: boolean
+  oidc_label: string | null
+}
+
+export interface AuthSettings {
+  allow_registration: boolean
+  updated_at: string
+}
+
 // --- Fetch helpers ---
 
 const BASE = '/api'
 
+// A 401 from any already-authenticated route means the session has expired or
+// been logged out elsewhere — reload so AuthProvider's mount check picks it up
+// and falls back to the login screen. /auth/* itself legitimately returns 401
+// for a wrong password, which callers need to catch and display, not reload past.
+function handleUnauthorized(path: string) {
+  if (!path.startsWith('/auth/')) window.location.reload()
+}
+
 async function get<T>(path: string): Promise<T> {
   const res = await fetch(`${BASE}${path}`)
+  if (res.status === 401) handleUnauthorized(path)
   if (!res.ok) throw new Error(`GET ${path} failed: ${res.status}`)
   return res.json()
 }
@@ -240,6 +267,7 @@ async function post<T>(path: string, body: unknown): Promise<T> {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
   })
+  if (res.status === 401) handleUnauthorized(path)
   if (!res.ok) throw new Error(`POST ${path} failed: ${res.status}`)
   return res.json()
 }
@@ -250,6 +278,7 @@ async function put<T>(path: string, body: unknown): Promise<T> {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
   })
+  if (res.status === 401) handleUnauthorized(path)
   if (!res.ok) throw new Error(`PUT ${path} failed: ${res.status}`)
   return res.json()
 }
@@ -260,13 +289,31 @@ async function patch<T>(path: string, body?: unknown): Promise<T> {
     headers: { 'Content-Type': 'application/json' },
     body: body ? JSON.stringify(body) : undefined,
   })
+  if (res.status === 401) handleUnauthorized(path)
   if (!res.ok) throw new Error(`PATCH ${path} failed: ${res.status}`)
   return res.json()
 }
 
 async function del(path: string): Promise<void> {
   const res = await fetch(`${BASE}${path}`, { method: 'DELETE' })
+  if (res.status === 401) handleUnauthorized(path)
   if (!res.ok) throw new Error(`DELETE ${path} failed: ${res.status}`)
+}
+
+// Auth endpoints surface a meaningful `detail` message (e.g. "Incorrect email
+// or password") that the login/register forms need to show, unlike the
+// generic helpers above which just throw a status code.
+async function authPost<T>(path: string, body: unknown): Promise<T> {
+  const res = await fetch(`${BASE}${path}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  })
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}))
+    throw new Error((err as any).detail ?? `Request failed: ${res.status}`)
+  }
+  return res.status === 204 ? (undefined as T) : res.json()
 }
 
 // --- API surface ---
@@ -467,5 +514,17 @@ export const api = {
       }
       return res.json()
     },
+  },
+  auth: {
+    config: () => get<AuthConfig>('/auth/config'),
+    me: () => get<AuthUser>('/auth/me'),
+    register: (body: { email: string; password: string; display_name?: string }) =>
+      authPost<AuthUser>('/auth/register', body),
+    login: (body: { email: string; password: string }) => authPost<AuthUser>('/auth/login', body),
+    logout: () => authPost<void>('/auth/logout', {}),
+    changePassword: (body: { current_password?: string; new_password: string }) =>
+      authPost<AuthUser>('/auth/change-password', body),
+    getSettings: () => get<AuthSettings>('/auth/settings'),
+    updateSettings: (body: { allow_registration?: boolean }) => patch<AuthSettings>('/auth/settings', body),
   },
 }

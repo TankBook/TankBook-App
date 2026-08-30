@@ -193,7 +193,7 @@ class JournalEntry(Base):
 
 
 class AppSettings(Base):
-    """Single-row table holding app-wide settings (no auth, so no per-user settings)."""
+    """Single-row table holding app-wide settings, shared by every account (no per-user settings yet)."""
     __tablename__ = "app_settings"
 
     id: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: "default")

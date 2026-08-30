@@ -1,8 +1,9 @@
 import { useState, useRef, useEffect } from 'react'
-import { CalendarDays, Ruler, Info, Download, Upload, Droplets, RefreshCw, Bell, Globe, Utensils, X, AlertTriangle, HardDrive, Fish, Image as ImageIcon, Bot } from 'lucide-react'
+import { CalendarDays, Ruler, Info, Download, Upload, Droplets, RefreshCw, Bell, Globe, Utensils, X, AlertTriangle, HardDrive, Fish, Image as ImageIcon, Bot, Lock } from 'lucide-react'
 import { useSettings, formatDate, DateFormat, UnitSystem } from '../context/SettingsContext'
 import { Card, Modal, StatCard, FieldLabel } from '../components/ui'
-import { api, Tank, AgentSettings } from '../api/client'
+import { api, Tank, AgentSettings, AuthSettings } from '../api/client'
+import { useAuth } from '../context/AuthContext'
 
 const PROVIDER_OPTIONS: { value: 'anthropic' | 'openai' | 'ollama'; label: string }[] = [
   { value: 'anthropic', label: 'Claude (Anthropic)' },
@@ -132,6 +133,112 @@ function AgentSettingsSection() {
           </button>
           {saved && <span style={{ fontSize: 12, color: 'var(--green)' }}>Saved</span>}
           {error && <span style={{ fontSize: 12, color: 'var(--red)' }}>{error}</span>}
+        </div>
+      </div>
+    </section>
+  )
+}
+
+function AccessSettingsSection() {
+  const { user } = useAuth()
+  const [authSettings, setAuthSettings] = useState<AuthSettings | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [savingToggle, setSavingToggle] = useState(false)
+
+  const [currentPassword, setCurrentPassword] = useState('')
+  const [newPassword, setNewPassword] = useState('')
+  const [changingPassword, setChangingPassword] = useState(false)
+  const [passwordSaved, setPasswordSaved] = useState(false)
+  const [passwordError, setPasswordError] = useState<string | null>(null)
+
+  useEffect(() => {
+    api.auth.getSettings().then(setAuthSettings).catch(() => {}).finally(() => setLoading(false))
+  }, [])
+
+  async function toggleRegistration(allow: boolean) {
+    setSavingToggle(true)
+    try {
+      setAuthSettings(await api.auth.updateSettings({ allow_registration: allow }))
+    } finally {
+      setSavingToggle(false)
+    }
+  }
+
+  async function changePassword() {
+    setChangingPassword(true)
+    setPasswordSaved(false)
+    setPasswordError(null)
+    try {
+      await api.auth.changePassword({
+        current_password: user?.has_password ? currentPassword : undefined,
+        new_password: newPassword,
+      })
+      setCurrentPassword('')
+      setNewPassword('')
+      setPasswordSaved(true)
+    } catch (e: any) {
+      setPasswordError(e.message ?? 'Could not change password')
+    } finally {
+      setChangingPassword(false)
+    }
+  }
+
+  if (loading) return null
+
+  return (
+    <section style={{ paddingBottom: 20, borderBottom: '0.5px solid var(--border-sub)' }}>
+      <p style={{ fontWeight: 500, fontSize: 14, margin: '0 0 4px', color: 'var(--text)', display: 'flex', alignItems: 'center', gap: 6 }}><Lock size={14} color="var(--text-2)" />Access</p>
+      <p style={{ fontSize: 12, color: 'var(--text-2)', margin: '0 0 14px' }}>
+        Everyone who's logged in shares the same tanks and data for now — this instance doesn't have per-user permissions yet.
+      </p>
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+        <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: 'var(--text-label)' }}>
+          <input
+            type="checkbox"
+            checked={authSettings?.allow_registration ?? false}
+            disabled={savingToggle}
+            onChange={e => toggleRegistration(e.target.checked)}
+          />
+          Allow new accounts to be created from the login screen
+        </label>
+
+        <div>
+          <FieldLabel>Change your password</FieldLabel>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {user?.has_password && (
+              <input
+                type="password"
+                value={currentPassword}
+                onChange={e => { setCurrentPassword(e.target.value); setPasswordSaved(false) }}
+                placeholder="Current password"
+                style={{ width: '100%', boxSizing: 'border-box' }}
+              />
+            )}
+            <input
+              type="password"
+              value={newPassword}
+              onChange={e => { setNewPassword(e.target.value); setPasswordSaved(false) }}
+              placeholder="New password (min. 8 characters)"
+              style={{ width: '100%', boxSizing: 'border-box' }}
+            />
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <button
+                onClick={changePassword}
+                disabled={changingPassword || newPassword.length < 8 || (!!user?.has_password && !currentPassword)}
+                style={{
+                  padding: '7px 16px', borderRadius: 8, fontSize: 13, fontWeight: 500,
+                  cursor: changingPassword ? 'default' : 'pointer',
+                  border: '0.5px solid var(--blue-border)',
+                  background: 'var(--blue-bg)', color: 'var(--blue)',
+                }}
+              >
+                {changingPassword ? 'Saving…' : 'Update Password'}
+              </button>
+              {passwordSaved && <span style={{ fontSize: 12, color: 'var(--green)' }}>Password updated</span>}
+              {passwordError && <span style={{ fontSize: 12, color: 'var(--red)' }}>{passwordError}</span>}
+            </div>
+          </div>
         </div>
       </div>
     </section>
@@ -343,7 +450,7 @@ export default function Settings() {
     <div>
       <h1 style={{ margin: '0 0 4px', fontSize: 22, fontWeight: 500, color: 'var(--text)' }}>Settings</h1>
       <p style={{ margin: '0 0 24px', fontSize: 13, color: 'var(--text-2)' }}>
-        App-wide settings for TankBook. There are no user accounts, so these apply to everyone using this instance.
+        App-wide settings for TankBook. Every account on this instance shares the same tanks and data, so these settings apply to everyone.
       </p>
 
       <Card style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 16, padding: 24 }}>
@@ -461,6 +568,8 @@ export default function Settings() {
             style={{ width: '100%', boxSizing: 'border-box' }}
           />
         </section>
+
+        <AccessSettingsSection />
 
         <AgentSettingsSection />
 
