@@ -480,6 +480,7 @@ class UserOut(BaseModel):
     email: str
     display_name: str | None = None
     has_password: bool
+    permissions: dict[str, str] = {}
 
 
 class UserListItemOut(BaseModel):
@@ -518,3 +519,11 @@ class AuthSettingsUpdate(BaseModel):
     oidc_client_id: str | None = None
     oidc_client_secret: str | None = None
     oidc_display_name: str | None = None
+
+
+class PermissionsOut(BaseModel):
+    ai: Literal["none", "use", "edit"]
+
+
+class PermissionsUpdate(BaseModel):
+    ai: Literal["none", "use", "edit"] | None = None

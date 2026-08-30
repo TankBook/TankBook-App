@@ -1,7 +1,7 @@
 import json
 import uuid
 from datetime import datetime
-from sqlalchemy import String, Integer, Float, Boolean, Text, ForeignKey, DateTime
+from sqlalchemy import String, Integer, Float, Boolean, Text, ForeignKey, DateTime, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
@@ -327,7 +327,7 @@ class Session(Base):
 
 
 class AuthSettings(Base):
-    """Single-row table holding instance-wide auth settings (no roles yet, so no per-user permissions)."""
+    """Single-row table holding instance-wide auth settings."""
     __tablename__ = "auth_settings"
 
     id: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: "default")
@@ -336,4 +336,17 @@ class AuthSettings(Base):
     oidc_client_id: Mapped[str | None] = mapped_column(String, nullable=True)
     oidc_client_secret: Mapped[str | None] = mapped_column(Text, nullable=True)
     oidc_display_name: Mapped[str | None] = mapped_column(String, nullable=True)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class Permission(Base):
+    """Per-user, per-capability access level. No row for a (user, key) pair means the
+    capability's default level applies — see services/permissions.py:DEFAULT_LEVELS."""
+    __tablename__ = "permissions"
+    __table_args__ = (UniqueConstraint("user_id", "key", name="uq_permission_user_key"),)
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=new_uuid)
+    user_id: Mapped[str] = mapped_column(String, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    key: Mapped[str] = mapped_column(String, nullable=False)
+    level: Mapped[str] = mapped_column(String, nullable=False)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

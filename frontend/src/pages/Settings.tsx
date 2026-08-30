@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from 'react'
 import { CalendarDays, Ruler, Info, Download, Upload, Droplets, RefreshCw, Bell, Globe, Utensils, X, AlertTriangle, HardDrive, Fish, Image as ImageIcon, Bot, Lock, SlidersHorizontal, Users as UsersIcon, KeyRound, Pencil, Trash2, Shield, type LucideIcon } from 'lucide-react'
 import { useSettings, formatDate, formatDateTime, DateFormat, UnitSystem } from '../context/SettingsContext'
 import { Card, Modal, ConfirmDialog, StatCard, FieldLabel } from '../components/ui'
-import { api, Tank, AgentSettings, AuthSettings, UserListItem } from '../api/client'
+import { api, hasPermission, Tank, AgentSettings, AuthSettings, UserListItem, PermissionLevel } from '../api/client'
 import { useAuth } from '../context/AuthContext'
 
 const PROVIDER_OPTIONS: { value: 'anthropic' | 'openai' | 'ollama'; label: string }[] = [
@@ -261,6 +261,10 @@ function UsersSection() {
   const [deleteError, setDeleteError] = useState<string | null>(null)
 
   const [permissionsUser, setPermissionsUser] = useState<UserListItem | null>(null)
+  const [permissionsDraft, setPermissionsDraft] = useState<Record<string, PermissionLevel> | null>(null)
+  const [loadingPermissions, setLoadingPermissions] = useState(false)
+  const [savingPermissions, setSavingPermissions] = useState(false)
+  const [permissionsError, setPermissionsError] = useState<string | null>(null)
 
   const [authSettings, setAuthSettings] = useState<AuthSettings | null>(null)
   const [issuerUrl, setIssuerUrl] = useState('')
@@ -347,6 +351,32 @@ function UsersSection() {
     }
   }
 
+  function openPermissions(u: UserListItem) {
+    setPermissionsUser(u)
+    setPermissionsDraft(null)
+    setPermissionsError(null)
+    setLoadingPermissions(true)
+    api.auth.getPermissions(u.id)
+      .then(setPermissionsDraft)
+      .catch(() => setPermissionsError('Could not load permissions'))
+      .finally(() => setLoadingPermissions(false))
+  }
+
+  async function savePermissions() {
+    if (!permissionsUser || !permissionsDraft) return
+    setSavingPermissions(true)
+    setPermissionsError(null)
+    try {
+      const updated = await api.auth.updatePermissions(permissionsUser.id, permissionsDraft)
+      setPermissionsDraft(updated)
+      setPermissionsUser(null)
+    } catch (e: any) {
+      setPermissionsError(e.message ?? 'Could not save permissions')
+    } finally {
+      setSavingPermissions(false)
+    }
+  }
+
   return (
     <>
       <section style={{ paddingBottom: 20, borderBottom: '0.5px solid var(--border-sub)' }}>
@@ -394,7 +424,7 @@ function UsersSection() {
                         <Pencil size={14} />
                       </button>
                       <button
-                        onClick={() => setPermissionsUser(u)}
+                        onClick={() => openPermissions(u)}
                         title="Permissions"
                         style={{ display: 'inline-flex', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-3)', padding: 4, lineHeight: 0 }}
                       >
@@ -550,9 +580,55 @@ function UsersSection() {
 
       {permissionsUser && (
         <Modal title={`Permissions — ${permissionsUser.display_name || permissionsUser.email}`} onClose={() => setPermissionsUser(null)} width={420}>
-          <p style={{ margin: 0, fontSize: 13, color: 'var(--text-2)' }}>
-            Coming soon.
-          </p>
+          {loadingPermissions || !permissionsDraft ? (
+            <p style={{ margin: 0, fontSize: 13, color: 'var(--text-3)' }}>Loading…</p>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+                <div>
+                  <p style={{ margin: 0, fontSize: 13, color: 'var(--text)', fontWeight: 500 }}>AI</p>
+                  <p style={{ margin: 0, fontSize: 12, color: 'var(--text-2)' }}>Assistant chat, species drafting, and AI settings</p>
+                </div>
+                <select
+                  value={permissionsDraft.ai}
+                  onChange={e => setPermissionsDraft(d => (d ? { ...d, ai: e.target.value as PermissionLevel } : d))}
+                  style={{ flexShrink: 0 }}
+                >
+                  <option value="none">None</option>
+                  <option value="use">Use</option>
+                  <option value="edit">Edit</option>
+                </select>
+              </div>
+
+              {permissionsError && <p style={{ margin: 0, fontSize: 12, color: 'var(--red)' }}>{permissionsError}</p>}
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 6 }}>
+                <button
+                  onClick={() => setPermissionsUser(null)}
+                  style={{
+                    fontSize: 13, padding: '7px 16px', borderRadius: 8,
+                    border: '0.5px solid var(--btn-border)', background: 'transparent', color: 'var(--text)',
+                    cursor: 'pointer',
+                  }}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={savePermissions}
+                  disabled={savingPermissions}
+                  style={{
+                    fontSize: 13, padding: '7px 16px', borderRadius: 8, fontWeight: 500,
+                    border: '0.5px solid var(--blue-border)',
+                    background: savingPermissions ? 'var(--surface-2)' : 'var(--blue-bg)',
+                    color: savingPermissions ? 'var(--text-3)' : 'var(--blue)',
+                    cursor: savingPermissions ? 'default' : 'pointer',
+                  }}
+                >
+                  {savingPermissions ? 'Saving…' : 'Save'}
+                </button>
+              </div>
+            </div>
+          )}
         </Modal>
       )}
     </>
@@ -603,6 +679,8 @@ const SETTINGS_TABS: { id: string; label: string; icon: LucideIcon }[] = [
 
 export default function Settings() {
   const { dateFormat, setDateFormat, unitSystem, setUnitSystem, defaultTank, setDefaultTank, alertRetentionDays, setAlertRetentionDays, appUrl, setAppUrl, feedingAmountPresets, setFeedingAmountPresets, loading } = useSettings()
+  const { user: loggedInUser } = useAuth()
+  const canEditAi = hasPermission(loggedInUser?.permissions.ai, 'edit')
   const [tanks, setTanks] = useState<Tank[]>([])
   const [draftDateFormat, setDraftDateFormat] = useState<DateFormat>(dateFormat)
   const [draftUnitSystem, setDraftUnitSystem] = useState<UnitSystem>(unitSystem)
@@ -917,7 +995,7 @@ export default function Settings() {
 
         <AccessSettingsSection />
 
-        <AgentSettingsSection />
+        {canEditAi && <AgentSettingsSection />}
 
         <section style={{ paddingBottom: 20, borderBottom: '0.5px solid var(--border-sub)' }}>
           <p style={{ fontWeight: 500, fontSize: 14, margin: '0 0 4px', color: 'var(--text)', display: 'flex', alignItems: 'center', gap: 6 }}><Utensils size={14} color="var(--text-2)" />Feeding Amounts</p>

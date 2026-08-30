@@ -6,7 +6,7 @@ from app.database import get_db
 from app.models.models import User, AuthSettings
 from app.schemas.schemas import (
     RegisterRequest, LoginRequest, ChangePasswordRequest, UserOut, UserListItemOut, UserUpdateRequest,
-    AuthConfigOut, AuthSettingsOut, AuthSettingsUpdate,
+    AuthConfigOut, AuthSettingsOut, AuthSettingsUpdate, PermissionsOut, PermissionsUpdate,
 )
 from app.services.auth import (
     hash_password, verify_password, create_session, revoke_session,
@@ -14,14 +14,18 @@ from app.services.auth import (
     get_or_create_auth_settings, registration_allowed,
     oidc_configured, build_oidc_client, SESSION_COOKIE,
 )
+from app.services import permissions as permissions_service
 
 router = APIRouter()
 
 MIN_PASSWORD_LENGTH = 8
 
 
-def _to_out(user: User) -> UserOut:
-    return UserOut(id=user.id, email=user.email, display_name=user.display_name, has_password=bool(user.password_hash))
+def _to_out(db: DBSession, user: User) -> UserOut:
+    return UserOut(
+        id=user.id, email=user.email, display_name=user.display_name, has_password=bool(user.password_hash),
+        permissions=permissions_service.get_all_for_user(db, user.id),
+    )
 
 
 def _to_list_item(user: User) -> UserListItemOut:
@@ -73,7 +77,7 @@ def register(body: RegisterRequest, response: Response, request: Request, db: DB
 
     token = create_session(db, user)
     set_session_cookie(response, request, token)
-    return _to_out(user)
+    return _to_out(db, user)
 
 
 @router.post("/login", response_model=UserOut)
@@ -84,7 +88,7 @@ def login(body: LoginRequest, response: Response, request: Request, db: DBSessio
 
     token = create_session(db, user)
     set_session_cookie(response, request, token)
-    return _to_out(user)
+    return _to_out(db, user)
 
 
 @router.post("/logout", status_code=204)
@@ -96,8 +100,8 @@ def logout(request: Request, response: Response, db: DBSession = Depends(get_db)
 
 
 @router.get("/me", response_model=UserOut)
-def me(user: User = Depends(get_current_user)):
-    return _to_out(user)
+def me(user: User = Depends(get_current_user), db: DBSession = Depends(get_db)):
+    return _to_out(db, user)
 
 
 @router.get("/users", response_model=list[UserListItemOut])
@@ -142,6 +146,22 @@ def delete_user(user_id: str, db: DBSession = Depends(get_db), user: User = Depe
     db.commit()
 
 
+@router.get("/users/{user_id}/permissions", response_model=PermissionsOut)
+def get_user_permissions(user_id: str, db: DBSession = Depends(get_db), _user: User = Depends(get_current_user)):
+    if not db.query(User).filter_by(id=user_id).first():
+        raise HTTPException(404, "User not found")
+    return PermissionsOut(**permissions_service.get_all_for_user(db, user_id))
+
+
+@router.put("/users/{user_id}/permissions", response_model=PermissionsOut)
+def update_user_permissions(user_id: str, body: PermissionsUpdate, db: DBSession = Depends(get_db), _user: User = Depends(get_current_user)):
+    if not db.query(User).filter_by(id=user_id).first():
+        raise HTTPException(404, "User not found")
+    for key, level in body.model_dump(exclude_unset=True).items():
+        permissions_service.set_level(db, user_id, key, level)
+    return PermissionsOut(**permissions_service.get_all_for_user(db, user_id))
+
+
 @router.post("/change-password", response_model=UserOut)
 def change_password(body: ChangePasswordRequest, user: User = Depends(get_current_user), db: DBSession = Depends(get_db)):
     if user.password_hash and not verify_password(body.current_password or "", user.password_hash):
@@ -150,7 +170,7 @@ def change_password(body: ChangePasswordRequest, user: User = Depends(get_curren
         raise HTTPException(422, f"Password must be at least {MIN_PASSWORD_LENGTH} characters")
     user.password_hash = hash_password(body.new_password)
     db.commit()
-    return _to_out(user)
+    return _to_out(db, user)
 
 
 @router.get("/settings", response_model=AuthSettingsOut)

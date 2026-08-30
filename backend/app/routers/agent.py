@@ -12,10 +12,13 @@ from app.schemas.schemas import (
 )
 from app.services.agent.agent import run_agent, draft_species
 from app.services.agent.errors import AgentNotConfigured, AgentProviderError
+from app.services.permissions import require_permission
 
 router = APIRouter()
 
 TITLE_MAX_LEN = 40
+require_ai_use = Depends(require_permission("ai", "use"))
+require_ai_edit = Depends(require_permission("ai", "edit"))
 
 
 def get_or_create_agent_settings(db: Session) -> AgentSettings:
@@ -44,12 +47,12 @@ def _make_title(message: str) -> str:
 
 
 @router.get("/settings", response_model=AgentSettingsOut)
-def get_settings(db: Session = Depends(get_db)):
+def get_settings(db: Session = Depends(get_db), _perm=require_ai_edit):
     return _to_out(get_or_create_agent_settings(db))
 
 
 @router.put("/settings", response_model=AgentSettingsOut)
-def update_settings(body: AgentSettingsUpdate, db: Session = Depends(get_db)):
+def update_settings(body: AgentSettingsUpdate, db: Session = Depends(get_db), _perm=require_ai_edit):
     settings = get_or_create_agent_settings(db)
     data = body.model_dump(exclude_unset=True)
     if "api_key" in data:
@@ -62,12 +65,12 @@ def update_settings(body: AgentSettingsUpdate, db: Session = Depends(get_db)):
 
 
 @router.get("/conversations", response_model=list[ConversationOut])
-def list_conversations(db: Session = Depends(get_db)):
+def list_conversations(db: Session = Depends(get_db), _perm=require_ai_use):
     return db.query(Conversation).order_by(Conversation.updated_at.desc()).all()
 
 
 @router.get("/conversations/{conversation_id}", response_model=ConversationDetailOut)
-def get_conversation(conversation_id: str, db: Session = Depends(get_db)):
+def get_conversation(conversation_id: str, db: Session = Depends(get_db), _perm=require_ai_use):
     conversation = db.query(Conversation).filter_by(id=conversation_id).first()
     if not conversation:
         raise HTTPException(404, "Conversation not found")
@@ -75,7 +78,7 @@ def get_conversation(conversation_id: str, db: Session = Depends(get_db)):
 
 
 @router.delete("/conversations/{conversation_id}", status_code=204)
-def delete_conversation(conversation_id: str, db: Session = Depends(get_db)):
+def delete_conversation(conversation_id: str, db: Session = Depends(get_db), _perm=require_ai_use):
     conversation = db.query(Conversation).filter_by(id=conversation_id).first()
     if not conversation:
         raise HTTPException(404, "Conversation not found")
@@ -84,7 +87,7 @@ def delete_conversation(conversation_id: str, db: Session = Depends(get_db)):
 
 
 @router.post("/chat", response_model=AgentChatResponse)
-def chat(body: AgentChatRequest, db: Session = Depends(get_db)):
+def chat(body: AgentChatRequest, db: Session = Depends(get_db), _perm=require_ai_use):
     if body.conversation_id:
         conversation = db.query(Conversation).filter_by(id=body.conversation_id).first()
         if not conversation:
@@ -115,7 +118,7 @@ def chat(body: AgentChatRequest, db: Session = Depends(get_db)):
 
 
 @router.post("/species-draft", response_model=SpeciesDraftOut)
-def species_draft(body: SpeciesDraftRequest, db: Session = Depends(get_db)):
+def species_draft(body: SpeciesDraftRequest, db: Session = Depends(get_db), _perm=require_ai_use):
     try:
         raw = draft_species(db, body.name)
         return SpeciesDraftOut.model_validate(raw)

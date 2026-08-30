@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { BrowserRouter, Routes, Route, Link, useLocation } from 'react-router-dom'
 import { LayoutDashboard, BookOpen, Cog, NotebookPen, ShieldCheck, Calculator, Receipt, Menu, X, Plus, Fish, Droplets, ChevronLeft, Package, Building, Sun, Moon, Bot, LogOut, type LucideIcon } from 'lucide-react'
-import { api } from './api/client'
+import { api, hasPermission } from './api/client'
 import RoomLayout from './pages/RoomLayout'
 import RoomDetail from './pages/RoomDetail'
 
@@ -346,9 +346,11 @@ const NAV_LINKS: [string, string, LucideIcon][] = [
 function Nav() {
   const { pathname } = useLocation()
   const { theme, toggleTheme } = useSettings()
-  const { logout } = useAuth()
+  const { logout, user } = useAuth()
   const [menuOpen, setMenuOpen] = useState(false)
   const [isMobile, setIsMobile] = useState(() => window.matchMedia('(max-width: 1280px)').matches)
+
+  const navLinks = NAV_LINKS.filter(([to]) => to !== '/assistant' || hasPermission(user?.permissions.ai, 'use'))
 
   useEffect(() => {
     const mq = window.matchMedia('(max-width: 1280px)')
@@ -388,7 +390,7 @@ function Nav() {
       </span>
 
       <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4, minWidth: 0 }}>
-        {!isMobile && NAV_LINKS.map(([to, label, Icon]) => link(to, label, Icon))}
+        {!isMobile && navLinks.map(([to, label, Icon]) => link(to, label, Icon))}
       </div>
 
       <QuickAdd />
@@ -441,7 +443,7 @@ function Nav() {
           display: 'flex', flexDirection: 'column', gap: 2, padding: '8px 16px 12px',
           boxShadow: '0 8px 24px rgba(0,0,0,0.12)',
         }}>
-          {NAV_LINKS.map(([to, label, Icon]) => link(to, label, Icon, () => setMenuOpen(false)))}
+          {navLinks.map(([to, label, Icon]) => link(to, label, Icon, () => setMenuOpen(false)))}
           {link('/settings', 'Settings', Cog, () => setMenuOpen(false))}
         </div>
       )}

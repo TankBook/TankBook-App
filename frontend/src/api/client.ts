@@ -224,11 +224,20 @@ export interface ConversationDetail extends Conversation {
   messages: (ChatMessage & { created_at: string })[]
 }
 
+export type PermissionLevel = 'none' | 'use' | 'edit'
+
 export interface AuthUser {
   id: string
   email: string
   display_name: string | null
   has_password: boolean
+  permissions: Record<string, PermissionLevel>
+}
+
+const PERMISSION_LEVEL_RANK: Record<PermissionLevel, number> = { none: 0, use: 1, edit: 2 }
+
+export function hasPermission(level: PermissionLevel | string | undefined, required: PermissionLevel): boolean {
+  return (PERMISSION_LEVEL_RANK[(level as PermissionLevel) ?? 'none'] ?? 0) >= PERMISSION_LEVEL_RANK[required]
 }
 
 export interface AuthConfig {
@@ -564,5 +573,8 @@ export const api = {
     updateUser: (id: string, body: { email?: string; display_name?: string | null }) =>
       patch<UserListItem>(`/auth/users/${id}`, body),
     deleteUser: (id: string) => del(`/auth/users/${id}`),
+    getPermissions: (id: string) => get<Record<string, PermissionLevel>>(`/auth/users/${id}/permissions`),
+    updatePermissions: (id: string, body: Partial<Record<string, PermissionLevel>>) =>
+      put<Record<string, PermissionLevel>>(`/auth/users/${id}/permissions`, body),
   },
 }

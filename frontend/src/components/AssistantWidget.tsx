@@ -2,23 +2,30 @@ import { useState, useEffect } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { Bot, X, Plus, Maximize2 } from 'lucide-react'
 import { ChatPane } from './ChatPane'
-import { api, AgentSettings } from '../api/client'
+import { api, hasPermission, AgentSettings } from '../api/client'
 import { useAssistantConversation } from '../hooks/useAssistantConversation'
+import { useAuth } from '../context/AuthContext'
 
 const STORAGE_KEY = 'tankbook-widget-conversation-id'
 
 export default function AssistantWidget() {
   const { pathname } = useLocation()
+  const { user } = useAuth()
+  const canUse = hasPermission(user?.permissions.ai, 'use')
+  const canEdit = hasPermission(user?.permissions.ai, 'edit')
   const [open, setOpen] = useState(false)
-  const [configured, setConfigured] = useState(false)
+  // Use-only accounts can't read /agent/settings (edit-only endpoint) — assume
+  // configured and let an actual chat attempt surface "not configured" if it isn't.
+  const [configured, setConfigured] = useState(!canEdit)
 
   const conv = useAssistantConversation(localStorage.getItem(STORAGE_KEY))
 
   useEffect(() => {
+    if (!canUse || !canEdit) return
     api.agent.getSettings()
       .then((s: AgentSettings) => setConfigured(!!s.provider && !!s.model))
       .catch(() => setConfigured(false))
-  }, [])
+  }, [canUse, canEdit])
 
   useEffect(() => {
     if (conv.activeId) localStorage.setItem(STORAGE_KEY, conv.activeId)
@@ -26,7 +33,7 @@ export default function AssistantWidget() {
   }, [conv.activeId])
 
   // Avoid a second chat surface stacked on top of the full Assistant page itself.
-  if (pathname === '/assistant' || !configured) return null
+  if (pathname === '/assistant' || !canUse || !configured) return null
 
   return (
     <>

@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { Fish, Leaf, Upload, Link, Shrimp, Bug, Plus, Pencil, X, Sparkles } from 'lucide-react'
 import { Tag, tabStyle, Card, FieldLabel, Modal } from '../components/ui'
-import { api } from '../api/client'
+import { api, hasPermission } from '../api/client'
 import type { SpeciesBody } from '../api/client'
+import { useAuth } from '../context/AuthContext'
 import { type Species, DifficultyBadge, SpeciesImage, SpeciesDetailModal } from '../components/SpeciesDetail'
 
 // ── Species form ─────────────────────────────────────────────────────────────
@@ -669,6 +670,8 @@ function typeFilterStyle(type: string, active: boolean): React.CSSProperties {
 }
 
 export default function SpeciesBrowser() {
+  const { user } = useAuth()
+  const canUseAi = hasPermission(user?.permissions.ai, 'use')
   const [all, setAll] = useState<Species[]>([])
   const [filter, setFilter] = useState<'all' | 'fish' | 'plant' | 'invertebrate' | 'amphibian'>('all')
   const [search, setSearch] = useState('')
@@ -783,12 +786,14 @@ export default function SpeciesBrowser() {
             >
               <Plus size={14} />Add Species
             </button>
-            <button
-              onClick={() => setShowAIModal(true)}
-              style={{ display: 'flex', flex: 1, alignItems: 'center', justifyContent: 'center', gap: 6, fontSize: 14, padding: '8px 12px', borderRadius: 8, border: '0.5px solid var(--blue-border)', background: 'transparent', color: 'var(--blue)', cursor: 'pointer', fontWeight: 500 }}
-            >
-              <Sparkles size={14} />AI
-            </button>
+            {canUseAi && (
+              <button
+                onClick={() => setShowAIModal(true)}
+                style={{ display: 'flex', flex: 1, alignItems: 'center', justifyContent: 'center', gap: 6, fontSize: 14, padding: '8px 12px', borderRadius: 8, border: '0.5px solid var(--blue-border)', background: 'transparent', color: 'var(--blue)', cursor: 'pointer', fontWeight: 500 }}
+              >
+                <Sparkles size={14} />AI
+              </button>
+            )}
             <button
               onClick={() => fetchAllImages(visible)}
               disabled={fetchAllProgress?.running || visible.length === 0}
@@ -822,12 +827,14 @@ export default function SpeciesBrowser() {
             >
               <Plus size={14} />Add Species
             </button>
-            <button
-              onClick={() => setShowAIModal(true)}
-              style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 14, padding: '8px 16px', borderRadius: 8, border: '0.5px solid var(--blue-border)', background: 'transparent', color: 'var(--blue)', cursor: 'pointer', fontWeight: 500 }}
-            >
-              <Sparkles size={14} />AI
-            </button>
+            {canUseAi && (
+              <button
+                onClick={() => setShowAIModal(true)}
+                style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 14, padding: '8px 16px', borderRadius: 8, border: '0.5px solid var(--blue-border)', background: 'transparent', color: 'var(--blue)', cursor: 'pointer', fontWeight: 500 }}
+              >
+                <Sparkles size={14} />AI
+              </button>
+            )}
             {fetchAllProgress && !fetchAllProgress.running && (
               <span style={{ fontSize: 12, color: fetchAllProgress.failed < fetchAllProgress.total ? 'var(--green)' : 'var(--text-3)', alignSelf: 'center' }}>
                 {fetchAllProgress.total - fetchAllProgress.failed} fetched

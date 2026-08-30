@@ -1,14 +1,18 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
-import { Bot, Cog, Plus, Trash2, MessageSquare } from 'lucide-react'
+import { Bot, Cog, Lock, Plus, Trash2, MessageSquare } from 'lucide-react'
 import { Card } from '../components/ui'
 import { ChatPane } from '../components/ChatPane'
-import { api, AgentSettings, Conversation } from '../api/client'
+import { api, hasPermission, AgentSettings, Conversation } from '../api/client'
 import { useSettings, formatDateTime } from '../context/SettingsContext'
 import { useAssistantConversation } from '../hooks/useAssistantConversation'
+import { useAuth } from '../context/AuthContext'
 
 export default function Assistant() {
   const { dateFormat } = useSettings()
+  const { user } = useAuth()
+  const canUse = hasPermission(user?.permissions.ai, 'use')
+  const canEdit = hasPermission(user?.permissions.ai, 'edit')
   const [settings, setSettings] = useState<AgentSettings | null>(null)
   const [checkingSettings, setCheckingSettings] = useState(true)
   const [conversations, setConversations] = useState<Conversation[]>([])
@@ -24,14 +28,21 @@ export default function Assistant() {
   }, [])
 
   useEffect(() => {
+    if (!canUse) { setCheckingSettings(false); return }
+    refreshConversations()
+    if (!canEdit) {
+      // Only edit-level accounts can read /agent/settings — a use-only account just
+      // tries the chat directly and sees any "not configured" error there instead.
+      setCheckingSettings(false)
+      return
+    }
     api.agent.getSettings()
       .then(setSettings)
       .catch(() => setSettings(null))
       .finally(() => setCheckingSettings(false))
-    refreshConversations()
-  }, [])
+  }, [canUse, canEdit])
 
-  const configured = !!settings?.provider && !!settings?.model
+  const configured = canEdit ? (!!settings?.provider && !!settings?.model) : true
 
   function refreshConversations() {
     api.agent.listConversations().then(setConversations).catch(() => {})
@@ -64,7 +75,15 @@ export default function Assistant() {
         Ask questions about your tanks — water parameters, alerts, journal history, and species compatibility.
       </p>
 
-      {!configured ? (
+      {!canUse ? (
+        <Card style={{ textAlign: 'center', padding: '2.5rem 1.5rem' }}>
+          <Lock size={28} color="var(--text-3)" style={{ marginBottom: 12 }} />
+          <p style={{ margin: '0 0 6px', fontSize: 14, fontWeight: 500, color: 'var(--text)' }}>You don't have access to the assistant</p>
+          <p style={{ margin: 0, fontSize: 13, color: 'var(--text-2)' }}>
+            Ask someone with permission to grant you AI access in Settings.
+          </p>
+        </Card>
+      ) : !configured ? (
         <Card style={{ textAlign: 'center', padding: '2.5rem 1.5rem' }}>
           <Bot size={28} color="var(--text-3)" style={{ marginBottom: 12 }} />
           <p style={{ margin: '0 0 6px', fontSize: 14, fontWeight: 500, color: 'var(--text)' }}>No AI provider configured</p>
