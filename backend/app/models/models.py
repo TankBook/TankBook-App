@@ -24,6 +24,7 @@ class Tank(Base):
     width_mm: Mapped[int | None] = mapped_column(Integer)
     height_mm: Mapped[int | None] = mapped_column(Integer)
     depth_mm: Mapped[int | None] = mapped_column(Integer)
+    shape: Mapped[str] = mapped_column(String, default="rectangle")  # "rectangle" | "cylinder" — for cylinder, width_mm holds the diameter
     water_type: Mapped[str] = mapped_column(String, default="freshwater")
     co2_injection: Mapped[bool] = mapped_column(Boolean, default=False)
     co2_source: Mapped[str | None] = mapped_column(String)

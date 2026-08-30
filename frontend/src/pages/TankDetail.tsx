@@ -105,11 +105,36 @@ const FISH_STATUS_COLORS: Record<string, { bg: string; color: string }> = {
 }
 
 function TankDimensionWireframe({ tank, unitSystem }: { tank: Tank; unitSystem: Parameters<typeof fmtDim>[1] }) {
-  const width = fmtDim(tank.width_mm, unitSystem)
   const height = fmtDim(tank.height_mm, unitSystem)
-  const depth = fmtDim(tank.depth_mm, unitSystem)
   const stroke = 'var(--blue)'
   const faintStroke = 'var(--blue-border)'
+
+  if (tank.shape === 'cylinder') {
+    const diameter = fmtDim(tank.width_mm, unitSystem)
+    return (
+      <div style={{ width: '100%', maxWidth: 760, margin: '0 auto', overflow: 'hidden' }}>
+        <svg viewBox="0 0 640 360" role="img" aria-label={`Tank wireframe: diameter ${diameter}, height ${height}`} style={{ display: 'block', width: '100%', height: 'auto' }}>
+          <g fill="none" stroke={stroke} strokeWidth="2">
+            <path d="M210 120 A130 30 0 0 1 470 120 L470 280 A130 30 0 0 0 210 280 Z" fill="var(--surface)" fillOpacity="0.72" />
+            <ellipse cx="340" cy="120" rx="130" ry="30" fill="var(--surface)" fillOpacity="0.32" />
+            <path d="M210 280 A130 30 0 0 1 470 280" />
+            <path d="M210 280 A130 30 0 0 0 470 280" stroke={faintStroke} strokeDasharray="6 6" />
+          </g>
+          <g fill="none" stroke={stroke} strokeWidth="1.5">
+            <path d="M210 293 L470 293 M210 286 L210 300 M470 286 L470 300" />
+            <path d="M157 120 L157 280 M150 120 L164 120 M150 280 L164 280" />
+          </g>
+          <g fill="var(--text)" fontFamily="system-ui, sans-serif" textAnchor="middle">
+            <text x="340" y="313" fontSize="15" fontWeight="600">Diameter: {diameter}</text>
+            <text x="137" y="205" fontSize="15" fontWeight="600" transform="rotate(-90 137 205)">Height: {height}</text>
+          </g>
+        </svg>
+      </div>
+    )
+  }
+
+  const width = fmtDim(tank.width_mm, unitSystem)
+  const depth = fmtDim(tank.depth_mm, unitSystem)
 
   return (
     <div style={{ width: '100%', maxWidth: 760, margin: '0 auto', overflow: 'hidden' }}>
@@ -444,6 +469,7 @@ function EditTankPanel({ tank, onSave }: { tank: any; onSave: () => void }) {
   const [lightTechnology, setLightTechnology] = useState(tank.light_technology ?? '')
   const [filterFlow, setFilterFlow] = useState(tank.filter_flow_lph != null ? String(tank.filter_flow_lph) : '')
   const [hasFilter, setHasFilter] = useState(tank.has_filter)
+  const [shape, setShape] = useState<'rectangle' | 'cylinder'>(tank.shape ?? 'rectangle')
   const [width, setWidth] = useState(tank.width_mm != null ? String(fromMM(tank.width_mm, unitSystem)) : '')
   const [height, setHeight] = useState(tank.height_mm != null ? String(fromMM(tank.height_mm, unitSystem)) : '')
   const [depth, setDepth] = useState(tank.depth_mm != null ? String(fromMM(tank.depth_mm, unitSystem)) : '')
@@ -471,12 +497,13 @@ function EditTankPanel({ tank, onSave }: { tank: any; onSave: () => void }) {
       body: JSON.stringify({
         name, volume_litres: Number(volume),
         water_type: waterType,
+        shape,
         substrate: substrate || null,
         has_filter: hasFilter,
         filter_flow_lph: hasFilter && filterFlow ? Number(filterFlow) : null,
         width_mm: width ? toMM(Number(width), unitSystem) : null,
         height_mm: height ? toMM(Number(height), unitSystem) : null,
-        depth_mm: depth ? toMM(Number(depth), unitSystem) : null,
+        depth_mm: shape === 'cylinder' ? null : (depth ? toMM(Number(depth), unitSystem) : null),
         co2_injection: co2,
         co2_source: co2 && co2Source ? co2Source : null,
         co2_method: co2 && co2Method ? co2Method : null,
@@ -494,6 +521,10 @@ function EditTankPanel({ tank, onSave }: { tank: any; onSave: () => void }) {
     setTimeout(() => setSaved(false), 2000)
   }
 
+  const dimensionFields: [string, string, (v: string) => void][] = shape === 'cylinder'
+    ? [['Diameter', width, setWidth], ['Height', height, setHeight]]
+    : [['Width', width, setWidth], ['Height', height, setHeight], ['Depth', depth, setDepth]]
+
   return (
     <Card>
       <SectionTitle>Edit Tank</SectionTitle>
@@ -501,8 +532,15 @@ function EditTankPanel({ tank, onSave }: { tank: any; onSave: () => void }) {
         <FieldLabel>Tank Name</FieldLabel>
         <input value={name} onChange={e => setName(e.target.value)} style={{ width: '100%', boxSizing: 'border-box' }} />
       </div>
+      <div style={{ marginBottom: 12 }}>
+        <FieldLabel>Tank Shape</FieldLabel>
+        <select value={shape} onChange={e => setShape(e.target.value as 'rectangle' | 'cylinder')} style={{ width: '100%', boxSizing: 'border-box' }}>
+          <option value="rectangle">Rectangle / Square</option>
+          <option value="cylinder">Round / Cylinder</option>
+        </select>
+      </div>
       <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(4, minmax(0, 1fr))', gap: 10, marginBottom: 12 }}>
-        {([['Width', width, setWidth], ['Height', height, setHeight], ['Depth', depth, setDepth]] as [string, string, (v: string) => void][]).map(([lbl, val, set]) => (
+        {dimensionFields.map(([lbl, val, set]) => (
           <div key={lbl}>
             <FieldLabel>{lbl} ({unitSystem})</FieldLabel>
             <input type="number" min="0" step={dp.step} placeholder={dp.placeholder}

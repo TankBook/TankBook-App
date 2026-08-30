@@ -97,7 +97,7 @@ function QuickAdd() {
     if (!qaName || !qaVolume) return
     setSaving(true)
     try {
-      await api.tanks.create({ name: qaName, volume_litres: Number(qaVolume), water_type: qaWaterType, co2_injection: false, co2_source: null, co2_method: null, has_heater: false, heater_watts: null, has_lighting: false, light_intensity: null, light_watts: null, light_technology: null, setup_date: null, substrate: null, lighting: null, has_filter: false, filter_flow_lph: null, width_mm: null, height_mm: null, depth_mm: null })
+      await api.tanks.create({ name: qaName, volume_litres: Number(qaVolume), water_type: qaWaterType, shape: 'rectangle', co2_injection: false, co2_source: null, co2_method: null, has_heater: false, heater_watts: null, has_lighting: false, light_intensity: null, light_watts: null, light_technology: null, setup_date: null, substrate: null, lighting: null, has_filter: false, filter_flow_lph: null, width_mm: null, height_mm: null, depth_mm: null })
       close()
     } finally { setSaving(false) }
   }

@@ -5,6 +5,7 @@ export interface Tank {
   name: string
   volume_litres: number
   water_type: string
+  shape: 'rectangle' | 'cylinder'
   substrate: string | null
   lighting: string | null
   has_filter: boolean

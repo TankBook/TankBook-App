@@ -265,6 +265,7 @@ export default function Dashboard() {
   const [substrate, setSubstrate] = useState('')
   const [lighting, setLighting] = useState('')
   const [filterFlow, setFilterFlow] = useState('')
+  const [shape, setShape] = useState<'rectangle' | 'cylinder'>('rectangle')
   const [width, setWidth] = useState('')
   const [height, setHeight] = useState('')
   const [depth, setDepth] = useState('')
@@ -330,9 +331,10 @@ export default function Dashboard() {
       lighting: lighting || null,
       has_filter: !!filterFlow,
       filter_flow_lph: filterFlow ? Number(filterFlow) : null,
+      shape,
       width_mm: width ? toMM(Number(width), unitSystem) : null,
       height_mm: height ? toMM(Number(height), unitSystem) : null,
-      depth_mm: depth ? toMM(Number(depth), unitSystem) : null,
+      depth_mm: shape === 'cylinder' ? null : (depth ? toMM(Number(depth), unitSystem) : null),
       has_heater: false,
       heater_watts: null,
       has_lighting: false,
@@ -343,7 +345,7 @@ export default function Dashboard() {
     })
     setName(''); setVolume(''); setWaterType('freshwater'); setCo2(false)
     setSubstrate(''); setLighting(''); setFilterFlow('')
-    setWidth(''); setHeight(''); setDepth('')
+    setShape('rectangle'); setWidth(''); setHeight(''); setDepth('')
     setShowForm(false)
     reload(); loadStats()
   }
@@ -686,19 +688,28 @@ export default function Dashboard() {
                   <input type="number" value={filterFlow} onChange={e => setFilterFlow(e.target.value)} placeholder="e.g. 600" style={{ width: '100%', boxSizing: 'border-box' }} />
                 </div>
               </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
+              <div>
+                <FieldLabel>Tank Shape</FieldLabel>
+                <select value={shape} onChange={e => setShape(e.target.value as 'rectangle' | 'cylinder')} style={{ width: '100%', boxSizing: 'border-box' }}>
+                  <option value="rectangle">Rectangle / Square</option>
+                  <option value="cylinder">Round / Cylinder</option>
+                </select>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: shape === 'cylinder' ? '1fr 1fr' : '1fr 1fr 1fr', gap: 12 }}>
                 <div>
-                  <FieldLabel>Width ({unitSystem})</FieldLabel>
+                  <FieldLabel>{shape === 'cylinder' ? `Diameter (${unitSystem})` : `Width (${unitSystem})`}</FieldLabel>
                   <input type="number" min="0" step={dimProps.step} value={width} onChange={e => setWidth(e.target.value)} placeholder={dimProps.placeholder} style={{ width: '100%', boxSizing: 'border-box' }} />
                 </div>
                 <div>
                   <FieldLabel>Height ({unitSystem})</FieldLabel>
                   <input type="number" min="0" step={dimProps.step} value={height} onChange={e => setHeight(e.target.value)} placeholder={dimProps.placeholder} style={{ width: '100%', boxSizing: 'border-box' }} />
                 </div>
-                <div>
-                  <FieldLabel>Depth ({unitSystem})</FieldLabel>
-                  <input type="number" min="0" step={dimProps.step} value={depth} onChange={e => setDepth(e.target.value)} placeholder={dimProps.placeholder} style={{ width: '100%', boxSizing: 'border-box' }} />
-                </div>
+                {shape !== 'cylinder' && (
+                  <div>
+                    <FieldLabel>Depth ({unitSystem})</FieldLabel>
+                    <input type="number" min="0" step={dimProps.step} value={depth} onChange={e => setDepth(e.target.value)} placeholder={dimProps.placeholder} style={{ width: '100%', boxSizing: 'border-box' }} />
+                  </div>
+                )}
               </div>
               <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: 'var(--text-label)' }}>
                 <input type="checkbox" checked={co2} onChange={e => setCo2(e.target.checked)} />

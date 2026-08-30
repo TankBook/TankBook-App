@@ -9,6 +9,7 @@ class TankCreate(BaseModel):
     name: str
     volume_litres: int
     water_type: str = "freshwater"
+    shape: Literal["rectangle", "cylinder"] = "rectangle"
     substrate: str | None = None
     lighting: str | None = None
     has_filter: bool = False
