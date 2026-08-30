@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
-import { CalendarDays, Ruler, Info, Download, Upload, Droplets, RefreshCw, Bell, Globe, Utensils, X, AlertTriangle, HardDrive, Fish, Image as ImageIcon, Bot, Lock, SlidersHorizontal, Users as UsersIcon, KeyRound, Pencil, Trash2, Shield, type LucideIcon } from 'lucide-react'
-import { useSettings, formatDate, formatDateTime, DateFormat, UnitSystem } from '../context/SettingsContext'
+import { Info, Download, Upload, Droplets, RefreshCw, Bell, Globe, Utensils, X, AlertTriangle, HardDrive, Fish, Image as ImageIcon, Bot, Lock, SlidersHorizontal, Users as UsersIcon, KeyRound, Pencil, Trash2, Shield, type LucideIcon } from 'lucide-react'
+import { useSettings, formatDate, formatDateTime } from '../context/SettingsContext'
 import { Card, Modal, ConfirmDialog, StatCard, FieldLabel } from '../components/ui'
 import { api, hasPermission, Tank, AgentSettings, AuthSettings, UserListItem, PermissionLevel } from '../api/client'
 import { useAuth } from '../context/AuthContext'
@@ -658,19 +658,6 @@ function semverNewer(current: string, latest: string): boolean {
   return false
 }
 
-const FORMAT_OPTIONS: { value: DateFormat; label: string }[] = [
-  { value: 'DD/MM/YYYY', label: 'DD/MM/YYYY (UK / Europe)' },
-  { value: 'MM/DD/YYYY', label: 'MM/DD/YYYY (US)' },
-  { value: 'YYYY-MM-DD', label: 'YYYY-MM-DD (ISO)' },
-]
-
-const UNIT_OPTIONS: { value: UnitSystem; label: string; example: string }[] = [
-  { value: 'mm', label: 'Millimetres (mm)', example: '600 × 400 × 300 mm' },
-  { value: 'cm', label: 'Centimetres (cm)', example: '60 × 40 × 30 cm' },
-  { value: 'm',  label: 'Metres (m)',        example: '0.6 × 0.4 × 0.3 m' },
-  { value: 'imperial', label: 'Imperial (inches)', example: '23.62 × 15.75 × 11.81 in' },
-]
-
 const SETTINGS_TABS: { id: string; label: string; icon: LucideIcon }[] = [
   { id: 'general', label: 'General', icon: SlidersHorizontal },
   { id: 'ai', label: 'AI', icon: Bot },
@@ -679,12 +666,10 @@ const SETTINGS_TABS: { id: string; label: string; icon: LucideIcon }[] = [
 ]
 
 export default function Settings() {
-  const { dateFormat, setDateFormat, unitSystem, setUnitSystem, defaultTank, setDefaultTank, alertRetentionDays, setAlertRetentionDays, appUrl, setAppUrl, feedingAmountPresets, setFeedingAmountPresets, loading } = useSettings()
+  const { defaultTank, setDefaultTank, alertRetentionDays, setAlertRetentionDays, appUrl, setAppUrl, feedingAmountPresets, setFeedingAmountPresets, loading } = useSettings()
   const { user: loggedInUser } = useAuth()
   const canEditAi = hasPermission(loggedInUser?.permissions.ai, 'edit')
   const [tanks, setTanks] = useState<Tank[]>([])
-  const [draftDateFormat, setDraftDateFormat] = useState<DateFormat>(dateFormat)
-  const [draftUnitSystem, setDraftUnitSystem] = useState<UnitSystem>(unitSystem)
   const [draftDefaultTank, setDraftDefaultTank] = useState(defaultTank ?? '')
   const [draftAlertRetentionDays, setDraftAlertRetentionDays] = useState<number | null>(alertRetentionDays)
   const [draftAppUrl, setDraftAppUrl] = useState(appUrl ?? '')
@@ -704,8 +689,6 @@ export default function Settings() {
 
   useEffect(() => {
     if (!loading) {
-      setDraftDateFormat(dateFormat)
-      setDraftUnitSystem(unitSystem)
       setDraftDefaultTank(defaultTank ?? '')
       setDraftAlertRetentionDays(alertRetentionDays)
       setDraftAppUrl(appUrl ?? '')
@@ -726,9 +709,7 @@ export default function Settings() {
 
   const feedingAmountPresetsChanged = JSON.stringify(draftFeedingAmountPresets) !== JSON.stringify(feedingAmountPresets)
 
-  const settingsChanged = draftDateFormat !== dateFormat
-    || draftUnitSystem !== unitSystem
-    || draftDefaultTank !== (defaultTank ?? '')
+  const settingsChanged = draftDefaultTank !== (defaultTank ?? '')
     || draftAlertRetentionDays !== alertRetentionDays
     || draftAppUrl !== (appUrl ?? '')
     || feedingAmountPresetsChanged
@@ -738,8 +719,6 @@ export default function Settings() {
     setSettingsSaved(false)
     try {
       await Promise.all([
-        draftDateFormat !== dateFormat && setDateFormat(draftDateFormat),
-        draftUnitSystem !== unitSystem && setUnitSystem(draftUnitSystem),
         draftDefaultTank !== (defaultTank ?? '') && setDefaultTank(draftDefaultTank || null),
         draftAlertRetentionDays !== alertRetentionDays && setAlertRetentionDays(draftAlertRetentionDays),
         draftAppUrl !== (appUrl ?? '') && setAppUrl(draftAppUrl || null),
@@ -752,8 +731,6 @@ export default function Settings() {
   }
 
   function resetToDefaults() {
-    setDraftDateFormat('DD/MM/YYYY')
-    setDraftUnitSystem('mm')
     setDraftDefaultTank('')
     setDraftAlertRetentionDays(null)
     setDraftAppUrl('')
@@ -844,8 +821,6 @@ export default function Settings() {
 
   if (loading) return <p style={{ color: 'var(--text-2)' }}>Loading settings…</p>
 
-  const exampleDate = new Date()
-
   return (
     <div>
       <h1 style={{ margin: '0 0 4px', fontSize: 22, fontWeight: 500, color: 'var(--text)' }}>Settings</h1>
@@ -895,70 +870,6 @@ export default function Settings() {
               <option key={t.id} value={t.id}>{t.name}</option>
             ))}
           </select>
-        </section>
-
-        <section style={{ paddingBottom: 20, borderBottom: '0.5px solid var(--border-sub)' }}>
-          <p style={{ fontWeight: 500, fontSize: 14, margin: '0 0 4px', color: 'var(--text)', display: 'flex', alignItems: 'center', gap: 6 }}><CalendarDays size={14} color="var(--text-2)" />Date Format</p>
-          <p style={{ fontSize: 12, color: 'var(--text-2)', margin: '0 0 14px' }}>
-            Controls how dates are displayed across tanks, parameters, and the maintenance schedule.
-          </p>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {FORMAT_OPTIONS.map(opt => (
-              <label
-                key={opt.value}
-                style={{
-                  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                  padding: '10px 12px', borderRadius: 8, cursor: 'pointer',
-                  border: draftDateFormat === opt.value ? '1px solid var(--blue-border)' : '0.5px solid var(--border)',
-                  background: draftDateFormat === opt.value ? 'var(--blue-bg)' : 'transparent',
-                }}
-              >
-                <span style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                  <input
-                    type="radio"
-                    name="dateFormat"
-                    checked={draftDateFormat === opt.value}
-                    onChange={() => { setDraftDateFormat(opt.value); setSettingsSaved(false) }}
-                  />
-                  <span style={{ fontSize: 13, color: 'var(--text)' }}>{opt.label}</span>
-                </span>
-                <span style={{ fontSize: 12, color: 'var(--text-2)', fontFamily: 'monospace' }}>
-                  {formatDate(exampleDate, opt.value)}
-                </span>
-              </label>
-            ))}
-          </div>
-        </section>
-
-        <section style={{ paddingBottom: 20, borderBottom: '0.5px solid var(--border-sub)' }}>
-          <p style={{ fontWeight: 500, fontSize: 14, margin: '0 0 4px', color: 'var(--text)', display: 'flex', alignItems: 'center', gap: 6 }}><Ruler size={14} color="var(--text-2)" />Dimension Units</p>
-          <p style={{ fontSize: 12, color: 'var(--text-2)', margin: '0 0 14px' }}>
-            Controls how tank dimensions (width, height, depth) are displayed and entered. Changing this converts existing values automatically.
-          </p>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {UNIT_OPTIONS.map(opt => (
-              <label
-                key={opt.value}
-                style={{
-                  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                  padding: '10px 12px', borderRadius: 8, cursor: 'pointer',
-                  border: draftUnitSystem === opt.value ? '1px solid var(--blue-border)' : '0.5px solid var(--border)',
-                  background: draftUnitSystem === opt.value ? 'var(--blue-bg)' : 'transparent',
-                }}
-              >
-                <span style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                  <input
-                    type="radio"
-                    name="unitSystem"
-                    checked={draftUnitSystem === opt.value}
-                    onChange={() => { setDraftUnitSystem(opt.value); setSettingsSaved(false) }}
-                  />
-                  <span style={{ fontSize: 13, color: 'var(--text)' }}>{opt.label}</span>
-                </span>
-                <span style={{ fontSize: 12, color: 'var(--text-2)', fontFamily: 'monospace' }}>{opt.example}</span>
-              </label>
-            ))}
-          </div>
         </section>
 
         <section style={{ paddingBottom: 20, borderBottom: '0.5px solid var(--border-sub)' }}>

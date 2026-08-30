@@ -10,9 +10,6 @@ from app.services.species import species_service
 
 router = APIRouter()
 
-VALID_DATE_FORMATS = ["DD/MM/YYYY", "MM/DD/YYYY", "YYYY-MM-DD"]
-VALID_UNIT_SYSTEMS = ["mm", "cm", "m", "imperial"]
-
 
 def get_or_create_settings(db: Session) -> AppSettings:
     settings = db.query(AppSettings).filter_by(id="default").first()
@@ -33,10 +30,6 @@ def get_settings(db: Session = Depends(get_db)):
 def update_settings(body: AppSettingsUpdate, db: Session = Depends(get_db)):
     settings = get_or_create_settings(db)
     data = body.model_dump(exclude_unset=True)
-    if "date_format" in data and data["date_format"] not in VALID_DATE_FORMATS:
-        data.pop("date_format")
-    if "unit_system" in data and data["unit_system"] not in VALID_UNIT_SYSTEMS:
-        data.pop("unit_system")
     if "feeding_amount_presets" in data:
         presets = data.pop("feeding_amount_presets")
         settings.feeding_amount_presets_json = json.dumps(presets) if presets else None

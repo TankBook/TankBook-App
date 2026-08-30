@@ -1,4 +1,5 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react'
+import { useAuth } from './AuthContext'
 
 export type DateFormat = 'DD/MM/YYYY' | 'MM/DD/YYYY' | 'YYYY-MM-DD'
 export type Theme = 'light' | 'dark'
@@ -41,8 +42,11 @@ const SettingsContext = createContext<SettingsContextValue>({
 })
 
 export function SettingsProvider({ children }: { children: ReactNode }) {
-  const [dateFormat, setDateFormatState] = useState<DateFormat>('DD/MM/YYYY')
-  const [unitSystem, setUnitSystemState] = useState<UnitSystem>('cm')
+  // Date format and unit system are per-user preferences, edited on the Profile page —
+  // sourced from and persisted to the logged-in account rather than the shared app settings.
+  const { user, updateProfile } = useAuth()
+  const dateFormat = (user?.date_format as DateFormat) ?? 'DD/MM/YYYY'
+  const unitSystem = (user?.unit_system as UnitSystem) ?? 'cm'
   const [defaultTank, setDefaultTankState] = useState<string | null>(null)
   const [alertRetentionDays, setAlertRetentionDaysState] = useState<number | null>(null)
   const [appUrl, setAppUrlState] = useState<string | null>(null)
@@ -56,8 +60,6 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     fetch('/api/settings/')
       .then(r => r.json())
       .then(d => {
-        setDateFormatState(d.date_format)
-        setUnitSystemState(d.unit_system ?? 'cm')
         setDefaultTankState(d.default_tank_id ?? null)
         setAlertRetentionDaysState(d.alert_retention_days ?? null)
         setAppUrlState(d.app_url ?? null)
@@ -73,21 +75,11 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
   }, [theme])
 
   async function setDateFormat(f: DateFormat) {
-    setDateFormatState(f)
-    await fetch('/api/settings/', {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ date_format: f }),
-    })
+    await updateProfile({ date_format: f })
   }
 
   async function setUnitSystem(u: UnitSystem) {
-    setUnitSystemState(u)
-    await fetch('/api/settings/', {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ unit_system: u }),
-    })
+    await updateProfile({ unit_system: u })
   }
 
   async function setDefaultTank(id: string | null) {

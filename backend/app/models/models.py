@@ -194,12 +194,11 @@ class JournalEntry(Base):
 
 
 class AppSettings(Base):
-    """Single-row table holding app-wide settings, shared by every account (no per-user settings yet)."""
+    """Single-row table holding app-wide settings, shared by every account. Date format and unit
+    system are per-user (see User) — everything left here is genuinely instance-wide."""
     __tablename__ = "app_settings"
 
     id: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: "default")
-    date_format: Mapped[str] = mapped_column(String, default="DD/MM/YYYY")
-    unit_system: Mapped[str] = mapped_column(String, default="cm")
     default_tank_id: Mapped[str | None] = mapped_column(String, nullable=True)
     alert_retention_days: Mapped[int | None] = mapped_column(Integer, nullable=True)
     app_url: Mapped[str | None] = mapped_column(String, nullable=True)
@@ -310,6 +309,8 @@ class User(Base):
     display_name: Mapped[str | None] = mapped_column(String, nullable=True)
     password_hash: Mapped[str | None] = mapped_column(String, nullable=True)
     oidc_subject: Mapped[str | None] = mapped_column(String, nullable=True, unique=True)
+    date_format: Mapped[str] = mapped_column(String, default="DD/MM/YYYY")
+    unit_system: Mapped[str] = mapped_column(String, default="cm")
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     last_login_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 

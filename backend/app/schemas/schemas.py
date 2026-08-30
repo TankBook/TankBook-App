@@ -233,8 +233,6 @@ class JournalEntryOut(BaseModel):
 # --- App settings ---
 
 class AppSettingsUpdate(BaseModel):
-    date_format: str | None = None
-    unit_system: str | None = None
     default_tank_id: str | None = None
     alert_retention_days: int | None = None
     app_url: str | None = None
@@ -242,8 +240,6 @@ class AppSettingsUpdate(BaseModel):
 
 
 class AppSettingsOut(BaseModel):
-    date_format: str
-    unit_system: str
     default_tank_id: str | None = None
     alert_retention_days: int | None = None
     app_url: str | None = None
@@ -482,6 +478,13 @@ class UserOut(BaseModel):
     display_name: str | None = None
     has_password: bool
     permissions: dict[str, str] = {}
+    date_format: str
+    unit_system: str
+
+
+class ProfileUpdate(BaseModel):
+    date_format: str | None = None
+    unit_system: str | None = None
 
 
 class UserListItemOut(BaseModel):

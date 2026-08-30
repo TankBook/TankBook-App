@@ -233,6 +233,8 @@ export interface AuthUser {
   display_name: string | null
   has_password: boolean
   permissions: Record<string, PermissionLevel>
+  date_format: string
+  unit_system: string
 }
 
 const PERMISSION_LEVEL_RANK: Record<PermissionLevel, number> = { none: 0, use: 1, edit: 2 }
@@ -568,6 +570,8 @@ export const api = {
     logout: () => authPost<void>('/auth/logout', {}),
     changePassword: (body: { current_password?: string; new_password: string }) =>
       authPost<AuthUser>('/auth/change-password', body),
+    updateProfile: (body: { date_format?: string; unit_system?: string }) =>
+      patch<AuthUser>('/auth/me', body),
     getSettings: () => get<AuthSettings>('/auth/settings'),
     updateSettings: (body: AuthSettingsUpdate) => patch<AuthSettings>('/auth/settings', body),
     listUsers: () => get<UserListItem[]>('/auth/users'),

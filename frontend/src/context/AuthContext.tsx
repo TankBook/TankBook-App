@@ -7,6 +7,7 @@ interface AuthContextValue {
   login: (email: string, password: string) => Promise<void>
   register: (email: string, password: string, displayName?: string) => Promise<void>
   logout: () => Promise<void>
+  updateProfile: (body: { date_format?: string; unit_system?: string }) => Promise<void>
 }
 
 const AuthContext = createContext<AuthContextValue>({
@@ -15,6 +16,7 @@ const AuthContext = createContext<AuthContextValue>({
   login: async () => {},
   register: async () => {},
   logout: async () => {},
+  updateProfile: async () => {},
 })
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -41,8 +43,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null)
   }
 
+  async function updateProfile(body: { date_format?: string; unit_system?: string }) {
+    setUser(await api.auth.updateProfile(body))
+  }
+
   return (
-    <AuthContext.Provider value={{ user, loading, login, register, logout }}>
+    <AuthContext.Provider value={{ user, loading, login, register, logout, updateProfile }}>
       {children}
     </AuthContext.Provider>
   )

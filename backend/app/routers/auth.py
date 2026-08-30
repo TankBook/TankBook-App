@@ -6,7 +6,7 @@ from app.database import get_db
 from app.models.models import User, AuthSettings
 from app.schemas.schemas import (
     RegisterRequest, LoginRequest, ChangePasswordRequest, UserOut, UserListItemOut, UserUpdateRequest,
-    AuthConfigOut, AuthSettingsOut, AuthSettingsUpdate, PermissionsOut, PermissionsUpdate,
+    AuthConfigOut, AuthSettingsOut, AuthSettingsUpdate, PermissionsOut, PermissionsUpdate, ProfileUpdate,
 )
 from app.services.auth import (
     hash_password, verify_password, create_session, revoke_session,
@@ -19,12 +19,15 @@ from app.services import permissions as permissions_service
 router = APIRouter()
 
 MIN_PASSWORD_LENGTH = 8
+VALID_DATE_FORMATS = ["DD/MM/YYYY", "MM/DD/YYYY", "YYYY-MM-DD"]
+VALID_UNIT_SYSTEMS = ["mm", "cm", "m", "imperial"]
 
 
 def _to_out(db: DBSession, user: User) -> UserOut:
     return UserOut(
         id=user.id, email=user.email, display_name=user.display_name, has_password=bool(user.password_hash),
         permissions=permissions_service.get_all_for_user(db, user.id),
+        date_format=user.date_format, unit_system=user.unit_system,
     )
 
 
@@ -101,6 +104,20 @@ def logout(request: Request, response: Response, db: DBSession = Depends(get_db)
 
 @router.get("/me", response_model=UserOut)
 def me(user: User = Depends(get_current_user), db: DBSession = Depends(get_db)):
+    return _to_out(db, user)
+
+
+@router.patch("/me", response_model=UserOut)
+def update_profile(body: ProfileUpdate, user: User = Depends(get_current_user), db: DBSession = Depends(get_db)):
+    data = body.model_dump(exclude_unset=True)
+    if "date_format" in data and data["date_format"] not in VALID_DATE_FORMATS:
+        data.pop("date_format")
+    if "unit_system" in data and data["unit_system"] not in VALID_UNIT_SYSTEMS:
+        data.pop("unit_system")
+    for k, v in data.items():
+        setattr(user, k, v)
+    db.commit()
+    db.refresh(user)
     return _to_out(db, user)
 
 

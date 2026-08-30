@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { BrowserRouter, Routes, Route, Link, useLocation } from 'react-router-dom'
-import { LayoutDashboard, BookOpen, Cog, NotebookPen, ShieldCheck, Calculator, Receipt, Menu, X, Plus, Fish, Droplets, ChevronLeft, Package, Building, Sun, Moon, Bot, LogOut, type LucideIcon } from 'lucide-react'
+import { LayoutDashboard, BookOpen, Cog, NotebookPen, ShieldCheck, Calculator, Receipt, Menu, X, Plus, Fish, Droplets, ChevronLeft, Package, Building, Sun, Moon, Bot, LogOut, UserCircle, type LucideIcon } from 'lucide-react'
 import { api, hasPermission } from './api/client'
 import RoomLayout from './pages/RoomLayout'
 import RoomDetail from './pages/RoomDetail'
@@ -19,6 +19,7 @@ import SpendingTracker from './pages/SpendingTracker'
 import TankDetail from './pages/TankDetail'
 import SpeciesBrowser from './pages/SpeciesBrowser'
 import Settings from './pages/Settings'
+import Profile from './pages/Profile'
 import LivestockJournal from './pages/LivestockJournal'
 import CompatibilityChecker from './pages/CompatibilityChecker'
 import Calculators from './pages/Calculators'
@@ -419,7 +420,10 @@ function Nav() {
           {menuOpen ? <X size={18} /> : <Menu size={18} />}
         </button>
       ) : (
-        link('/settings', 'Settings', Cog)
+        <>
+          {link('/profile', 'Profile', UserCircle)}
+          {link('/settings', 'Settings', Cog)}
+        </>
       )}
 
       {isMobile && menuOpen && (
@@ -430,6 +434,7 @@ function Nav() {
           boxShadow: '0 8px 24px rgba(0,0,0,0.12)',
         }}>
           {navLinks.map(([to, label, Icon]) => link(to, label, Icon, () => setMenuOpen(false)))}
+          {link('/profile', 'Profile', UserCircle, () => setMenuOpen(false))}
           {link('/settings', 'Settings', Cog, () => setMenuOpen(false))}
         </div>
       )}
@@ -511,6 +516,7 @@ function AppShell() {
             <Route path="/compatibility" element={<CompatibilityChecker />} />
             <Route path="/journal" element={<LivestockJournal />} />
             <Route path="/calculators" element={<Calculators />} />
+            <Route path="/profile" element={<Profile />} />
             <Route path="/settings" element={<Settings />} />
             <Route path="/spending" element={<SpendingTracker />} />
             <Route path="/inventory" element={<Inventory />} />
