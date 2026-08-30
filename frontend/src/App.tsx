@@ -374,6 +374,21 @@ function Nav() {
     </Link>
   )
 
+  const logoutButton = (
+    <button
+      onClick={() => logout()}
+      title="Log out"
+      style={{
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        padding: '6px', border: '0.5px solid var(--border)', borderRadius: 8,
+        background: 'transparent', color: 'var(--text-2)',
+        cursor: 'pointer', lineHeight: 0,
+      }}
+    >
+      <LogOut size={16} />
+    </button>
+  )
+
   return (
     <nav style={{
       position: 'relative',
@@ -393,36 +408,27 @@ function Nav() {
         {!isMobile && navLinks.map(([to, label, Icon]) => link(to, label, Icon))}
       </div>
 
-      <QuickAdd />
-
-      <button
-        onClick={() => logout()}
-        title="Log out"
-        style={{
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          padding: '6px', border: '0.5px solid var(--border)', borderRadius: 8,
-          background: 'transparent', color: 'var(--text-2)',
-          cursor: 'pointer', lineHeight: 0, marginRight: 4,
-        }}
-      >
-        <LogOut size={16} />
-      </button>
-
       {isMobile ? (
-        <button
-          onClick={() => setMenuOpen(o => !o)}
-          style={{
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            padding: '6px', border: '0.5px solid var(--border)', borderRadius: 8,
-            background: 'transparent', color: 'var(--text-2)', cursor: 'pointer', lineHeight: 0,
-          }}
-        >
-          {menuOpen ? <X size={18} /> : <Menu size={18} />}
-        </button>
+        <>
+          <QuickAdd />
+          {logoutButton}
+          <button
+            onClick={() => setMenuOpen(o => !o)}
+            style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              padding: '6px', border: '0.5px solid var(--border)', borderRadius: 8,
+              background: 'transparent', color: 'var(--text-2)', cursor: 'pointer', lineHeight: 0,
+            }}
+          >
+            {menuOpen ? <X size={18} /> : <Menu size={18} />}
+          </button>
+        </>
       ) : (
         <>
+          <QuickAdd />
           {link('/profile', 'Profile', UserCircle)}
-          {link('/settings', 'Settings', Cog)}
+          {link('/settings', 'Admin', Cog)}
+          {logoutButton}
         </>
       )}
 
@@ -434,8 +440,21 @@ function Nav() {
           boxShadow: '0 8px 24px rgba(0,0,0,0.12)',
         }}>
           {navLinks.map(([to, label, Icon]) => link(to, label, Icon, () => setMenuOpen(false)))}
+          <div style={{ height: 1, background: 'var(--border-sub)', margin: '4px 0' }} />
           {link('/profile', 'Profile', UserCircle, () => setMenuOpen(false))}
-          {link('/settings', 'Settings', Cog, () => setMenuOpen(false))}
+          {link('/settings', 'Admin', Cog, () => setMenuOpen(false))}
+          <button
+            onClick={() => { setMenuOpen(false); logout() }}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 6,
+              padding: '6px 14px', borderRadius: 8, fontSize: 14,
+              border: 'none', background: 'transparent', color: 'var(--text-2)',
+              cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit',
+            }}
+          >
+            <LogOut size={14} />
+            Logout
+          </button>
         </div>
       )}
     </nav>

@@ -743,7 +743,7 @@ export default function Settings() {
 
   return (
     <div>
-      <h1 style={{ margin: '0 0 4px', fontSize: 22, fontWeight: 500, color: 'var(--text)' }}>Settings</h1>
+      <h1 style={{ margin: '0 0 4px', fontSize: 22, fontWeight: 500, color: 'var(--text)' }}>Admin</h1>
       <p style={{ margin: '0 0 24px', fontSize: 13, color: 'var(--text-2)' }}>
         App-wide settings for TankBook. Every account on this instance shares the same tanks and data, so these settings apply to everyone.
       </p>
