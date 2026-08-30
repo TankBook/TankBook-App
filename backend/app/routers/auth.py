@@ -3,16 +3,16 @@ from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session as DBSession
 
 from app.database import get_db
-from app.models.models import User
+from app.models.models import User, AuthSettings
 from app.schemas.schemas import (
-    RegisterRequest, LoginRequest, ChangePasswordRequest, UserOut,
+    RegisterRequest, LoginRequest, ChangePasswordRequest, UserOut, UserListItemOut,
     AuthConfigOut, AuthSettingsOut, AuthSettingsUpdate,
 )
 from app.services.auth import (
     hash_password, verify_password, create_session, revoke_session,
     set_session_cookie, clear_session_cookie, get_current_user,
     get_or_create_auth_settings, registration_allowed,
-    oidc_enabled, oauth, OIDC_DISPLAY_NAME, SESSION_COOKIE,
+    oidc_configured, build_oidc_client, SESSION_COOKIE,
 )
 
 router = APIRouter()
@@ -24,12 +24,25 @@ def _to_out(user: User) -> UserOut:
     return UserOut(id=user.id, email=user.email, display_name=user.display_name, has_password=bool(user.password_hash))
 
 
+def _settings_to_out(settings: AuthSettings) -> AuthSettingsOut:
+    return AuthSettingsOut(
+        allow_registration=settings.allow_registration,
+        oidc_issuer_url=settings.oidc_issuer_url,
+        oidc_client_id=settings.oidc_client_id,
+        oidc_client_secret_set=bool(settings.oidc_client_secret),
+        oidc_display_name=settings.oidc_display_name,
+        updated_at=settings.updated_at,
+    )
+
+
 @router.get("/config", response_model=AuthConfigOut)
 def auth_config(db: DBSession = Depends(get_db)):
+    settings = get_or_create_auth_settings(db)
+    configured = oidc_configured(settings)
     return AuthConfigOut(
         allow_registration_effective=registration_allowed(db),
-        oidc_enabled=oidc_enabled,
-        oidc_label=OIDC_DISPLAY_NAME if oidc_enabled else None,
+        oidc_enabled=configured,
+        oidc_label=(settings.oidc_display_name or "SSO") if configured else None,
     )
 
 
@@ -79,6 +92,19 @@ def me(user: User = Depends(get_current_user)):
     return _to_out(user)
 
 
+@router.get("/users", response_model=list[UserListItemOut])
+def list_users(db: DBSession = Depends(get_db), _user: User = Depends(get_current_user)):
+    users = db.query(User).order_by(User.created_at.asc()).all()
+    return [
+        UserListItemOut(
+            id=u.id, email=u.email, display_name=u.display_name,
+            has_password=bool(u.password_hash), has_oidc=bool(u.oidc_subject),
+            created_at=u.created_at, last_login_at=u.last_login_at,
+        )
+        for u in users
+    ]
+
+
 @router.post("/change-password", response_model=UserOut)
 def change_password(body: ChangePasswordRequest, user: User = Depends(get_current_user), db: DBSession = Depends(get_db)):
     if user.password_hash and not verify_password(body.current_password or "", user.password_hash):
@@ -92,33 +118,40 @@ def change_password(body: ChangePasswordRequest, user: User = Depends(get_curren
 
 @router.get("/settings", response_model=AuthSettingsOut)
 def get_auth_settings(db: DBSession = Depends(get_db), _user: User = Depends(get_current_user)):
-    return get_or_create_auth_settings(db)
+    return _settings_to_out(get_or_create_auth_settings(db))
 
 
 @router.patch("/settings", response_model=AuthSettingsOut)
 def update_auth_settings(body: AuthSettingsUpdate, db: DBSession = Depends(get_db), _user: User = Depends(get_current_user)):
     settings = get_or_create_auth_settings(db)
-    for k, v in body.model_dump(exclude_unset=True).items():
+    data = body.model_dump(exclude_unset=True)
+    if "oidc_client_secret" in data:
+        settings.oidc_client_secret = data.pop("oidc_client_secret") or None
+    for k, v in data.items():
         setattr(settings, k, v)
     db.commit()
     db.refresh(settings)
-    return settings
+    return _settings_to_out(settings)
 
 
 @router.get("/oidc/login")
-async def oidc_login(request: Request):
-    if not oidc_enabled:
+async def oidc_login(request: Request, db: DBSession = Depends(get_db)):
+    settings = get_or_create_auth_settings(db)
+    if not oidc_configured(settings):
         raise HTTPException(404, "OIDC is not configured")
+    client = build_oidc_client(settings)
     redirect_uri = str(request.url_for("oidc_callback"))
-    return await oauth.oidc.authorize_redirect(request, redirect_uri)
+    return await client.authorize_redirect(request, redirect_uri)
 
 
 @router.get("/oidc/callback")
 async def oidc_callback(request: Request, db: DBSession = Depends(get_db)):
-    if not oidc_enabled:
+    settings = get_or_create_auth_settings(db)
+    if not oidc_configured(settings):
         raise HTTPException(404, "OIDC is not configured")
-    token = await oauth.oidc.authorize_access_token(request)
-    claims = token.get("userinfo") or await oauth.oidc.userinfo(token=token)
+    client = build_oidc_client(settings)
+    token = await client.authorize_access_token(request)
+    claims = token.get("userinfo") or await client.userinfo(token=token)
     subject = claims["sub"]
     email = claims.get("email")
     if not email:

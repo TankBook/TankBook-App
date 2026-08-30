@@ -433,6 +433,16 @@ class UserOut(BaseModel):
     has_password: bool
 
 
+class UserListItemOut(BaseModel):
+    id: str
+    email: str
+    display_name: str | None = None
+    has_password: bool
+    has_oidc: bool
+    created_at: datetime
+    last_login_at: datetime | None = None
+
+
 class AuthConfigOut(BaseModel):
     allow_registration_effective: bool
     oidc_enabled: bool
@@ -441,9 +451,16 @@ class AuthConfigOut(BaseModel):
 
 class AuthSettingsOut(BaseModel):
     allow_registration: bool
+    oidc_issuer_url: str | None = None
+    oidc_client_id: str | None = None
+    oidc_client_secret_set: bool = False
+    oidc_display_name: str | None = None
     updated_at: datetime
-    model_config = {"from_attributes": True}
 
 
 class AuthSettingsUpdate(BaseModel):
     allow_registration: bool | None = None
+    oidc_issuer_url: str | None = None
+    oidc_client_id: str | None = None
+    oidc_client_secret: str | None = None
+    oidc_display_name: str | None = None

@@ -1,4 +1,3 @@
-import os
 import secrets
 from datetime import datetime, timedelta
 
@@ -13,22 +12,23 @@ from app.models.models import User, Session as SessionModel, AuthSettings
 SESSION_COOKIE = "tankbook_session"
 SESSION_TTL_DAYS = 30
 
-OIDC_ISSUER_URL = os.environ.get("OIDC_ISSUER_URL")
-OIDC_CLIENT_ID = os.environ.get("OIDC_CLIENT_ID")
-OIDC_CLIENT_SECRET = os.environ.get("OIDC_CLIENT_SECRET")
-OIDC_DISPLAY_NAME = os.environ.get("OIDC_DISPLAY_NAME", "SSO")
 
-oidc_enabled = bool(OIDC_ISSUER_URL and OIDC_CLIENT_ID and OIDC_CLIENT_SECRET)
+def oidc_configured(settings: AuthSettings) -> bool:
+    return bool(settings.oidc_issuer_url and settings.oidc_client_id and settings.oidc_client_secret)
 
-oauth = OAuth()
-if oidc_enabled:
+
+def build_oidc_client(settings: AuthSettings):
+    """OIDC config lives in the database and can change at runtime (via the Users settings tab),
+    so the client is built fresh per request rather than registered once at startup."""
+    oauth = OAuth()
     oauth.register(
         name="oidc",
-        server_metadata_url=f"{OIDC_ISSUER_URL.rstrip('/')}/.well-known/openid-configuration",
-        client_id=OIDC_CLIENT_ID,
-        client_secret=OIDC_CLIENT_SECRET,
+        server_metadata_url=f"{settings.oidc_issuer_url.rstrip('/')}/.well-known/openid-configuration",
+        client_id=settings.oidc_client_id,
+        client_secret=settings.oidc_client_secret,
         client_kwargs={"scope": "openid email profile"},
     )
+    return oauth.oidc
 
 
 def hash_password(password: str) -> str:

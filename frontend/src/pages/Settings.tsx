@@ -1,8 +1,8 @@
 import { useState, useRef, useEffect } from 'react'
-import { CalendarDays, Ruler, Info, Download, Upload, Droplets, RefreshCw, Bell, Globe, Utensils, X, AlertTriangle, HardDrive, Fish, Image as ImageIcon, Bot, Lock } from 'lucide-react'
-import { useSettings, formatDate, DateFormat, UnitSystem } from '../context/SettingsContext'
+import { CalendarDays, Ruler, Info, Download, Upload, Droplets, RefreshCw, Bell, Globe, Utensils, X, AlertTriangle, HardDrive, Fish, Image as ImageIcon, Bot, Lock, SlidersHorizontal, Users as UsersIcon, KeyRound, type LucideIcon } from 'lucide-react'
+import { useSettings, formatDate, formatDateTime, DateFormat, UnitSystem } from '../context/SettingsContext'
 import { Card, Modal, StatCard, FieldLabel } from '../components/ui'
-import { api, Tank, AgentSettings, AuthSettings } from '../api/client'
+import { api, Tank, AgentSettings, AuthSettings, UserListItem } from '../api/client'
 import { useAuth } from '../context/AuthContext'
 
 const PROVIDER_OPTIONS: { value: 'anthropic' | 'openai' | 'ollama'; label: string }[] = [
@@ -245,6 +245,169 @@ function AccessSettingsSection() {
   )
 }
 
+function UsersSection() {
+  const { dateFormat } = useSettings()
+  const [users, setUsers] = useState<UserListItem[]>([])
+  const [loadingUsers, setLoadingUsers] = useState(true)
+
+  const [authSettings, setAuthSettings] = useState<AuthSettings | null>(null)
+  const [issuerUrl, setIssuerUrl] = useState('')
+  const [clientId, setClientId] = useState('')
+  const [clientSecret, setClientSecret] = useState('')
+  const [displayName, setDisplayName] = useState('')
+  const [loadingOidc, setLoadingOidc] = useState(true)
+  const [savingOidc, setSavingOidc] = useState(false)
+  const [oidcSaved, setOidcSaved] = useState(false)
+  const [oidcError, setOidcError] = useState<string | null>(null)
+
+  useEffect(() => {
+    api.auth.listUsers().then(setUsers).catch(() => {}).finally(() => setLoadingUsers(false))
+    api.auth.getSettings()
+      .then(s => {
+        setAuthSettings(s)
+        setIssuerUrl(s.oidc_issuer_url ?? '')
+        setClientId(s.oidc_client_id ?? '')
+        setDisplayName(s.oidc_display_name ?? '')
+      })
+      .catch(() => {})
+      .finally(() => setLoadingOidc(false))
+  }, [])
+
+  async function saveOidc() {
+    setSavingOidc(true)
+    setOidcSaved(false)
+    setOidcError(null)
+    try {
+      const updated = await api.auth.updateSettings({
+        oidc_issuer_url: issuerUrl.trim() || null,
+        oidc_client_id: clientId.trim() || null,
+        oidc_display_name: displayName.trim() || null,
+        ...(clientSecret.trim() ? { oidc_client_secret: clientSecret.trim() } : {}),
+      })
+      setAuthSettings(updated)
+      setClientSecret('')
+      setOidcSaved(true)
+    } catch {
+      setOidcError('Could not save OIDC settings')
+    } finally {
+      setSavingOidc(false)
+    }
+  }
+
+  return (
+    <>
+      <section style={{ paddingBottom: 20, borderBottom: '0.5px solid var(--border-sub)' }}>
+        <p style={{ fontWeight: 500, fontSize: 14, margin: '0 0 4px', color: 'var(--text)', display: 'flex', alignItems: 'center', gap: 6 }}><UsersIcon size={14} color="var(--text-2)" />Users</p>
+        <p style={{ fontSize: 12, color: 'var(--text-2)', margin: '0 0 14px' }}>
+          Everyone with an account on this instance, local or via SSO. There's no role system yet — every account has the same access.
+        </p>
+
+        {loadingUsers ? (
+          <p style={{ fontSize: 13, color: 'var(--text-3)' }}>Loading…</p>
+        ) : (
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+              <thead>
+                <tr>
+                  <th style={{ textAlign: 'left', padding: '6px 10px', color: 'var(--text-2)', fontWeight: 500, fontSize: 11, borderBottom: '0.5px solid var(--border)' }}>Name</th>
+                  <th style={{ textAlign: 'left', padding: '6px 10px', color: 'var(--text-2)', fontWeight: 500, fontSize: 11, borderBottom: '0.5px solid var(--border)' }}>Email</th>
+                  <th style={{ textAlign: 'left', padding: '6px 10px', color: 'var(--text-2)', fontWeight: 500, fontSize: 11, borderBottom: '0.5px solid var(--border)' }}>Method</th>
+                  <th style={{ textAlign: 'left', padding: '6px 10px', color: 'var(--text-2)', fontWeight: 500, fontSize: 11, borderBottom: '0.5px solid var(--border)' }}>Joined</th>
+                  <th style={{ textAlign: 'left', padding: '6px 10px', color: 'var(--text-2)', fontWeight: 500, fontSize: 11, borderBottom: '0.5px solid var(--border)' }}>Last login</th>
+                </tr>
+              </thead>
+              <tbody>
+                {users.map(u => (
+                  <tr key={u.id}>
+                    <td style={{ padding: '8px 10px', color: 'var(--text)', borderBottom: '0.5px solid var(--border-sub)' }}>{u.display_name || '—'}</td>
+                    <td style={{ padding: '8px 10px', color: 'var(--text)', borderBottom: '0.5px solid var(--border-sub)' }}>{u.email}</td>
+                    <td style={{ padding: '8px 10px', borderBottom: '0.5px solid var(--border-sub)' }}>
+                      <span style={{ display: 'inline-flex', gap: 4 }}>
+                        {u.has_password && <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 6, background: 'var(--surface-2)', color: 'var(--text-2)' }}>Local</span>}
+                        {u.has_oidc && <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 6, background: 'var(--blue-bg)', color: 'var(--blue)' }}>SSO</span>}
+                      </span>
+                    </td>
+                    <td style={{ padding: '8px 10px', color: 'var(--text-2)', borderBottom: '0.5px solid var(--border-sub)' }}>{formatDate(u.created_at, dateFormat)}</td>
+                    <td style={{ padding: '8px 10px', color: 'var(--text-2)', borderBottom: '0.5px solid var(--border-sub)' }}>
+                      {u.last_login_at ? formatDateTime(u.last_login_at, dateFormat) : 'Never'}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
+
+      {!loadingOidc && (
+        <section>
+          <p style={{ fontWeight: 500, fontSize: 14, margin: '0 0 4px', color: 'var(--text)', display: 'flex', alignItems: 'center', gap: 6 }}><KeyRound size={14} color="var(--text-2)" />Single Sign-On (OIDC)</p>
+          <p style={{ fontSize: 12, color: 'var(--text-2)', margin: '0 0 14px' }}>
+            Let people sign in with an external identity provider (Authentik, Keycloak, Google, etc). Leave the issuer URL blank to turn SSO off — the login screen will only show local email/password.
+          </p>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <div>
+              <FieldLabel>Issuer URL</FieldLabel>
+              <input
+                value={issuerUrl}
+                onChange={e => { setIssuerUrl(e.target.value); setOidcSaved(false) }}
+                placeholder="e.g. https://auth.example.com/application/o/tankbook/"
+                style={{ width: '100%', boxSizing: 'border-box' }}
+              />
+            </div>
+            <div>
+              <FieldLabel>Client ID</FieldLabel>
+              <input
+                value={clientId}
+                onChange={e => { setClientId(e.target.value); setOidcSaved(false) }}
+                style={{ width: '100%', boxSizing: 'border-box' }}
+              />
+            </div>
+            <div>
+              <FieldLabel>Client Secret</FieldLabel>
+              <input
+                type="password"
+                value={clientSecret}
+                onChange={e => { setClientSecret(e.target.value); setOidcSaved(false) }}
+                placeholder={authSettings?.oidc_client_secret_set ? 'Secret saved — enter a new one to replace it' : ''}
+                style={{ width: '100%', boxSizing: 'border-box' }}
+              />
+            </div>
+            <div>
+              <FieldLabel>Provider name — shown on the login page as "Sign in with …"</FieldLabel>
+              <input
+                value={displayName}
+                onChange={e => { setDisplayName(e.target.value); setOidcSaved(false) }}
+                placeholder="e.g. Authentik"
+                style={{ width: '100%', boxSizing: 'border-box' }}
+              />
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 4 }}>
+              <button
+                onClick={saveOidc}
+                disabled={savingOidc}
+                style={{
+                  padding: '7px 16px', borderRadius: 8, fontSize: 13, fontWeight: 500,
+                  cursor: savingOidc ? 'default' : 'pointer',
+                  border: '0.5px solid var(--blue-border)',
+                  background: !savingOidc ? 'var(--blue-bg)' : 'var(--surface-2)',
+                  color: !savingOidc ? 'var(--blue)' : 'var(--text-3)',
+                }}
+              >
+                {savingOidc ? 'Saving…' : 'Save SSO Settings'}
+              </button>
+              {oidcSaved && <span style={{ fontSize: 12, color: 'var(--green)' }}>Saved</span>}
+              {oidcError && <span style={{ fontSize: 12, color: 'var(--red)' }}>{oidcError}</span>}
+            </div>
+          </div>
+        </section>
+      )}
+    </>
+  )
+}
+
 function formatBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`
   const units = ['KB', 'MB', 'GB', 'TB']
@@ -281,6 +444,12 @@ const UNIT_OPTIONS: { value: UnitSystem; label: string; example: string }[] = [
   { value: 'imperial', label: 'Imperial (inches)', example: '23.62 × 15.75 × 11.81 in' },
 ]
 
+const SETTINGS_TABS: { id: string; label: string; icon: LucideIcon }[] = [
+  { id: 'general', label: 'General', icon: SlidersHorizontal },
+  { id: 'users', label: 'Users', icon: UsersIcon },
+  { id: 'about', label: 'About', icon: Info },
+]
+
 export default function Settings() {
   const { dateFormat, setDateFormat, unitSystem, setUnitSystem, defaultTank, setDefaultTank, alertRetentionDays, setAlertRetentionDays, appUrl, setAppUrl, feedingAmountPresets, setFeedingAmountPresets, loading } = useSettings()
   const [tanks, setTanks] = useState<Tank[]>([])
@@ -294,6 +463,7 @@ export default function Settings() {
   const [settingsSaved, setSettingsSaved] = useState(false)
   const [newPreset, setNewPreset] = useState('')
   const [isMobile, setIsMobile] = useState(() => window.matchMedia('(max-width: 768px)').matches)
+  const [activeTab, setActiveTab] = useState(SETTINGS_TABS[0].id)
 
   useEffect(() => {
     const mq = window.matchMedia('(max-width: 768px)')
@@ -453,7 +623,32 @@ export default function Settings() {
         App-wide settings for TankBook. Every account on this instance shares the same tanks and data, so these settings apply to everyone.
       </p>
 
-      <Card style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 16, padding: 24 }}>
+      <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', gap: 16, alignItems: 'flex-start' }}>
+
+        <Card style={{ width: isMobile ? '100%' : 200, flexShrink: 0, padding: 8, boxSizing: 'border-box' }}>
+          <div style={{ display: 'flex', flexDirection: isMobile ? 'row' : 'column', gap: 2, overflowX: isMobile ? 'auto' : 'visible' }}>
+            {SETTINGS_TABS.map(t => (
+              <button
+                key={t.id}
+                onClick={() => setActiveTab(t.id)}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 8, width: isMobile ? 'auto' : '100%',
+                  padding: '8px 10px', borderRadius: 8, fontSize: 13, textAlign: 'left', cursor: 'pointer',
+                  border: 'none', whiteSpace: 'nowrap',
+                  background: activeTab === t.id ? 'var(--blue-bg)' : 'transparent',
+                  color: activeTab === t.id ? 'var(--blue)' : 'var(--text)',
+                  fontWeight: activeTab === t.id ? 500 : 400,
+                }}
+              >
+                <t.icon size={14} style={{ flexShrink: 0 }} />
+                {t.label}
+              </button>
+            ))}
+          </div>
+        </Card>
+
+        {activeTab === 'general' && (
+      <Card style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 16, padding: 24, flex: 1, minWidth: 0, width: '100%', boxSizing: 'border-box' }}>
 
         <section style={{ paddingBottom: 20, borderBottom: '0.5px solid var(--border-sub)' }}>
           <p style={{ fontWeight: 500, fontSize: 14, margin: '0 0 4px', color: 'var(--text)', display: 'flex', alignItems: 'center', gap: 6 }}><Droplets size={14} color="var(--text-2)" />Default Tank</p>
@@ -620,6 +815,47 @@ export default function Settings() {
           )}
         </section>
 
+        <section style={{ display: 'flex', flexDirection: isMobile ? 'column-reverse' : 'row', alignItems: isMobile ? 'stretch' : 'center', justifyContent: 'space-between', gap: 12 }}>
+          <button
+            onClick={resetToDefaults}
+            style={{
+              padding: '8px 18px', borderRadius: 8, border: '0.5px solid var(--btn-border)',
+              background: 'transparent', color: 'var(--text-2)', fontWeight: 500, cursor: 'pointer',
+              width: isMobile ? '100%' : undefined, boxSizing: 'border-box',
+            }}
+          >
+            Reset to Defaults
+          </button>
+          <div style={{ display: 'flex', flexDirection: isMobile ? 'column-reverse' : 'row', alignItems: isMobile ? 'stretch' : 'center', gap: 12 }}>
+            {settingsSaved && <span style={{ fontSize: 12, color: 'var(--green)', textAlign: isMobile ? 'center' : undefined }}>Settings saved</span>}
+            <button
+              onClick={saveSettings}
+              disabled={!settingsChanged || savingSettings}
+              style={{
+                padding: '8px 18px', borderRadius: 8, border: '0.5px solid var(--blue-border)',
+                background: settingsChanged && !savingSettings ? 'var(--blue-bg)' : 'var(--surface-2)',
+                color: settingsChanged && !savingSettings ? 'var(--blue)' : 'var(--text-3)',
+                fontWeight: 500, cursor: settingsChanged && !savingSettings ? 'pointer' : 'default',
+                width: isMobile ? '100%' : undefined, boxSizing: 'border-box',
+              }}
+            >
+              {savingSettings ? 'Saving…' : 'Save Settings'}
+            </button>
+          </div>
+        </section>
+
+      </Card>
+        )}
+
+        {activeTab === 'users' && (
+      <Card style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 16, padding: 24, flex: 1, minWidth: 0, width: '100%', boxSizing: 'border-box' }}>
+        <UsersSection />
+      </Card>
+        )}
+
+        {activeTab === 'about' && (
+      <Card style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 16, padding: 24, flex: 1, minWidth: 0, width: '100%', boxSizing: 'border-box' }}>
+
         <section style={{ paddingBottom: 20, borderBottom: '0.5px solid var(--border-sub)' }}>
           <p style={{ fontWeight: 500, fontSize: 14, margin: '0 0 4px', color: 'var(--text)', display: 'flex', alignItems: 'center', gap: 6 }}>
             <Download size={14} color="var(--text-2)" />Data Backup
@@ -765,7 +1001,7 @@ export default function Settings() {
           </Modal>
         )}
 
-        <section style={{ paddingBottom: 20, borderBottom: '0.5px solid var(--border-sub)' }}>
+        <section>
           <p style={{ fontWeight: 500, fontSize: 14, margin: '0 0 12px', color: 'var(--text)', display: 'flex', alignItems: 'center', gap: 6 }}>
             <Info size={14} color="var(--text-2)" />About
           </p>
@@ -837,36 +1073,10 @@ export default function Settings() {
           </p>
         </section>
 
-        <section style={{ display: 'flex', flexDirection: isMobile ? 'column-reverse' : 'row', alignItems: isMobile ? 'stretch' : 'center', justifyContent: 'space-between', gap: 12 }}>
-          <button
-            onClick={resetToDefaults}
-            style={{
-              padding: '8px 18px', borderRadius: 8, border: '0.5px solid var(--btn-border)',
-              background: 'transparent', color: 'var(--text-2)', fontWeight: 500, cursor: 'pointer',
-              width: isMobile ? '100%' : undefined, boxSizing: 'border-box',
-            }}
-          >
-            Reset to Defaults
-          </button>
-          <div style={{ display: 'flex', flexDirection: isMobile ? 'column-reverse' : 'row', alignItems: isMobile ? 'stretch' : 'center', gap: 12 }}>
-            {settingsSaved && <span style={{ fontSize: 12, color: 'var(--green)', textAlign: isMobile ? 'center' : undefined }}>Settings saved</span>}
-            <button
-              onClick={saveSettings}
-              disabled={!settingsChanged || savingSettings}
-              style={{
-                padding: '8px 18px', borderRadius: 8, border: '0.5px solid var(--blue-border)',
-                background: settingsChanged && !savingSettings ? 'var(--blue-bg)' : 'var(--surface-2)',
-                color: settingsChanged && !savingSettings ? 'var(--blue)' : 'var(--text-3)',
-                fontWeight: 500, cursor: settingsChanged && !savingSettings ? 'pointer' : 'default',
-                width: isMobile ? '100%' : undefined, boxSizing: 'border-box',
-              }}
-            >
-              {savingSettings ? 'Saving…' : 'Save Settings'}
-            </button>
-          </div>
-        </section>
-
       </Card>
+        )}
+
+      </div>
     </div>
   )
 }

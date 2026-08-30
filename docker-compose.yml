@@ -23,10 +23,6 @@ services:
     environment:
       DATABASE_URL: postgresql://${DB_USER:-tankbook}:${DB_PASSWORD:-changeme}@db/tankbook
       SECRET_KEY: ${SECRET_KEY:-}
-      OIDC_ISSUER_URL: ${OIDC_ISSUER_URL:-}
-      OIDC_CLIENT_ID: ${OIDC_CLIENT_ID:-}
-      OIDC_CLIENT_SECRET: ${OIDC_CLIENT_SECRET:-}
-      OIDC_DISPLAY_NAME: ${OIDC_DISPLAY_NAME:-SSO}
     volumes:
       - species_data:/app/species-data
       - tankbook-images:/app/images

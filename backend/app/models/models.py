@@ -332,4 +332,8 @@ class AuthSettings(Base):
 
     id: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: "default")
     allow_registration: Mapped[bool] = mapped_column(Boolean, default=True)
+    oidc_issuer_url: Mapped[str | None] = mapped_column(String, nullable=True)
+    oidc_client_id: Mapped[str | None] = mapped_column(String, nullable=True)
+    oidc_client_secret: Mapped[str | None] = mapped_column(Text, nullable=True)
+    oidc_display_name: Mapped[str | None] = mapped_column(String, nullable=True)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

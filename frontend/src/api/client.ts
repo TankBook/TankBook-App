@@ -239,7 +239,29 @@ export interface AuthConfig {
 
 export interface AuthSettings {
   allow_registration: boolean
+  oidc_issuer_url: string | null
+  oidc_client_id: string | null
+  oidc_client_secret_set: boolean
+  oidc_display_name: string | null
   updated_at: string
+}
+
+export interface AuthSettingsUpdate {
+  allow_registration?: boolean
+  oidc_issuer_url?: string | null
+  oidc_client_id?: string | null
+  oidc_client_secret?: string | null
+  oidc_display_name?: string | null
+}
+
+export interface UserListItem {
+  id: string
+  email: string
+  display_name: string | null
+  has_password: boolean
+  has_oidc: boolean
+  created_at: string
+  last_login_at: string | null
 }
 
 // --- Fetch helpers ---
@@ -525,6 +547,7 @@ export const api = {
     changePassword: (body: { current_password?: string; new_password: string }) =>
       authPost<AuthUser>('/auth/change-password', body),
     getSettings: () => get<AuthSettings>('/auth/settings'),
-    updateSettings: (body: { allow_registration?: boolean }) => patch<AuthSettings>('/auth/settings', body),
+    updateSettings: (body: AuthSettingsUpdate) => patch<AuthSettings>('/auth/settings', body),
+    listUsers: () => get<UserListItem[]>('/auth/users'),
   },
 }
