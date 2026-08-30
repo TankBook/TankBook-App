@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 
 from app.models.models import AgentSettings
 from app.schemas.schemas import ChatMessage
-from app.services.agent.errors import AgentNotConfigured
+from app.services.agent.errors import AgentNotConfigured, AgentProviderError
 from app.services.agent.tools import TOOL_SCHEMAS, execute_tool
 from app.services.agent.providers.openai_compatible import OpenAICompatibleProvider
 from app.services.agent.providers.anthropic_provider import AnthropicProvider
@@ -50,6 +50,78 @@ def _build_provider(settings: AgentSettings):
             requires_api_key=settings.provider == "openai",
         )
     raise AgentNotConfigured(f"Unknown provider: {settings.provider}")
+
+
+SPECIES_DRAFT_TOOL = {
+    "name": "submit_species_draft",
+    "description": "Submit a structured aquarium/vivarium species care-sheet draft.",
+    "parameters": {
+        "type": "object",
+        "properties": {
+            "slug": {"type": "string", "description": "Lowercase kebab-case identifier derived from the common name, e.g. 'neon-tetra'"},
+            "common_name": {"type": "string"},
+            "latin_name": {"type": "string", "description": "Scientific binomial name"},
+            "type": {"type": "string", "enum": ["fish", "plant", "invertebrate", "amphibian"]},
+            "family": {"type": "string"},
+            "origin": {"type": "string", "description": "Native geographic region"},
+            "care": {
+                "type": "object",
+                "properties": {
+                    "difficulty": {"type": "string", "enum": ["beginner", "intermediate", "advanced"]},
+                    "min_tank_litres": {"type": "number"},
+                    "shoal_min": {"type": "integer", "description": "Minimum shoal/school size, if relevant"},
+                    "group_min": {"type": "integer", "description": "Minimum group size, if relevant and different from shoal_min"},
+                    "max_size_cm": {"type": "number"},
+                    "lifespan_years": {"type": "number"},
+                    "growth_rate": {"type": "string", "enum": ["slow", "medium", "fast"]},
+                },
+            },
+            "water": {
+                "type": "object",
+                "properties": {
+                    "temp_c": {"type": "object", "properties": {"min": {"type": "number"}, "max": {"type": "number"}}},
+                    "ph": {"type": "object", "properties": {"min": {"type": "number"}, "max": {"type": "number"}}},
+                    "gh_dgh": {"type": "object", "properties": {"min": {"type": "number"}, "max": {"type": "number"}}},
+                    "kh_dkh": {"type": "object", "properties": {"min": {"type": "number"}, "max": {"type": "number"}}},
+                },
+            },
+            "compatibility": {
+                "type": "object",
+                "properties": {"temperament": {"type": "string", "enum": ["peaceful", "semi-aggressive", "aggressive"]}},
+            },
+            "light": {
+                "type": "object",
+                "properties": {"requirement": {"type": "string", "enum": ["low", "medium", "high"]}},
+            },
+            "co2_required": {"type": "boolean", "description": "Only meaningful for plants"},
+            "notes": {"type": "string", "description": "A couple of sentences of practical care notes"},
+        },
+        "required": ["slug", "common_name", "latin_name", "type"],
+    },
+}
+
+SPECIES_DRAFT_SYSTEM_PROMPT = (
+    "You are an aquarium/vivarium species care-sheet writer for TankBook. Given a common or scientific "
+    "species name, call submit_species_draft exactly once with accurate, typical care data for that "
+    "species. If you are not confident about a particular field, omit it rather than guessing — an "
+    "incomplete draft the user fills in themselves is much better than a confident wrong number. "
+    "slug must be lowercase kebab-case derived from the common name. type must be exactly one of fish, "
+    "plant, invertebrate, or amphibian."
+)
+
+
+def draft_species(db: Session, name: str) -> dict:
+    settings = _get_settings(db)
+    provider = _build_provider(settings)
+    response = provider.complete(
+        system=SPECIES_DRAFT_SYSTEM_PROMPT,
+        messages=[{"role": "user", "content": f"Species: {name}"}],
+        tools=[SPECIES_DRAFT_TOOL],
+        force_tool="submit_species_draft",
+    )
+    if not response.tool_calls:
+        raise AgentProviderError("The AI didn't return a structured draft.")
+    return response.tool_calls[0].arguments
 
 
 def run_agent(db: Session, messages: list[ChatMessage]) -> str:

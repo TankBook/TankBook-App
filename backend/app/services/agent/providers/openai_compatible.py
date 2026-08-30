@@ -18,7 +18,7 @@ class OpenAICompatibleProvider:
         self.base_url = base_url.rstrip("/")
         self.model = model
 
-    def complete(self, system: str, messages: list[dict], tools: list[dict]) -> AgentResponse:
+    def complete(self, system: str, messages: list[dict], tools: list[dict], force_tool: str | None = None) -> AgentResponse:
         wire_messages = [{"role": "system", "content": system}]
         for m in messages:
             if m["role"] == "tool":
@@ -44,6 +44,8 @@ class OpenAICompatibleProvider:
             "messages": wire_messages,
             "tools": [{"type": "function", "function": t} for t in tools],
         }
+        if force_tool:
+            body["tool_choice"] = {"type": "function", "function": {"name": force_tool}}
         headers = {"Content-Type": "application/json"}
         if self.api_key:
             headers["Authorization"] = f"Bearer {self.api_key}"

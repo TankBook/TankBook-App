@@ -536,6 +536,18 @@ export const api = {
       }
       return res.json()
     },
+    draftSpecies: async (name: string): Promise<SpeciesBody> => {
+      const res = await fetch(`${BASE}/agent/species-draft`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name }),
+      })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        throw new Error((err as any).detail ?? `Draft failed: ${res.status}`)
+      }
+      return res.json()
+    },
   },
   auth: {
     config: () => get<AuthConfig>('/auth/config'),

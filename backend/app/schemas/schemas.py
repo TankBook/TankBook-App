@@ -290,6 +290,55 @@ class AgentChatResponse(BaseModel):
     reply: str
 
 
+class SpeciesDraftRequest(BaseModel):
+    name: str
+
+
+class SpeciesDraftRange(BaseModel):
+    min: float | None = None
+    max: float | None = None
+
+
+class SpeciesDraftCare(BaseModel):
+    difficulty: str | None = None
+    min_tank_litres: float | None = None
+    shoal_min: int | None = None
+    group_min: int | None = None
+    max_size_cm: float | None = None
+    lifespan_years: float | None = None
+    growth_rate: str | None = None
+
+
+class SpeciesDraftWater(BaseModel):
+    temp_c: SpeciesDraftRange | None = None
+    ph: SpeciesDraftRange | None = None
+    gh_dgh: SpeciesDraftRange | None = None
+    kh_dkh: SpeciesDraftRange | None = None
+
+
+class SpeciesDraftCompatibility(BaseModel):
+    temperament: str | None = None
+
+
+class SpeciesDraftLight(BaseModel):
+    requirement: str | None = None
+
+
+class SpeciesDraftOut(BaseModel):
+    slug: str
+    common_name: str
+    latin_name: str
+    type: str
+    family: str | None = None
+    origin: str | None = None
+    care: SpeciesDraftCare | None = None
+    water: SpeciesDraftWater | None = None
+    compatibility: SpeciesDraftCompatibility | None = None
+    light: SpeciesDraftLight | None = None
+    co2_required: bool | None = None
+    notes: str | None = None
+
+
 class ConversationOut(BaseModel):
     id: str
     title: str | None = None

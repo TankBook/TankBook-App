@@ -1,5 +1,6 @@
 from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException
+from pydantic import ValidationError
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -7,8 +8,9 @@ from app.models.models import AgentSettings, Conversation, ConversationMessage
 from app.schemas.schemas import (
     AgentSettingsOut, AgentSettingsUpdate, AgentChatRequest, AgentChatResponse,
     ConversationOut, ConversationDetailOut, ChatMessage,
+    SpeciesDraftRequest, SpeciesDraftOut,
 )
-from app.services.agent.agent import run_agent
+from app.services.agent.agent import run_agent, draft_species
 from app.services.agent.errors import AgentNotConfigured, AgentProviderError
 
 router = APIRouter()
@@ -110,3 +112,16 @@ def chat(body: AgentChatRequest, db: Session = Depends(get_db)):
     db.commit()
 
     return AgentChatResponse(conversation_id=conversation.id, reply=reply)
+
+
+@router.post("/species-draft", response_model=SpeciesDraftOut)
+def species_draft(body: SpeciesDraftRequest, db: Session = Depends(get_db)):
+    try:
+        raw = draft_species(db, body.name)
+        return SpeciesDraftOut.model_validate(raw)
+    except AgentNotConfigured as e:
+        raise HTTPException(400, str(e))
+    except AgentProviderError as e:
+        raise HTTPException(502, str(e))
+    except ValidationError:
+        raise HTTPException(502, "The AI's draft didn't come back in the right shape — try again.")

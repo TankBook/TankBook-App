@@ -15,7 +15,7 @@ class AnthropicProvider:
         self.base_url = (base_url or DEFAULT_BASE_URL).rstrip("/")
         self.model = model
 
-    def complete(self, system: str, messages: list[dict], tools: list[dict]) -> AgentResponse:
+    def complete(self, system: str, messages: list[dict], tools: list[dict], force_tool: str | None = None) -> AgentResponse:
         wire_messages: list[dict] = []
         for m in messages:
             if m["role"] == "tool":
@@ -45,6 +45,8 @@ class AnthropicProvider:
                 for t in tools
             ],
         }
+        if force_tool:
+            body["tool_choice"] = {"type": "tool", "name": force_tool}
         headers = {
             "x-api-key": self.api_key,
             "anthropic-version": ANTHROPIC_VERSION,

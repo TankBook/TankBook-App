@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react'
-import { Fish, Leaf, Upload, Link, Shrimp, Bug, Plus, Pencil, X } from 'lucide-react'
-import { Tag, tabStyle, Card, FieldLabel } from '../components/ui'
+import { Fish, Leaf, Upload, Link, Shrimp, Bug, Plus, Pencil, X, Sparkles } from 'lucide-react'
+import { Tag, tabStyle, Card, FieldLabel, Modal } from '../components/ui'
 import { api } from '../api/client'
 import type { SpeciesBody } from '../api/client'
 import { type Species, DifficultyBadge, SpeciesImage, SpeciesDetailModal } from '../components/SpeciesDetail'
@@ -59,6 +59,32 @@ function speciesToForm(s: Species): SpeciesFormData {
   }
 }
 
+function draftToForm(d: SpeciesBody): SpeciesFormData {
+  return {
+    slug: d.slug, common_name: d.common_name, latin_name: d.latin_name, type: d.type,
+    family: d.family ?? '', origin: d.origin ?? '',
+    difficulty: d.care?.difficulty ?? '',
+    min_tank_litres: d.care?.min_tank_litres?.toString() ?? '',
+    shoal_min: d.care?.shoal_min?.toString() ?? '',
+    group_min: d.care?.group_min?.toString() ?? '',
+    max_size_cm: d.care?.max_size_cm?.toString() ?? '',
+    lifespan_years: d.care?.lifespan_years?.toString() ?? '',
+    growth_rate: d.care?.growth_rate ?? '',
+    temp_min: d.water?.temp_c?.min?.toString() ?? '',
+    temp_max: d.water?.temp_c?.max?.toString() ?? '',
+    ph_min: d.water?.ph?.min?.toString() ?? '',
+    ph_max: d.water?.ph?.max?.toString() ?? '',
+    gh_min: d.water?.gh_dgh?.min?.toString() ?? '',
+    gh_max: d.water?.gh_dgh?.max?.toString() ?? '',
+    kh_min: d.water?.kh_dkh?.min?.toString() ?? '',
+    kh_max: d.water?.kh_dkh?.max?.toString() ?? '',
+    temperament: d.compatibility?.temperament ?? '',
+    light_requirement: d.light?.requirement ?? '',
+    co2_required: d.co2_required === true ? 'true' : d.co2_required === false ? 'false' : '',
+    notes: d.notes ?? '',
+  }
+}
+
 function buildSubmitBody(form: SpeciesFormData): SpeciesBody {
   const body: SpeciesBody = {
     slug: form.slug.trim(),
@@ -96,13 +122,14 @@ function buildSubmitBody(form: SpeciesFormData): SpeciesBody {
 
 // ── Species modal ─────────────────────────────────────────────────────────────
 
-function SpeciesModal({ initial, onClose, onSaved }: {
+function SpeciesModal({ initial, initialForm, onClose, onSaved }: {
   initial?: Species | null
+  initialForm?: SpeciesFormData | null
   onClose: () => void
   onSaved: () => void
 }) {
   const isEdit = !!initial
-  const [form, setForm] = useState<SpeciesFormData>(initial ? speciesToForm(initial) : EMPTY_FORM)
+  const [form, setForm] = useState<SpeciesFormData>(initial ? speciesToForm(initial) : initialForm ?? EMPTY_FORM)
   const [slugEdited, setSlugEdited] = useState(isEdit)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -490,6 +517,79 @@ function SpeciesModal({ initial, onClose, onSaved }: {
   )
 }
 
+// ── AI draft modal ────────────────────────────────────────────────────────────
+
+function AIDraftModal({ onClose, onDraft }: {
+  onClose: () => void
+  onDraft: (draft: SpeciesBody) => void
+}) {
+  const [name, setName] = useState('')
+  const [generating, setGenerating] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  async function handleGenerate() {
+    if (!name.trim()) return
+    setGenerating(true)
+    setError(null)
+    try {
+      const draft = await api.agent.draftSpecies(name.trim())
+      onDraft(draft)
+    } catch (e: any) {
+      setError(e.message ?? 'Could not generate a draft')
+    } finally {
+      setGenerating(false)
+    }
+  }
+
+  return (
+    <Modal title="Draft Species with AI" onClose={onClose} width={420}>
+      <p style={{ margin: '0 0 12px', fontSize: 12, color: 'var(--text-2)' }}>
+        Enter a common or scientific name and the configured AI assistant will draft care-sheet
+        data into the Add Species form — you'll be able to review and edit everything before saving.
+      </p>
+      <FieldLabel>Species name</FieldLabel>
+      <input
+        value={name}
+        onChange={e => setName(e.target.value)}
+        onKeyDown={e => { if (e.key === 'Enter' && !generating) handleGenerate() }}
+        placeholder="e.g. Neon Tetra"
+        autoFocus
+        disabled={generating}
+        style={{ width: '100%', boxSizing: 'border-box' }}
+      />
+
+      {error && (
+        <div style={{ marginTop: 12, background: 'var(--red-bg)', border: '0.5px solid var(--red-border)', borderRadius: 8, padding: '8px 12px' }}>
+          <p style={{ margin: 0, fontSize: 12, color: 'var(--red)' }}>{error}</p>
+        </div>
+      )}
+
+      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 16 }}>
+        <button
+          onClick={onClose}
+          style={{ padding: '7px 16px', borderRadius: 8, fontSize: 13, border: '0.5px solid var(--btn-border)', background: 'transparent', color: 'var(--text)', cursor: 'pointer' }}
+        >
+          Cancel
+        </button>
+        <button
+          onClick={handleGenerate}
+          disabled={generating || !name.trim()}
+          style={{
+            display: 'flex', alignItems: 'center', gap: 6,
+            padding: '7px 16px', borderRadius: 8, fontSize: 13, fontWeight: 500,
+            cursor: generating || !name.trim() ? 'default' : 'pointer',
+            border: '0.5px solid var(--blue-border)',
+            background: generating || !name.trim() ? 'var(--surface-2)' : 'var(--blue-bg)',
+            color: generating || !name.trim() ? 'var(--text-3)' : 'var(--blue)',
+          }}
+        >
+          <Sparkles size={13} />{generating ? 'Generating…' : 'Generate'}
+        </button>
+      </div>
+    </Modal>
+  )
+}
+
 // ── Species card ──────────────────────────────────────────────────────────────
 
 function SpeciesCard({ s, onOpen, onEdit }: { s: Species; onOpen: () => void; onEdit: () => void }) {
@@ -592,6 +692,9 @@ export default function SpeciesBrowser() {
   const [editTarget, setEditTarget] = useState<Species | null>(null)
   const [detailTarget, setDetailTarget] = useState<Species | null>(null)
 
+  const [showAIModal, setShowAIModal] = useState(false)
+  const [aiDraftForm, setAiDraftForm] = useState<SpeciesFormData | null>(null)
+
   const [isMobile, setIsMobile] = useState(() => window.matchMedia('(max-width: 768px)').matches)
   useEffect(() => {
     const mq = window.matchMedia('(max-width: 768px)')
@@ -681,6 +784,12 @@ export default function SpeciesBrowser() {
               <Plus size={14} />Add Species
             </button>
             <button
+              onClick={() => setShowAIModal(true)}
+              style={{ display: 'flex', flex: 1, alignItems: 'center', justifyContent: 'center', gap: 6, fontSize: 14, padding: '8px 12px', borderRadius: 8, border: '0.5px solid var(--blue-border)', background: 'transparent', color: 'var(--blue)', cursor: 'pointer', fontWeight: 500 }}
+            >
+              <Sparkles size={14} />AI
+            </button>
+            <button
               onClick={() => fetchAllImages(visible)}
               disabled={fetchAllProgress?.running || visible.length === 0}
               style={{ display: 'flex', flex: 1, alignItems: 'center', justifyContent: 'center', gap: 6, fontSize: 14, padding: '8px 12px', borderRadius: 8, border: '0.5px solid var(--btn-border)', background: 'transparent', cursor: fetchAllProgress?.running || visible.length === 0 ? 'not-allowed' : 'pointer', color: 'var(--text)', opacity: fetchAllProgress?.running || visible.length === 0 ? 0.5 : 1 }}
@@ -712,6 +821,12 @@ export default function SpeciesBrowser() {
               style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 14, padding: '8px 16px', borderRadius: 8, border: '0.5px solid var(--blue-border)', background: 'var(--blue-bg)', color: 'var(--blue)', cursor: 'pointer', fontWeight: 500 }}
             >
               <Plus size={14} />Add Species
+            </button>
+            <button
+              onClick={() => setShowAIModal(true)}
+              style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 14, padding: '8px 16px', borderRadius: 8, border: '0.5px solid var(--blue-border)', background: 'transparent', color: 'var(--blue)', cursor: 'pointer', fontWeight: 500 }}
+            >
+              <Sparkles size={14} />AI
             </button>
             {fetchAllProgress && !fetchAllProgress.running && (
               <span style={{ fontSize: 12, color: fetchAllProgress.failed < fetchAllProgress.total ? 'var(--green)' : 'var(--text-3)', alignSelf: 'center' }}>
@@ -794,8 +909,21 @@ export default function SpeciesBrowser() {
       {modalMode && (
         <SpeciesModal
           initial={modalMode === 'edit' ? editTarget : null}
-          onClose={() => { setModalMode(null); setEditTarget(null) }}
+          initialForm={modalMode === 'add' ? aiDraftForm : null}
+          onClose={() => { setModalMode(null); setEditTarget(null); setAiDraftForm(null) }}
           onSaved={loadSpecies}
+        />
+      )}
+
+      {showAIModal && (
+        <AIDraftModal
+          onClose={() => setShowAIModal(false)}
+          onDraft={draft => {
+            setAiDraftForm(draftToForm(draft))
+            setShowAIModal(false)
+            setEditTarget(null)
+            setModalMode('add')
+          }}
         />
       )}
 
