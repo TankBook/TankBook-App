@@ -1,8 +1,9 @@
 import { useState } from 'react'
-import { CalendarDays, Ruler, UserCircle } from 'lucide-react'
-import { Card } from '../components/ui'
+import { CalendarDays, Ruler, UserCircle, Lock } from 'lucide-react'
+import { Card, FieldLabel } from '../components/ui'
 import { useSettings, formatDate, DateFormat, UnitSystem } from '../context/SettingsContext'
 import { useAuth } from '../context/AuthContext'
+import { api } from '../api/client'
 
 const FORMAT_OPTIONS: { value: DateFormat; label: string }[] = [
   { value: 'DD/MM/YYYY', label: 'DD/MM/YYYY (UK / Europe)' },
@@ -23,6 +24,31 @@ export default function Profile() {
   const [savingDateFormat, setSavingDateFormat] = useState(false)
   const [savingUnitSystem, setSavingUnitSystem] = useState(false)
   const exampleDate = new Date()
+
+  const [currentPassword, setCurrentPassword] = useState('')
+  const [newPassword, setNewPassword] = useState('')
+  const [changingPassword, setChangingPassword] = useState(false)
+  const [passwordSaved, setPasswordSaved] = useState(false)
+  const [passwordError, setPasswordError] = useState<string | null>(null)
+
+  async function changePassword() {
+    setChangingPassword(true)
+    setPasswordSaved(false)
+    setPasswordError(null)
+    try {
+      await api.auth.changePassword({
+        current_password: user?.has_password ? currentPassword : undefined,
+        new_password: newPassword,
+      })
+      setCurrentPassword('')
+      setNewPassword('')
+      setPasswordSaved(true)
+    } catch (e: any) {
+      setPasswordError(e.message ?? 'Could not change password')
+    } finally {
+      setChangingPassword(false)
+    }
+  }
 
   async function pickDateFormat(f: DateFormat) {
     setSavingDateFormat(true)
@@ -79,7 +105,7 @@ export default function Profile() {
           </div>
         </section>
 
-        <section>
+        <section style={{ paddingBottom: 20, borderBottom: '0.5px solid var(--border-sub)' }}>
           <p style={{ fontWeight: 500, fontSize: 14, margin: '0 0 4px', color: 'var(--text)', display: 'flex', alignItems: 'center', gap: 6 }}><Ruler size={14} color="var(--text-2)" />Dimension Units</p>
           <p style={{ fontSize: 12, color: 'var(--text-2)', margin: '0 0 14px' }}>
             Controls how tank dimensions (width, height, depth) are displayed and entered. Changing this converts existing values automatically.
@@ -108,6 +134,50 @@ export default function Profile() {
                 <span style={{ fontSize: 12, color: 'var(--text-2)', fontFamily: 'monospace' }}>{opt.example}</span>
               </label>
             ))}
+          </div>
+        </section>
+
+        <section>
+          <p style={{ fontWeight: 500, fontSize: 14, margin: '0 0 4px', color: 'var(--text)', display: 'flex', alignItems: 'center', gap: 6 }}><Lock size={14} color="var(--text-2)" />Password</p>
+          <p style={{ fontSize: 12, color: 'var(--text-2)', margin: '0 0 14px' }}>
+            Change the password you use to sign in to this account.
+          </p>
+          <div>
+            <FieldLabel>Change your password</FieldLabel>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {user?.has_password && (
+                <input
+                  type="password"
+                  value={currentPassword}
+                  onChange={e => { setCurrentPassword(e.target.value); setPasswordSaved(false) }}
+                  placeholder="Current password"
+                  style={{ width: '100%', boxSizing: 'border-box' }}
+                />
+              )}
+              <input
+                type="password"
+                value={newPassword}
+                onChange={e => { setNewPassword(e.target.value); setPasswordSaved(false) }}
+                placeholder="New password (min. 8 characters)"
+                style={{ width: '100%', boxSizing: 'border-box' }}
+              />
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <button
+                  onClick={changePassword}
+                  disabled={changingPassword || newPassword.length < 8 || (!!user?.has_password && !currentPassword)}
+                  style={{
+                    padding: '7px 16px', borderRadius: 8, fontSize: 13, fontWeight: 500,
+                    cursor: changingPassword ? 'default' : 'pointer',
+                    border: '0.5px solid var(--blue-border)',
+                    background: 'var(--blue-bg)', color: 'var(--blue)',
+                  }}
+                >
+                  {changingPassword ? 'Saving…' : 'Update Password'}
+                </button>
+                {passwordSaved && <span style={{ fontSize: 12, color: 'var(--green)' }}>Password updated</span>}
+                {passwordError && <span style={{ fontSize: 12, color: 'var(--red)' }}>{passwordError}</span>}
+              </div>
+            </div>
           </div>
         </section>
 
