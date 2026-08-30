@@ -64,7 +64,7 @@ function AgentSettingsSection() {
   if (loading) return null
 
   return (
-    <section style={{ paddingBottom: 20, borderBottom: '0.5px solid var(--border-sub)' }}>
+    <section>
       <p style={{ fontWeight: 500, fontSize: 14, margin: '0 0 4px', color: 'var(--text)', display: 'flex', alignItems: 'center', gap: 6 }}><Bot size={14} color="var(--text-2)" />AI Assistant</p>
       <p style={{ fontSize: 12, color: 'var(--text-2)', margin: '0 0 14px' }}>
         Connect an LLM to power the Assistant page, which can answer diagnostic questions using your tank data. The provider you choose is called directly from this server — its API key is stored here, not sent anywhere else.
@@ -673,6 +673,7 @@ const UNIT_OPTIONS: { value: UnitSystem; label: string; example: string }[] = [
 
 const SETTINGS_TABS: { id: string; label: string; icon: LucideIcon }[] = [
   { id: 'general', label: 'General', icon: SlidersHorizontal },
+  { id: 'ai', label: 'AI', icon: Bot },
   { id: 'users', label: 'Users', icon: UsersIcon },
   { id: 'about', label: 'About', icon: Info },
 ]
@@ -856,7 +857,7 @@ export default function Settings() {
 
         <Card style={{ width: isMobile ? '100%' : 200, flexShrink: 0, padding: 8, boxSizing: 'border-box' }}>
           <div style={{ display: 'flex', flexDirection: isMobile ? 'row' : 'column', gap: 2, overflowX: isMobile ? 'auto' : 'visible' }}>
-            {SETTINGS_TABS.map(t => (
+            {SETTINGS_TABS.filter(t => t.id !== 'ai' || canEditAi).map(t => (
               <button
                 key={t.id}
                 onClick={() => setActiveTab(t.id)}
@@ -995,8 +996,6 @@ export default function Settings() {
 
         <AccessSettingsSection />
 
-        {canEditAi && <AgentSettingsSection />}
-
         <section style={{ paddingBottom: 20, borderBottom: '0.5px solid var(--border-sub)' }}>
           <p style={{ fontWeight: 500, fontSize: 14, margin: '0 0 4px', color: 'var(--text)', display: 'flex', alignItems: 'center', gap: 6 }}><Utensils size={14} color="var(--text-2)" />Feeding Amounts</p>
           <p style={{ fontSize: 12, color: 'var(--text-2)', margin: '0 0 14px' }}>
@@ -1079,6 +1078,12 @@ export default function Settings() {
         {activeTab === 'users' && (
       <Card style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 16, padding: 24, flex: 1, minWidth: 0, width: '100%', boxSizing: 'border-box' }}>
         <UsersSection />
+      </Card>
+        )}
+
+        {activeTab === 'ai' && canEditAi && (
+      <Card style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 16, padding: 24, flex: 1, minWidth: 0, width: '100%', boxSizing: 'border-box' }}>
+        <AgentSettingsSection />
       </Card>
         )}
 
