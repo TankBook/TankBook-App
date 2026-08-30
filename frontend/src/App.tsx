@@ -345,7 +345,6 @@ const NAV_LINKS: [string, string, LucideIcon][] = [
 
 function Nav() {
   const { pathname } = useLocation()
-  const { theme, toggleTheme } = useSettings()
   const { logout, user } = useAuth()
   const [menuOpen, setMenuOpen] = useState(false)
   const [isMobile, setIsMobile] = useState(() => window.matchMedia('(max-width: 1280px)').matches)
@@ -396,19 +395,6 @@ function Nav() {
       <QuickAdd />
 
       <button
-        onClick={toggleTheme}
-        title={theme === 'light' ? 'Switch to dark mode' : 'Switch to light mode'}
-        style={{
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          padding: '6px', border: '0.5px solid var(--border)', borderRadius: 8,
-          background: 'transparent', color: 'var(--text-2)',
-          cursor: 'pointer', lineHeight: 0, marginRight: 4,
-        }}
-      >
-        {theme === 'light' ? <Moon size={16} /> : <Sun size={16} />}
-      </button>
-
-      <button
         onClick={() => logout()}
         title="Log out"
         style={{
@@ -452,6 +438,7 @@ function Nav() {
 }
 
 function Footer() {
+  const { theme, toggleTheme } = useSettings()
   return (
     <footer style={{
       borderTop: '0.5px solid var(--border)',
@@ -467,25 +454,39 @@ function Footer() {
         <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)', letterSpacing: '0.04em' }}>TANKBOOK</span>
         <span style={{ fontSize: 12, color: 'var(--text-2)' }}>© {new Date().getFullYear()}</span>
       </span>
-      <a
-        href="https://github.com/TankBook/TankBook-App"
-        target="_blank"
-        rel="noopener noreferrer"
-        style={{
-          display: 'flex', alignItems: 'center', gap: 6,
-          fontSize: 12, color: 'var(--text-2)', textDecoration: 'none',
-          padding: '5px 12px', borderRadius: 8,
-          border: '0.5px solid var(--border)',
-          background: 'transparent',
-          cursor: 'pointer',
-          transition: 'color 0.15s, border-color 0.15s',
-        }}
-        onMouseEnter={e => { (e.currentTarget as HTMLAnchorElement).style.color = 'var(--blue)'; (e.currentTarget as HTMLAnchorElement).style.borderColor = 'var(--blue-border)' }}
-        onMouseLeave={e => { (e.currentTarget as HTMLAnchorElement).style.color = 'var(--text-2)'; (e.currentTarget as HTMLAnchorElement).style.borderColor = 'var(--border)' }}
-      >
-        <GitHubIcon size={14} />
-        GitHub
-      </a>
+      <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <button
+          onClick={toggleTheme}
+          title={theme === 'light' ? 'Switch to dark mode' : 'Switch to light mode'}
+          style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            padding: '6px', border: '0.5px solid var(--border)', borderRadius: 8,
+            background: 'transparent', color: 'var(--text-2)',
+            cursor: 'pointer', lineHeight: 0,
+          }}
+        >
+          {theme === 'light' ? <Moon size={16} /> : <Sun size={16} />}
+        </button>
+        <a
+          href="https://github.com/TankBook/TankBook-App"
+          target="_blank"
+          rel="noopener noreferrer"
+          style={{
+            display: 'flex', alignItems: 'center', gap: 6,
+            fontSize: 12, color: 'var(--text-2)', textDecoration: 'none',
+            padding: '5px 12px', borderRadius: 8,
+            border: '0.5px solid var(--border)',
+            background: 'transparent',
+            cursor: 'pointer',
+            transition: 'color 0.15s, border-color 0.15s',
+          }}
+          onMouseEnter={e => { (e.currentTarget as HTMLAnchorElement).style.color = 'var(--blue)'; (e.currentTarget as HTMLAnchorElement).style.borderColor = 'var(--blue-border)' }}
+          onMouseLeave={e => { (e.currentTarget as HTMLAnchorElement).style.color = 'var(--text-2)'; (e.currentTarget as HTMLAnchorElement).style.borderColor = 'var(--border)' }}
+        >
+          <GitHubIcon size={14} />
+          GitHub
+        </a>
+      </span>
     </footer>
   )
 }
