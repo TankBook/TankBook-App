@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session as DBSession
 from app.database import get_db
 from app.models.models import User, AuthSettings
 from app.schemas.schemas import (
-    RegisterRequest, LoginRequest, ChangePasswordRequest, UserOut, UserListItemOut,
+    RegisterRequest, LoginRequest, ChangePasswordRequest, UserOut, UserListItemOut, UserUpdateRequest,
     AuthConfigOut, AuthSettingsOut, AuthSettingsUpdate,
 )
 from app.services.auth import (
@@ -22,6 +22,14 @@ MIN_PASSWORD_LENGTH = 8
 
 def _to_out(user: User) -> UserOut:
     return UserOut(id=user.id, email=user.email, display_name=user.display_name, has_password=bool(user.password_hash))
+
+
+def _to_list_item(user: User) -> UserListItemOut:
+    return UserListItemOut(
+        id=user.id, email=user.email, display_name=user.display_name,
+        has_password=bool(user.password_hash), has_oidc=bool(user.oidc_subject),
+        created_at=user.created_at, last_login_at=user.last_login_at,
+    )
 
 
 def _settings_to_out(settings: AuthSettings) -> AuthSettingsOut:
@@ -95,14 +103,43 @@ def me(user: User = Depends(get_current_user)):
 @router.get("/users", response_model=list[UserListItemOut])
 def list_users(db: DBSession = Depends(get_db), _user: User = Depends(get_current_user)):
     users = db.query(User).order_by(User.created_at.asc()).all()
-    return [
-        UserListItemOut(
-            id=u.id, email=u.email, display_name=u.display_name,
-            has_password=bool(u.password_hash), has_oidc=bool(u.oidc_subject),
-            created_at=u.created_at, last_login_at=u.last_login_at,
-        )
-        for u in users
-    ]
+    return [_to_list_item(u) for u in users]
+
+
+@router.patch("/users/{user_id}", response_model=UserListItemOut)
+def update_user(user_id: str, body: UserUpdateRequest, db: DBSession = Depends(get_db), _user: User = Depends(get_current_user)):
+    target = db.query(User).filter_by(id=user_id).first()
+    if not target:
+        raise HTTPException(404, "User not found")
+
+    data = body.model_dump(exclude_unset=True)
+    if "email" in data:
+        email = (data["email"] or "").strip().lower()
+        if not email or "@" not in email:
+            raise HTTPException(422, "Enter a valid email address")
+        existing = db.query(User).filter(User.email == email, User.id != target.id).first()
+        if existing:
+            raise HTTPException(409, "An account with that email already exists")
+        target.email = email
+    if "display_name" in data:
+        target.display_name = data["display_name"] or None
+
+    db.commit()
+    db.refresh(target)
+    return _to_list_item(target)
+
+
+@router.delete("/users/{user_id}", status_code=204)
+def delete_user(user_id: str, db: DBSession = Depends(get_db), user: User = Depends(get_current_user)):
+    if user_id == user.id:
+        raise HTTPException(400, "You can't delete your own account from here")
+    target = db.query(User).filter_by(id=user_id).first()
+    if not target:
+        raise HTTPException(404, "User not found")
+    if db.query(User).count() <= 1:
+        raise HTTPException(400, "Can't delete the only remaining account")
+    db.delete(target)
+    db.commit()
 
 
 @router.post("/change-password", response_model=UserOut)

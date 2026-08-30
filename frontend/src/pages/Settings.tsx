@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
-import { CalendarDays, Ruler, Info, Download, Upload, Droplets, RefreshCw, Bell, Globe, Utensils, X, AlertTriangle, HardDrive, Fish, Image as ImageIcon, Bot, Lock, SlidersHorizontal, Users as UsersIcon, KeyRound, type LucideIcon } from 'lucide-react'
+import { CalendarDays, Ruler, Info, Download, Upload, Droplets, RefreshCw, Bell, Globe, Utensils, X, AlertTriangle, HardDrive, Fish, Image as ImageIcon, Bot, Lock, SlidersHorizontal, Users as UsersIcon, KeyRound, Pencil, Trash2, type LucideIcon } from 'lucide-react'
 import { useSettings, formatDate, formatDateTime, DateFormat, UnitSystem } from '../context/SettingsContext'
-import { Card, Modal, StatCard, FieldLabel } from '../components/ui'
+import { Card, Modal, ConfirmDialog, StatCard, FieldLabel } from '../components/ui'
 import { api, Tank, AgentSettings, AuthSettings, UserListItem } from '../api/client'
 import { useAuth } from '../context/AuthContext'
 
@@ -247,8 +247,18 @@ function AccessSettingsSection() {
 
 function UsersSection() {
   const { dateFormat } = useSettings()
+  const { user: currentUser } = useAuth()
   const [users, setUsers] = useState<UserListItem[]>([])
   const [loadingUsers, setLoadingUsers] = useState(true)
+
+  const [editingUser, setEditingUser] = useState<UserListItem | null>(null)
+  const [editEmail, setEditEmail] = useState('')
+  const [editDisplayName, setEditDisplayName] = useState('')
+  const [savingEdit, setSavingEdit] = useState(false)
+  const [editError, setEditError] = useState<string | null>(null)
+
+  const [deletingUser, setDeletingUser] = useState<UserListItem | null>(null)
+  const [deleteError, setDeleteError] = useState<string | null>(null)
 
   const [authSettings, setAuthSettings] = useState<AuthSettings | null>(null)
   const [issuerUrl, setIssuerUrl] = useState('')
@@ -260,8 +270,12 @@ function UsersSection() {
   const [oidcSaved, setOidcSaved] = useState(false)
   const [oidcError, setOidcError] = useState<string | null>(null)
 
+  function refreshUsers() {
+    return api.auth.listUsers().then(setUsers).catch(() => {})
+  }
+
   useEffect(() => {
-    api.auth.listUsers().then(setUsers).catch(() => {}).finally(() => setLoadingUsers(false))
+    refreshUsers().finally(() => setLoadingUsers(false))
     api.auth.getSettings()
       .then(s => {
         setAuthSettings(s)
@@ -294,6 +308,43 @@ function UsersSection() {
     }
   }
 
+  function openEdit(u: UserListItem) {
+    setEditingUser(u)
+    setEditEmail(u.email)
+    setEditDisplayName(u.display_name ?? '')
+    setEditError(null)
+  }
+
+  async function saveEdit() {
+    if (!editingUser) return
+    setSavingEdit(true)
+    setEditError(null)
+    try {
+      const updated = await api.auth.updateUser(editingUser.id, {
+        email: editEmail.trim(),
+        display_name: editDisplayName.trim() || null,
+      })
+      setUsers(us => us.map(u => (u.id === updated.id ? updated : u)))
+      setEditingUser(null)
+    } catch (e: any) {
+      setEditError(e.message ?? 'Could not save changes')
+    } finally {
+      setSavingEdit(false)
+    }
+  }
+
+  async function confirmDelete() {
+    if (!deletingUser) return
+    setDeleteError(null)
+    try {
+      await api.auth.deleteUser(deletingUser.id)
+      setUsers(us => us.filter(u => u.id !== deletingUser.id))
+      setDeletingUser(null)
+    } catch (e: any) {
+      setDeleteError(e.message ?? 'Could not delete user')
+    }
+  }
+
   return (
     <>
       <section style={{ paddingBottom: 20, borderBottom: '0.5px solid var(--border-sub)' }}>
@@ -314,6 +365,7 @@ function UsersSection() {
                   <th style={{ textAlign: 'left', padding: '6px 10px', color: 'var(--text-2)', fontWeight: 500, fontSize: 11, borderBottom: '0.5px solid var(--border)' }}>Method</th>
                   <th style={{ textAlign: 'left', padding: '6px 10px', color: 'var(--text-2)', fontWeight: 500, fontSize: 11, borderBottom: '0.5px solid var(--border)' }}>Joined</th>
                   <th style={{ textAlign: 'left', padding: '6px 10px', color: 'var(--text-2)', fontWeight: 500, fontSize: 11, borderBottom: '0.5px solid var(--border)' }}>Last login</th>
+                  <th style={{ textAlign: 'right', padding: '6px 10px', color: 'var(--text-2)', fontWeight: 500, fontSize: 11, borderBottom: '0.5px solid var(--border)' }}></th>
                 </tr>
               </thead>
               <tbody>
@@ -330,6 +382,27 @@ function UsersSection() {
                     <td style={{ padding: '8px 10px', color: 'var(--text-2)', borderBottom: '0.5px solid var(--border-sub)' }}>{formatDate(u.created_at, dateFormat)}</td>
                     <td style={{ padding: '8px 10px', color: 'var(--text-2)', borderBottom: '0.5px solid var(--border-sub)' }}>
                       {u.last_login_at ? formatDateTime(u.last_login_at, dateFormat) : 'Never'}
+                    </td>
+                    <td style={{ padding: '8px 10px', borderBottom: '0.5px solid var(--border-sub)', textAlign: 'right', whiteSpace: 'nowrap' }}>
+                      <button
+                        onClick={() => openEdit(u)}
+                        title="Edit user"
+                        style={{ display: 'inline-flex', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-3)', padding: 4, lineHeight: 0 }}
+                      >
+                        <Pencil size={14} />
+                      </button>
+                      <button
+                        onClick={() => { setDeletingUser(u); setDeleteError(null) }}
+                        title={u.id === currentUser?.id ? "You can't delete your own account here" : 'Delete user'}
+                        disabled={u.id === currentUser?.id}
+                        style={{
+                          display: 'inline-flex', background: 'none', border: 'none', padding: 4, lineHeight: 0,
+                          cursor: u.id === currentUser?.id ? 'not-allowed' : 'pointer',
+                          color: u.id === currentUser?.id ? 'var(--text-4)' : 'var(--text-3)',
+                        }}
+                      >
+                        <Trash2 size={14} />
+                      </button>
                     </td>
                   </tr>
                 ))}
@@ -403,6 +476,67 @@ function UsersSection() {
             </div>
           </div>
         </section>
+      )}
+
+      {editingUser && (
+        <Modal title="Edit User" onClose={() => setEditingUser(null)} width={380}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <div>
+              <FieldLabel>Name</FieldLabel>
+              <input
+                value={editDisplayName}
+                onChange={e => setEditDisplayName(e.target.value)}
+                style={{ width: '100%', boxSizing: 'border-box' }}
+              />
+            </div>
+            <div>
+              <FieldLabel>Email</FieldLabel>
+              <input
+                type="email"
+                value={editEmail}
+                onChange={e => setEditEmail(e.target.value)}
+                style={{ width: '100%', boxSizing: 'border-box' }}
+              />
+            </div>
+            {editError && <p style={{ margin: 0, fontSize: 12, color: 'var(--red)' }}>{editError}</p>}
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 6 }}>
+              <button
+                onClick={() => setEditingUser(null)}
+                style={{
+                  fontSize: 13, padding: '7px 16px', borderRadius: 8,
+                  border: '0.5px solid var(--btn-border)', background: 'transparent', color: 'var(--text)',
+                  cursor: 'pointer',
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={saveEdit}
+                disabled={savingEdit || !editEmail.trim()}
+                style={{
+                  fontSize: 13, padding: '7px 16px', borderRadius: 8, fontWeight: 500,
+                  border: '0.5px solid var(--blue-border)',
+                  background: savingEdit || !editEmail.trim() ? 'var(--surface-2)' : 'var(--blue-bg)',
+                  color: savingEdit || !editEmail.trim() ? 'var(--text-3)' : 'var(--blue)',
+                  cursor: savingEdit || !editEmail.trim() ? 'default' : 'pointer',
+                }}
+              >
+                {savingEdit ? 'Saving…' : 'Save'}
+              </button>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {deletingUser && (
+        <ConfirmDialog
+          title="Delete user?"
+          message={`This permanently deletes the account for ${deletingUser.display_name || deletingUser.email}. This can't be undone.${deleteError ? ` ${deleteError}.` : ''}`}
+          confirmLabel="Delete"
+          danger
+          onConfirm={confirmDelete}
+          onCancel={() => setDeletingUser(null)}
+        />
       )}
     </>
   )

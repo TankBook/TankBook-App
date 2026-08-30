@@ -443,6 +443,11 @@ class UserListItemOut(BaseModel):
     last_login_at: datetime | None = None
 
 
+class UserUpdateRequest(BaseModel):
+    email: str | None = None
+    display_name: str | None = None
+
+
 class AuthConfigOut(BaseModel):
     allow_registration_effective: bool
     oidc_enabled: bool

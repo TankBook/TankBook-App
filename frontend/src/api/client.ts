@@ -549,5 +549,8 @@ export const api = {
     getSettings: () => get<AuthSettings>('/auth/settings'),
     updateSettings: (body: AuthSettingsUpdate) => patch<AuthSettings>('/auth/settings', body),
     listUsers: () => get<UserListItem[]>('/auth/users'),
+    updateUser: (id: string, body: { email?: string; display_name?: string | null }) =>
+      patch<UserListItem>(`/auth/users/${id}`, body),
+    deleteUser: (id: string) => del(`/auth/users/${id}`),
   },
 }
