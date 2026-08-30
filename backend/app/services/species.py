@@ -1,5 +1,6 @@
 import yaml
 from pathlib import Path
+from sqlalchemy.orm import Session
 
 
 class SpeciesService:
@@ -64,3 +65,28 @@ class SpeciesService:
 
 
 species_service = SpeciesService()
+
+
+def check_compatibility(db: Session, tank_id: str, slug: str) -> dict:
+    """Check if a species slug is compatible with existing fish in a tank."""
+    from app.models.models import TankFish
+
+    incoming = species_service.get(slug)
+    if not incoming:
+        return {"warnings": [], "errors": [f"Unknown species: {slug}"]}
+
+    existing_fish = db.query(TankFish).filter_by(tank_id=tank_id).all()
+    warnings = []
+    for row in existing_fish:
+        existing = species_service.get(row.species_slug)
+        if not existing:
+            continue
+        compat = incoming.get("compatibility", {})
+        incompat_list = compat.get("incompatible_with", [])
+        if existing["slug"] in incompat_list:
+            warnings.append(f"{incoming['common_name']} is incompatible with {existing['common_name']} already in this tank.")
+        existing_incompat = existing.get("compatibility", {}).get("incompatible_with", [])
+        if incoming["slug"] in existing_incompat:
+            warnings.append(f"{existing['common_name']} (already in tank) is incompatible with {incoming['common_name']}.")
+
+    return {"warnings": list(set(warnings)), "errors": []}

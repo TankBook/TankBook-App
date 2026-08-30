@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { BrowserRouter, Routes, Route, Link, useLocation } from 'react-router-dom'
-import { LayoutDashboard, BookOpen, Cog, NotebookPen, ShieldCheck, Calculator, Receipt, Menu, X, Plus, Fish, Droplets, ChevronLeft, Package, Building, Sun, Moon, type LucideIcon } from 'lucide-react'
+import { LayoutDashboard, BookOpen, Cog, NotebookPen, ShieldCheck, Calculator, Receipt, Menu, X, Plus, Fish, Droplets, ChevronLeft, Package, Building, Sun, Moon, Bot, type LucideIcon } from 'lucide-react'
 import { api } from './api/client'
 import RoomLayout from './pages/RoomLayout'
 import RoomDetail from './pages/RoomDetail'
@@ -35,6 +35,7 @@ import LivestockJournal from './pages/LivestockJournal'
 import CompatibilityChecker from './pages/CompatibilityChecker'
 import Calculators from './pages/Calculators'
 import Inventory from './pages/Inventory'
+import Assistant from './pages/Assistant'
 import UpdateToast from './components/UpdateToast'
 import { SettingsProvider, useSettings } from './context/SettingsContext'
 
@@ -348,6 +349,7 @@ const NAV_LINKS: [string, string, LucideIcon][] = [
   ['/calculators', 'Calculators', Calculator],
   ['/spending', 'Spending', Receipt],
   ['/inventory', 'Inventory', Package],
+  ['/assistant', 'Assistant', Bot],
 ]
 
 function Nav() {
@@ -500,6 +502,7 @@ export default function App() {
               <Route path="/settings" element={<Settings />} />
               <Route path="/spending" element={<SpendingTracker />} />
               <Route path="/inventory" element={<Inventory />} />
+              <Route path="/assistant" element={<Assistant />} />
             </Routes>
           </div>
           <Footer />

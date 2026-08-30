@@ -1,8 +1,142 @@
 import { useState, useRef, useEffect } from 'react'
-import { CalendarDays, Ruler, Info, Download, Upload, Droplets, RefreshCw, Bell, Globe, Utensils, X, AlertTriangle, HardDrive, Fish, Image as ImageIcon } from 'lucide-react'
+import { CalendarDays, Ruler, Info, Download, Upload, Droplets, RefreshCw, Bell, Globe, Utensils, X, AlertTriangle, HardDrive, Fish, Image as ImageIcon, Bot } from 'lucide-react'
 import { useSettings, formatDate, DateFormat, UnitSystem } from '../context/SettingsContext'
-import { Card, Modal, StatCard } from '../components/ui'
-import { api, Tank } from '../api/client'
+import { Card, Modal, StatCard, FieldLabel } from '../components/ui'
+import { api, Tank, AgentSettings } from '../api/client'
+
+const PROVIDER_OPTIONS: { value: 'anthropic' | 'openai' | 'ollama'; label: string }[] = [
+  { value: 'anthropic', label: 'Claude (Anthropic)' },
+  { value: 'openai', label: 'OpenAI' },
+  { value: 'ollama', label: 'Ollama (local / self-hosted)' },
+]
+
+const MODEL_PLACEHOLDER: Record<string, string> = {
+  anthropic: 'e.g. claude-sonnet-4-5-20250929',
+  openai: 'e.g. gpt-4o',
+  ollama: 'e.g. llama3.1',
+}
+
+function AgentSettingsSection() {
+  const [settings, setSettings] = useState<AgentSettings | null>(null)
+  const [provider, setProvider] = useState<'anthropic' | 'openai' | 'ollama'>('anthropic')
+  const [model, setModel] = useState('')
+  const [baseUrl, setBaseUrl] = useState('')
+  const [apiKey, setApiKey] = useState('')
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+  const [saved, setSaved] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    api.agent.getSettings()
+      .then(s => {
+        setSettings(s)
+        setProvider(s.provider ?? 'anthropic')
+        setModel(s.model ?? '')
+        setBaseUrl(s.base_url ?? '')
+      })
+      .catch(() => setError('Could not load assistant settings'))
+      .finally(() => setLoading(false))
+  }, [])
+
+  async function save() {
+    setSaving(true)
+    setSaved(false)
+    setError(null)
+    try {
+      const updated = await api.agent.updateSettings({
+        provider,
+        model: model.trim(),
+        base_url: baseUrl.trim() || null,
+        ...(apiKey.trim() ? { api_key: apiKey.trim() } : {}),
+      })
+      setSettings(updated)
+      setApiKey('')
+      setSaved(true)
+    } catch {
+      setError('Could not save assistant settings')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  if (loading) return null
+
+  return (
+    <section style={{ paddingBottom: 20, borderBottom: '0.5px solid var(--border-sub)' }}>
+      <p style={{ fontWeight: 500, fontSize: 14, margin: '0 0 4px', color: 'var(--text)', display: 'flex', alignItems: 'center', gap: 6 }}><Bot size={14} color="var(--text-2)" />AI Assistant</p>
+      <p style={{ fontSize: 12, color: 'var(--text-2)', margin: '0 0 14px' }}>
+        Connect an LLM to power the Assistant page, which can answer diagnostic questions using your tank data. The provider you choose is called directly from this server — its API key is stored here, not sent anywhere else.
+      </p>
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        <div>
+          <FieldLabel>Provider</FieldLabel>
+          <select
+            value={provider}
+            onChange={e => { setProvider(e.target.value as typeof provider); setSaved(false) }}
+            style={{ width: '100%' }}
+          >
+            {PROVIDER_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+          </select>
+        </div>
+
+        <div>
+          <FieldLabel>Model</FieldLabel>
+          <input
+            value={model}
+            onChange={e => { setModel(e.target.value); setSaved(false) }}
+            placeholder={MODEL_PLACEHOLDER[provider]}
+            style={{ width: '100%', boxSizing: 'border-box' }}
+          />
+        </div>
+
+        {(provider === 'ollama' || provider === 'openai') && (
+          <div>
+            <FieldLabel>{provider === 'ollama' ? 'Base URL' : 'Base URL (optional override)'}</FieldLabel>
+            <input
+              value={baseUrl}
+              onChange={e => { setBaseUrl(e.target.value); setSaved(false) }}
+              placeholder={provider === 'ollama' ? 'e.g. http://192.168.1.50:11434/v1' : 'https://api.openai.com/v1'}
+              style={{ width: '100%', boxSizing: 'border-box' }}
+            />
+          </div>
+        )}
+
+        {provider !== 'ollama' && (
+          <div>
+            <FieldLabel>API Key</FieldLabel>
+            <input
+              type="password"
+              value={apiKey}
+              onChange={e => { setApiKey(e.target.value); setSaved(false) }}
+              placeholder={settings?.api_key_set ? 'Key saved — enter a new key to replace it' : 'sk-…'}
+              style={{ width: '100%', boxSizing: 'border-box' }}
+            />
+          </div>
+        )}
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 4 }}>
+          <button
+            onClick={save}
+            disabled={saving || !model.trim()}
+            style={{
+              padding: '7px 16px', borderRadius: 8, fontSize: 13, fontWeight: 500,
+              cursor: saving || !model.trim() ? 'default' : 'pointer',
+              border: '0.5px solid var(--blue-border)',
+              background: !saving && model.trim() ? 'var(--blue-bg)' : 'var(--surface-2)',
+              color: !saving && model.trim() ? 'var(--blue)' : 'var(--text-3)',
+            }}
+          >
+            {saving ? 'Saving…' : 'Save Assistant Settings'}
+          </button>
+          {saved && <span style={{ fontSize: 12, color: 'var(--green)' }}>Saved</span>}
+          {error && <span style={{ fontSize: 12, color: 'var(--red)' }}>{error}</span>}
+        </div>
+      </div>
+    </section>
+  )
+}
 
 function formatBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`
@@ -327,6 +461,8 @@ export default function Settings() {
             style={{ width: '100%', boxSizing: 'border-box' }}
           />
         </section>
+
+        <AgentSettingsSection />
 
         <section style={{ paddingBottom: 20, borderBottom: '0.5px solid var(--border-sub)' }}>
           <p style={{ fontWeight: 500, fontSize: 14, margin: '0 0 4px', color: 'var(--text)', display: 'flex', alignItems: 'center', gap: 6 }}><Utensils size={14} color="var(--text-2)" />Feeding Amounts</p>

@@ -212,6 +212,43 @@ class AppSettings(Base):
         return json.loads(self.feeding_amount_presets_json)
 
 
+class AgentSettings(Base):
+    """Single-row table holding the configured LLM provider for the AI assistant."""
+    __tablename__ = "agent_settings"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: "default")
+    provider: Mapped[str | None] = mapped_column(String, nullable=True)  # "anthropic" | "openai" | "ollama"
+    model: Mapped[str | None] = mapped_column(String, nullable=True)
+    base_url: Mapped[str | None] = mapped_column(String, nullable=True)
+    api_key: Mapped[str | None] = mapped_column(Text, nullable=True)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class Conversation(Base):
+    __tablename__ = "conversations"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=new_uuid)
+    title: Mapped[str | None] = mapped_column(String, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    messages: Mapped[list["ConversationMessage"]] = relationship(
+        back_populates="conversation", cascade="all, delete-orphan", order_by="ConversationMessage.created_at"
+    )
+
+
+class ConversationMessage(Base):
+    __tablename__ = "conversation_messages"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=new_uuid)
+    conversation_id: Mapped[str] = mapped_column(String, ForeignKey("conversations.id", ondelete="CASCADE"), nullable=False)
+    role: Mapped[str] = mapped_column(String, nullable=False)  # "user" | "assistant"
+    content: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    conversation: Mapped["Conversation"] = relationship(back_populates="messages")
+
+
 class Expense(Base):
     __tablename__ = "expenses"
 

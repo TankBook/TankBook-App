@@ -193,6 +193,37 @@ export interface Alert {
   triggered_at: string
 }
 
+export interface AgentSettings {
+  provider: 'anthropic' | 'openai' | 'ollama' | null
+  model: string | null
+  base_url: string | null
+  api_key_set: boolean
+  updated_at: string
+}
+
+export interface AgentSettingsUpdate {
+  provider?: 'anthropic' | 'openai' | 'ollama'
+  model?: string
+  base_url?: string | null
+  api_key?: string | null
+}
+
+export interface ChatMessage {
+  role: 'user' | 'assistant'
+  content: string
+}
+
+export interface Conversation {
+  id: string
+  title: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface ConversationDetail extends Conversation {
+  messages: (ChatMessage & { created_at: string })[]
+}
+
 // --- Fetch helpers ---
 
 const BASE = '/api'
@@ -417,5 +448,24 @@ export const api = {
     setTankPosition: (tankId: string, body: { room_id: string; x: number; y: number }) =>
       put<RoomTankPosition>(`/rooms/tank-positions/${tankId}`, body),
     unassignTank: (tankId: string) => del(`/rooms/tank-positions/${tankId}`),
+  },
+  agent: {
+    getSettings: () => get<AgentSettings>('/agent/settings'),
+    updateSettings: (body: AgentSettingsUpdate) => put<AgentSettings>('/agent/settings', body),
+    listConversations: () => get<Conversation[]>('/agent/conversations'),
+    getConversation: (id: string) => get<ConversationDetail>(`/agent/conversations/${id}`),
+    deleteConversation: (id: string) => del(`/agent/conversations/${id}`),
+    chat: async (message: string, conversationId?: string | null): Promise<{ conversation_id: string; reply: string }> => {
+      const res = await fetch(`${BASE}/agent/chat`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message, conversation_id: conversationId ?? null }),
+      })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        throw new Error((err as any).detail ?? `Chat failed: ${res.status}`)
+      }
+      return res.json()
+    },
   },
 }

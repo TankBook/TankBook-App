@@ -6,8 +6,8 @@ from fastapi import FastAPI, Depends
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 
-from app.routers import tanks, fish, plants, parameters, alerts, species, maintenance, settings, daily_tasks, journal, backup, images, spending, inventory, rooms, tap_water
-from app.services.species import species_service
+from app.routers import tanks, fish, plants, parameters, alerts, species, maintenance, settings, daily_tasks, journal, backup, images, spending, inventory, rooms, tap_water, agent
+from app.services.species import species_service, check_compatibility
 from app.database import get_db
 
 
@@ -42,31 +42,12 @@ app.include_router(spending.router, prefix="/api", tags=["spending"])
 app.include_router(inventory.router, prefix="/api/inventory", tags=["inventory"])
 app.include_router(rooms.router, prefix="/api/rooms", tags=["rooms"])
 app.include_router(tap_water.router, prefix="/api/tap-water", tags=["tap_water"])
+app.include_router(agent.router, prefix="/api/agent", tags=["agent"])
 
 
 @app.get("/api/tanks/{tank_id}/compatibility")
-def check_compatibility(tank_id: str, slug: str, db=Depends(get_db)):
-    """Check if a species slug is compatible with existing fish in a tank."""
-    from app.models.models import TankFish
-    incoming = species_service.get(slug)
-    if not incoming:
-        return {"warnings": [], "errors": [f"Unknown species: {slug}"]}
-
-    existing_fish = db.query(TankFish).filter_by(tank_id=tank_id).all()
-    warnings = []
-    for row in existing_fish:
-        existing = species_service.get(row.species_slug)
-        if not existing:
-            continue
-        compat = incoming.get("compatibility", {})
-        incompat_list = compat.get("incompatible_with", [])
-        if existing["slug"] in incompat_list:
-            warnings.append(f"{incoming['common_name']} is incompatible with {existing['common_name']} already in this tank.")
-        existing_incompat = existing.get("compatibility", {}).get("incompatible_with", [])
-        if incoming["slug"] in existing_incompat:
-            warnings.append(f"{existing['common_name']} (already in tank) is incompatible with {incoming['common_name']}.")
-
-    return {"warnings": list(set(warnings)), "errors": []}
+def get_compatibility(tank_id: str, slug: str, db=Depends(get_db)):
+    return check_compatibility(db, tank_id, slug)
 
 
 @app.get("/api/health")

@@ -257,6 +257,58 @@ class SettingsStatsOut(BaseModel):
     storage_bytes: int
 
 
+# --- Agent ---
+
+class AgentSettingsUpdate(BaseModel):
+    provider: Literal["anthropic", "openai", "ollama"] | None = None
+    model: str | None = None
+    base_url: str | None = None
+    api_key: str | None = None
+
+
+class AgentSettingsOut(BaseModel):
+    provider: str | None = None
+    model: str | None = None
+    base_url: str | None = None
+    api_key_set: bool = False
+    updated_at: datetime
+    model_config = {"from_attributes": True}
+
+
+class ChatMessage(BaseModel):
+    role: Literal["user", "assistant"]
+    content: str
+
+
+class AgentChatRequest(BaseModel):
+    conversation_id: str | None = None
+    message: str
+
+
+class AgentChatResponse(BaseModel):
+    conversation_id: str
+    reply: str
+
+
+class ConversationOut(BaseModel):
+    id: str
+    title: str | None = None
+    created_at: datetime
+    updated_at: datetime
+    model_config = {"from_attributes": True}
+
+
+class ConversationMessageOut(BaseModel):
+    role: str
+    content: str
+    created_at: datetime
+    model_config = {"from_attributes": True}
+
+
+class ConversationDetailOut(ConversationOut):
+    messages: list[ConversationMessageOut] = []
+
+
 # --- Rooms ---
 
 class RoomCreate(BaseModel):
