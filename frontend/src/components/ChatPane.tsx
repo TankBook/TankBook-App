@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { Send } from 'lucide-react'
 import { ChatMessage } from '../api/client'
+import { renderNotes } from './ui'
 
 export function ChatPane({
   messages,
@@ -60,7 +61,9 @@ export function ChatPane({
                 border: m.role === 'user' ? '0.5px solid var(--blue-border)' : '0.5px solid var(--border)',
               }}
             >
-              {m.content}
+              {m.role === 'assistant'
+                ? <span dangerouslySetInnerHTML={{ __html: renderNotes(m.content) }} />
+                : m.content}
             </div>
           ))}
           {sending && (

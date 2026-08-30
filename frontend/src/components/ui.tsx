@@ -6,6 +6,7 @@ function formatInline(text: string): string {
   const escaped = text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
   return escaped
     .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+    .replace(/\*(.*?)\*/g, '<em>$1</em>')
     .replace(/__(.*?)__/g, '<u>$1</u>')
 }
 
@@ -14,17 +15,25 @@ export function renderNotes(text: string): string {
   const lines = text.split('\n')
   const parts: string[] = []
   let inList = false
-  for (const line of lines) {
+  const closeList = () => { if (inList) { parts.push('</ul>'); inList = false } }
+
+  for (const rawLine of lines) {
+    const line = rawLine.trimStart()
+    const heading = line.match(/^(#{1,6})\s+(.*)/)
     if (line.startsWith('- ')) {
       if (!inList) { parts.push('<ul style="margin:4px 0 4px;padding-left:18px;">'); inList = true }
       parts.push(`<li style="margin:2px 0">${formatInline(line.slice(2))}</li>`)
+    } else if (heading) {
+      closeList()
+      const size = heading[1].length === 1 ? 15 : 13
+      parts.push(`<span style="display:block;font-weight:600;font-size:${size}px;margin:6px 0 2px">${formatInline(heading[2])}</span>`)
     } else {
-      if (inList) { parts.push('</ul>'); inList = false }
+      closeList()
       if (line.trim() === '') parts.push('<br>')
       else parts.push(`<span style="display:block">${formatInline(line)}</span>`)
     }
   }
-  if (inList) parts.push('</ul>')
+  closeList()
   return parts.join('')
 }
 

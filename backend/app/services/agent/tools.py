@@ -226,8 +226,10 @@ TOOL_SCHEMAS = [
     },
     {
         "name": "get_tap_water_tests",
-        "description": "Get recent tap/source water test results (for the household water supply, not any "
-                       "specific tank).",
+        "description": "Get recent results from the app's 'Tap Water' section — test readings for the "
+                       "household tap/source water supply (pH, GH, KH, chlorine, nitrate, TDS). This is "
+                       "not tied to any specific tank; check it when diagnosing tank water quality issues, "
+                       "since source water is a common root cause.",
         "parameters": {
             "type": "object",
             "properties": {"limit": {"type": "integer", "description": "Default 10, max 50"}},
