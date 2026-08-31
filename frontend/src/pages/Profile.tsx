@@ -1,9 +1,19 @@
-import { useState } from 'react'
-import { CalendarDays, Ruler, UserCircle, Lock } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { CalendarDays, Ruler, UserCircle, Lock, Bell } from 'lucide-react'
 import { Card, FieldLabel } from '../components/ui'
 import { useSettings, formatDate, DateFormat, UnitSystem } from '../context/SettingsContext'
 import { useAuth } from '../context/AuthContext'
 import { api } from '../api/client'
+
+const PUSH_SUPPORTED =
+  typeof window !== 'undefined' && window.isSecureContext && 'serviceWorker' in navigator && 'PushManager' in window
+
+function urlBase64ToUint8Array(base64: string): Uint8Array {
+  const padding = '='.repeat((4 - (base64.length % 4)) % 4)
+  const b64 = (base64 + padding).replace(/-/g, '+').replace(/_/g, '/')
+  const raw = atob(b64)
+  return Uint8Array.from([...raw].map(c => c.charCodeAt(0)))
+}
 
 const FORMAT_OPTIONS: { value: DateFormat; label: string }[] = [
   { value: 'DD/MM/YYYY', label: 'DD/MM/YYYY (UK / Europe)' },
@@ -19,7 +29,7 @@ const UNIT_OPTIONS: { value: UnitSystem; label: string; example: string }[] = [
 ]
 
 export default function Profile() {
-  const { user } = useAuth()
+  const { user, updateProfile } = useAuth()
   const { dateFormat, setDateFormat, unitSystem, setUnitSystem } = useSettings()
   const [savingDateFormat, setSavingDateFormat] = useState(false)
   const [savingUnitSystem, setSavingUnitSystem] = useState(false)
@@ -30,6 +40,64 @@ export default function Profile() {
   const [changingPassword, setChangingPassword] = useState(false)
   const [passwordSaved, setPasswordSaved] = useState(false)
   const [passwordError, setPasswordError] = useState<string | null>(null)
+
+  const [notifBusy, setNotifBusy] = useState(false)
+  const [notifError, setNotifError] = useState<string | null>(null)
+  const [deviceSubscribed, setDeviceSubscribed] = useState<boolean | null>(null)
+
+  useEffect(() => {
+    if (!PUSH_SUPPORTED) { setDeviceSubscribed(false); return }
+    navigator.serviceWorker.ready
+      .then(reg => reg.pushManager.getSubscription())
+      .then(sub => setDeviceSubscribed(!!sub))
+      .catch(() => setDeviceSubscribed(false))
+  }, [])
+
+  async function enableOnThisDevice() {
+    setNotifBusy(true)
+    setNotifError(null)
+    try {
+      const permission = await Notification.requestPermission()
+      if (permission !== 'granted') {
+        setNotifError('Notifications were blocked in the browser')
+        return
+      }
+      const reg = await navigator.serviceWorker.ready
+      const { public_key } = await api.push.getVapidPublicKey()
+      const sub = await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(public_key).buffer as ArrayBuffer,
+      })
+      const json = sub.toJSON()
+      await api.push.subscribe({ endpoint: json.endpoint!, keys: { p256dh: json.keys!.p256dh, auth: json.keys!.auth } })
+      if (!user?.notifications_enabled) await updateProfile({ notifications_enabled: true })
+      setDeviceSubscribed(true)
+    } catch (e: any) {
+      setNotifError(e.message ?? 'Could not enable notifications')
+    } finally {
+      setNotifBusy(false)
+    }
+  }
+
+  async function toggleNotifications(enabled: boolean) {
+    setNotifBusy(true)
+    setNotifError(null)
+    try {
+      if (enabled) {
+        await enableOnThisDevice()
+      } else {
+        await updateProfile({ notifications_enabled: false })
+        const reg = await navigator.serviceWorker.ready
+        const sub = await reg.pushManager.getSubscription()
+        await sub?.unsubscribe().catch(() => {})
+        setDeviceSubscribed(false)
+      }
+    } catch (e: any) {
+      setNotifError(e.message ?? 'Could not update notification settings')
+    } finally {
+      setNotifBusy(false)
+    }
+  }
 
   async function changePassword() {
     setChangingPassword(true)
@@ -137,7 +205,7 @@ export default function Profile() {
           </div>
         </section>
 
-        <section>
+        <section style={{ paddingBottom: 20, borderBottom: '0.5px solid var(--border-sub)' }}>
           <p style={{ fontWeight: 500, fontSize: 14, margin: '0 0 4px', color: 'var(--text)', display: 'flex', alignItems: 'center', gap: 6 }}><Lock size={14} color="var(--text-2)" />Password</p>
           <p style={{ fontSize: 12, color: 'var(--text-2)', margin: '0 0 14px' }}>
             Change the password you use to sign in to this account.
@@ -179,6 +247,48 @@ export default function Profile() {
               </div>
             </div>
           </div>
+        </section>
+
+        <section>
+          <p style={{ fontWeight: 500, fontSize: 14, margin: '0 0 4px', color: 'var(--text)', display: 'flex', alignItems: 'center', gap: 6 }}><Bell size={14} color="var(--text-2)" />Notifications</p>
+          <p style={{ fontSize: 12, color: 'var(--text-2)', margin: '0 0 14px' }}>
+            Get a browser push notification when a maintenance task becomes due.
+          </p>
+          {!PUSH_SUPPORTED ? (
+            <p style={{ fontSize: 12, color: 'var(--text-3)', margin: 0 }}>
+              Push notifications require this site to be served over HTTPS — unavailable in this browser/connection.
+            </p>
+          ) : (
+            <>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: 'var(--text-label)' }}>
+                <input
+                  type="checkbox"
+                  checked={!!user?.notifications_enabled}
+                  disabled={notifBusy}
+                  onChange={e => toggleNotifications(e.target.checked)}
+                />
+                Send me a push notification for due maintenance tasks
+              </label>
+              {user?.notifications_enabled && deviceSubscribed === false && (
+                <div style={{ marginTop: 10, display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <span style={{ fontSize: 12, color: 'var(--text-2)' }}>Not enabled on this device/browser yet.</span>
+                  <button
+                    onClick={enableOnThisDevice}
+                    disabled={notifBusy}
+                    style={{
+                      padding: '5px 12px', borderRadius: 8, fontSize: 12, fontWeight: 500,
+                      cursor: notifBusy ? 'default' : 'pointer',
+                      border: '0.5px solid var(--blue-border)',
+                      background: 'var(--blue-bg)', color: 'var(--blue)',
+                    }}
+                  >
+                    Enable on this device
+                  </button>
+                </div>
+              )}
+              {notifError && <p style={{ fontSize: 12, color: 'var(--red)', margin: '10px 0 0' }}>{notifError}</p>}
+            </>
+          )}
         </section>
 
       </Card>

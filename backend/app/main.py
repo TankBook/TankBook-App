@@ -1,4 +1,6 @@
 from contextlib import asynccontextmanager
+import asyncio
+import contextlib
 from pathlib import Path
 import os
 import secrets
@@ -8,16 +10,21 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from starlette.middleware.sessions import SessionMiddleware
 
-from app.routers import tanks, fish, plants, parameters, alerts, species, maintenance, settings, daily_tasks, journal, backup, images, spending, inventory, rooms, tap_water, agent, auth
+from app.routers import tanks, fish, plants, parameters, alerts, species, maintenance, settings, daily_tasks, journal, backup, images, spending, inventory, rooms, tap_water, agent, auth, push
 from app.services.species import species_service, check_compatibility
 from app.services.auth import get_current_user
+from app.services.push import notification_loop
 from app.database import get_db
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     species_service.load()
+    sweep_task = asyncio.create_task(notification_loop())
     yield
+    sweep_task.cancel()
+    with contextlib.suppress(asyncio.CancelledError):
+        await sweep_task
 
 
 app = FastAPI(
@@ -57,6 +64,7 @@ app.include_router(inventory.router, prefix="/api/inventory", tags=["inventory"]
 app.include_router(rooms.router, prefix="/api/rooms", tags=["rooms"], dependencies=authenticated)
 app.include_router(tap_water.router, prefix="/api/tap-water", tags=["tap_water"], dependencies=authenticated)
 app.include_router(agent.router, prefix="/api/agent", tags=["agent"], dependencies=authenticated)
+app.include_router(push.router, prefix="/api/push", tags=["push"], dependencies=authenticated)
 
 
 @app.get("/api/tanks/{tank_id}/compatibility")

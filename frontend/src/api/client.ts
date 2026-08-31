@@ -235,6 +235,7 @@ export interface AuthUser {
   permissions: Record<string, PermissionLevel>
   date_format: string
   unit_system: string
+  notifications_enabled: boolean
 }
 
 const PERMISSION_LEVEL_RANK: Record<PermissionLevel, number> = { none: 0, use: 1, edit: 2 }
@@ -332,8 +333,12 @@ async function patch<T>(path: string, body?: unknown): Promise<T> {
   return res.json()
 }
 
-async function del(path: string): Promise<void> {
-  const res = await fetch(`${BASE}${path}`, { method: 'DELETE' })
+async function del(path: string, body?: unknown): Promise<void> {
+  const res = await fetch(`${BASE}${path}`, {
+    method: 'DELETE',
+    headers: body ? { 'Content-Type': 'application/json' } : undefined,
+    body: body ? JSON.stringify(body) : undefined,
+  })
   if (res.status === 401) handleUnauthorized(path)
   if (!res.ok) throw new Error(`DELETE ${path} failed: ${res.status}`)
 }
@@ -576,7 +581,7 @@ export const api = {
     logout: () => authPost<void>('/auth/logout', {}),
     changePassword: (body: { current_password?: string; new_password: string }) =>
       authPost<AuthUser>('/auth/change-password', body),
-    updateProfile: (body: { date_format?: string; unit_system?: string }) =>
+    updateProfile: (body: { date_format?: string; unit_system?: string; notifications_enabled?: boolean }) =>
       patch<AuthUser>('/auth/me', body),
     getSettings: () => get<AuthSettings>('/auth/settings'),
     updateSettings: (body: AuthSettingsUpdate) => patch<AuthSettings>('/auth/settings', body),
@@ -587,5 +592,11 @@ export const api = {
     getPermissions: (id: string) => get<Record<string, PermissionLevel>>(`/auth/users/${id}/permissions`),
     updatePermissions: (id: string, body: Partial<Record<string, PermissionLevel>>) =>
       put<Record<string, PermissionLevel>>(`/auth/users/${id}/permissions`, body),
+  },
+  push: {
+    getVapidPublicKey: () => get<{ public_key: string }>('/push/vapid-public-key'),
+    subscribe: (body: { endpoint: string; keys: { p256dh: string; auth: string } }) =>
+      post<{ ok: boolean }>('/push/subscribe', body),
+    unsubscribe: (endpoint: string) => del('/push/subscribe', { endpoint }),
   },
 }

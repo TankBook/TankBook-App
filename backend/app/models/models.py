@@ -127,6 +127,7 @@ class MaintenanceTask(Base):
     description: Mapped[str | None] = mapped_column(Text)
     due_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
     completed_at: Mapped[datetime | None] = mapped_column(DateTime)
+    notified_at: Mapped[datetime | None] = mapped_column(DateTime)
     status: Mapped[str] = mapped_column(String, default="pending")
     is_recurring: Mapped[bool] = mapped_column(Boolean, default=False)
     recur_every_weeks: Mapped[int | None] = mapped_column(Integer)
@@ -203,6 +204,8 @@ class AppSettings(Base):
     alert_retention_days: Mapped[int | None] = mapped_column(Integer, nullable=True)
     app_url: Mapped[str | None] = mapped_column(String, nullable=True)
     feeding_amount_presets_json: Mapped[str | None] = mapped_column(Text, nullable=True)
+    vapid_public_key: Mapped[str | None] = mapped_column(String, nullable=True)
+    vapid_private_key: Mapped[str | None] = mapped_column(Text, nullable=True)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     @property
@@ -311,10 +314,12 @@ class User(Base):
     oidc_subject: Mapped[str | None] = mapped_column(String, nullable=True, unique=True)
     date_format: Mapped[str] = mapped_column(String, default="DD/MM/YYYY")
     unit_system: Mapped[str] = mapped_column(String, default="cm")
+    notifications_enabled: Mapped[bool] = mapped_column(Boolean, default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     last_login_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
     sessions: Mapped[list["Session"]] = relationship(back_populates="user", cascade="all, delete-orphan")
+    push_subscriptions: Mapped[list["PushSubscription"]] = relationship(back_populates="user", cascade="all, delete-orphan")
 
 
 class Session(Base):
@@ -326,6 +331,21 @@ class Session(Base):
     expires_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
 
     user: Mapped["User"] = relationship(back_populates="sessions")
+
+
+class PushSubscription(Base):
+    """A single browser/device's Web Push subscription. A user can have several — one per
+    device or browser they've enabled notifications on."""
+    __tablename__ = "push_subscriptions"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=new_uuid)
+    user_id: Mapped[str] = mapped_column(String, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    endpoint: Mapped[str] = mapped_column(Text, nullable=False, unique=True)
+    p256dh: Mapped[str] = mapped_column(String, nullable=False)
+    auth: Mapped[str] = mapped_column(String, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    user: Mapped["User"] = relationship(back_populates="push_subscriptions")
 
 
 class AuthSettings(Base):

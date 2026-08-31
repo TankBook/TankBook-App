@@ -31,6 +31,7 @@ def _to_out(db: DBSession, user: User) -> UserOut:
         id=user.id, email=user.email, display_name=user.display_name, has_password=bool(user.password_hash),
         permissions=permissions_service.get_all_for_user(db, user.id),
         date_format=user.date_format, unit_system=user.unit_system,
+        notifications_enabled=user.notifications_enabled,
     )
 
 

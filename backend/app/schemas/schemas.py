@@ -166,6 +166,26 @@ class MaintenanceTaskPostpone(BaseModel):
 class MaintenanceTaskCompletionUpdate(BaseModel):
     completed_at: datetime
 
+
+# --- Push notifications ---
+
+class PushSubscriptionKeys(BaseModel):
+    p256dh: str
+    auth: str
+
+
+class PushSubscriptionCreate(BaseModel):
+    endpoint: str
+    keys: PushSubscriptionKeys
+
+
+class PushSubscriptionDelete(BaseModel):
+    endpoint: str
+
+
+class VapidPublicKeyOut(BaseModel):
+    public_key: str
+
 # --- Alerts ---
 
 class AlertOut(BaseModel):
@@ -483,11 +503,13 @@ class UserOut(BaseModel):
     permissions: dict[str, str] = {}
     date_format: str
     unit_system: str
+    notifications_enabled: bool
 
 
 class ProfileUpdate(BaseModel):
     date_format: str | None = None
     unit_system: str | None = None
+    notifications_enabled: bool | None = None
 
 
 class UserListItemOut(BaseModel):

@@ -92,6 +92,7 @@ def skip_task(tank_id: str, task_id: str, body: MaintenanceTaskSkip, db: Session
         task.due_at = task.due_at + timedelta(weeks=(task.recur_every_weeks or 1) * body.times)
     else:
         task.due_at = task.due_at + timedelta(days=body.times)
+    task.notified_at = None
     db.commit(); db.refresh(task)
     return task
 
@@ -106,6 +107,7 @@ def postpone_task(tank_id: str, task_id: str, body: MaintenanceTaskPostpone, db:
     if body.due_at.date() < datetime.utcnow().date():
         raise HTTPException(422, "Reminder date can't be in the past")
     task.due_at = body.due_at
+    task.notified_at = None
     db.commit(); db.refresh(task)
     return task
 
