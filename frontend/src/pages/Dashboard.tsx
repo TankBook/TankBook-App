@@ -858,7 +858,7 @@ export default function Dashboard() {
                   onChange={e => setStatSlotDraft(e.target.value)}
                   style={{ width: '100%', boxSizing: 'border-box' }}
                 >
-                  {STAT_KEYS.filter(k => k === statSlotDraft || !statSlots.includes(k)).map(k => (
+                  {STAT_KEYS.map(k => (
                     <option key={k} value={k}>{STAT_DEFS[k].label}</option>
                   ))}
                 </select>
