@@ -20,16 +20,24 @@ export default function AssistantWidget() {
 
   const conv = useAssistantConversation(localStorage.getItem(STORAGE_KEY))
 
-  // The panel grows upward from its fixed bottom offset — cap its chat area so the
-  // panel as a whole never rises above the navbar (keeping the same 20px gap below
-  // it that the panel already keeps from the screen edges).
+  // The button/panel float at a fixed distance from the bottom of the viewport, but
+  // the footer sits in normal document flow — so scrolling to the bottom of a page
+  // can bring the footer up underneath them. footerExtra lifts both by however much
+  // of the footer is currently showing, keeping the same 20px gap above the footer
+  // that they keep from the screen edge otherwise. The panel also grows upward from
+  // its bottom offset, so chatHeight caps its chat area so the panel as a whole never
+  // rises above the navbar (same 20px gap below it).
+  const [footerExtra, setFooterExtra] = useState(0)
   const [chatHeight, setChatHeight] = useState(360)
 
   useEffect(() => {
-    if (!open) return
     function recalc() {
+      const footerRect = document.querySelector('footer')?.getBoundingClientRect()
+      const visibleFooter = footerRect ? Math.min(footerRect.height, Math.max(0, window.innerHeight - footerRect.top)) : 0
+      setFooterExtra(visibleFooter)
+
       const navBottom = document.querySelector('nav')?.getBoundingClientRect().bottom ?? 0
-      const panelBottomOffset = 84
+      const panelBottomOffset = 84 + visibleFooter
       const gapBelowNav = 20
       const chrome = 110 // header + input row + borders, the panel's non-scrolling parts
       const available = window.innerHeight - navBottom - gapBelowNav - panelBottomOffset - chrome
@@ -37,8 +45,12 @@ export default function AssistantWidget() {
     }
     recalc()
     window.addEventListener('resize', recalc)
-    return () => window.removeEventListener('resize', recalc)
-  }, [open])
+    window.addEventListener('scroll', recalc, { passive: true })
+    return () => {
+      window.removeEventListener('resize', recalc)
+      window.removeEventListener('scroll', recalc)
+    }
+  }, [])
 
   useEffect(() => {
     if (!canUse || !canEdit) return
@@ -60,7 +72,7 @@ export default function AssistantWidget() {
       {open && (
         <div
           style={{
-            position: 'fixed', bottom: 84, left: 20, zIndex: 300,
+            position: 'fixed', bottom: 84 + footerExtra, left: 20, zIndex: 300,
             width: 340, maxWidth: 'calc(100vw - 40px)',
             background: 'var(--surface)', border: '0.5px solid var(--border)', borderRadius: 14,
             boxShadow: '0 12px 40px rgba(0,0,0,0.22)',
@@ -115,7 +127,7 @@ export default function AssistantWidget() {
         onClick={() => setOpen(o => !o)}
         title="Chat with the assistant"
         style={{
-          position: 'fixed', bottom: 20, left: 20, zIndex: 300,
+          position: 'fixed', bottom: 20 + footerExtra, left: 20, zIndex: 300,
           width: 48, height: 48, borderRadius: '50%',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           border: '0.5px solid var(--blue-border)', background: 'var(--blue-bg)', color: 'var(--blue)',
