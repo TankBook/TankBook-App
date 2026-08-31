@@ -228,6 +228,7 @@ class DailyTaskOut(DailyTaskCreate):
 
 class JournalEntryCreate(BaseModel):
     tank_fish_id: str | None = None
+    case_id: str | None = None
     event_type: str
     notes: str
     occurred_at: datetime | None = None
@@ -235,6 +236,7 @@ class JournalEntryCreate(BaseModel):
 
 class JournalEntryUpdate(BaseModel):
     tank_fish_id: str | None = None
+    case_id: str | None = None
     event_type: str | None = None
     notes: str | None = None
     occurred_at: datetime | None = None
@@ -244,6 +246,7 @@ class JournalEntryOut(BaseModel):
     id: str
     tank_id: str
     tank_fish_id: str | None
+    case_id: str | None = None
     event_type: str
     notes: str
     occurred_at: datetime
@@ -251,6 +254,37 @@ class JournalEntryOut(BaseModel):
     common_name: str | None = None
     species_slug: str | None = None
     model_config = {"from_attributes": True}
+
+
+# --- Health cases (quarantine / disease tracking) ---
+
+class HealthCaseCreate(BaseModel):
+    tank_fish_id: str | None = None
+    title: str
+    started_at: datetime | None = None
+    treatment: str | None = None
+
+
+class HealthCaseUpdate(BaseModel):
+    tank_fish_id: str | None = None
+    title: str | None = None
+    status: str | None = None
+    started_at: datetime | None = None
+    treatment: str | None = None
+
+
+class HealthCaseOut(BaseModel):
+    id: str
+    tank_id: str
+    tank_fish_id: str | None
+    title: str
+    status: str
+    started_at: datetime
+    treatment: str | None
+    resolved_at: datetime | None
+    created_at: datetime
+    common_name: str | None = None
+    species_slug: str | None = None
 
 
 # --- App settings ---

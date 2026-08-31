@@ -10,7 +10,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from starlette.middleware.sessions import SessionMiddleware
 
-from app.routers import tanks, fish, plants, parameters, alerts, species, maintenance, settings, daily_tasks, journal, backup, images, spending, inventory, rooms, tap_water, agent, auth, push
+from app.routers import tanks, fish, plants, parameters, alerts, species, maintenance, settings, daily_tasks, journal, backup, images, spending, inventory, rooms, tap_water, agent, auth, push, health_cases
 from app.services.species import species_service, check_compatibility
 from app.services.auth import get_current_user
 from app.services.push import notification_loop
@@ -57,6 +57,7 @@ app.include_router(maintenance.router, prefix="/api/tanks", tags=["maintenance"]
 app.include_router(daily_tasks.router, prefix="/api/tanks", tags=["daily_tasks"], dependencies=authenticated)
 app.include_router(settings.router, prefix="/api/settings", tags=["settings"], dependencies=authenticated)
 app.include_router(journal.router, prefix="/api/tanks", tags=["journal"], dependencies=authenticated)
+app.include_router(health_cases.router, prefix="/api/tanks", tags=["health_cases"], dependencies=authenticated)
 app.include_router(backup.router, prefix="/api/backup", tags=["backup"], dependencies=authenticated)
 app.include_router(images.router, prefix="/api/images", tags=["images"], dependencies=authenticated)
 app.include_router(spending.router, prefix="/api", tags=["spending"], dependencies=authenticated)

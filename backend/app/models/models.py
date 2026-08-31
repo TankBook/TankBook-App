@@ -46,6 +46,7 @@ class Tank(Base):
     alerts: Mapped[list["Alert"]] = relationship(back_populates="tank", cascade="all, delete-orphan")
     daily_tasks: Mapped[list["DailyTask"]] = relationship(back_populates="tank", cascade="all, delete-orphan")
     journal_entries: Mapped[list["JournalEntry"]] = relationship(back_populates="tank", cascade="all, delete-orphan")
+    health_cases: Mapped[list["HealthCase"]] = relationship(back_populates="tank", cascade="all, delete-orphan")
     room_position: Mapped["RoomTankPosition | None"] = relationship(back_populates="tank", cascade="all, delete-orphan")
 
 
@@ -186,12 +187,34 @@ class JournalEntry(Base):
     id: Mapped[str] = mapped_column(String, primary_key=True, default=new_uuid)
     tank_id: Mapped[str] = mapped_column(String, ForeignKey("tanks.id"), nullable=False)
     tank_fish_id: Mapped[str | None] = mapped_column(String, ForeignKey("tank_fish.id", ondelete="SET NULL"))
+    case_id: Mapped[str | None] = mapped_column(String, ForeignKey("health_cases.id", ondelete="SET NULL"))
     event_type: Mapped[str] = mapped_column(String, nullable=False)
     notes: Mapped[str] = mapped_column(Text, nullable=False)
     occurred_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
     tank: Mapped["Tank"] = relationship(back_populates="journal_entries")
+    case: Mapped["HealthCase | None"] = relationship(back_populates="entries")
+
+
+class HealthCase(Base):
+    """A tracked illness/quarantine episode for a tank (optionally scoped to one species
+    group). Journal entries can be tagged to a case via JournalEntry.case_id to build its
+    progress timeline, while still showing up in the tank's normal journal."""
+    __tablename__ = "health_cases"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=new_uuid)
+    tank_id: Mapped[str] = mapped_column(String, ForeignKey("tanks.id"), nullable=False)
+    tank_fish_id: Mapped[str | None] = mapped_column(String, ForeignKey("tank_fish.id", ondelete="SET NULL"))
+    title: Mapped[str] = mapped_column(String, nullable=False)
+    status: Mapped[str] = mapped_column(String, default="active")
+    started_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    treatment: Mapped[str | None] = mapped_column(Text)
+    resolved_at: Mapped[datetime | None] = mapped_column(DateTime)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    tank: Mapped["Tank"] = relationship(back_populates="health_cases")
+    entries: Mapped[list["JournalEntry"]] = relationship(back_populates="case")
 
 
 class AppSettings(Base):

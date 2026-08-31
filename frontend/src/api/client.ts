@@ -133,9 +133,24 @@ export interface JournalEntry {
   id: string
   tank_id: string
   tank_fish_id: string | null
+  case_id: string | null
   event_type: string
   notes: string
   occurred_at: string
+  created_at: string
+  common_name: string | null
+  species_slug: string | null
+}
+
+export interface HealthCase {
+  id: string
+  tank_id: string
+  tank_fish_id: string | null
+  title: string
+  status: string
+  started_at: string
+  treatment: string | null
+  resolved_at: string | null
   created_at: string
   common_name: string | null
   species_slug: string | null
@@ -448,11 +463,19 @@ export const api = {
   },
   journal: {
     list: (tankId: string) => get<JournalEntry[]>(`/tanks/${tankId}/journal`),
-    add: (tankId: string, body: { tank_fish_id?: string | null; event_type: string; notes: string; occurred_at?: string }) =>
+    add: (tankId: string, body: { tank_fish_id?: string | null; case_id?: string | null; event_type: string; notes: string; occurred_at?: string }) =>
       post<JournalEntry>(`/tanks/${tankId}/journal`, body),
-    update: (tankId: string, entryId: string, body: { tank_fish_id?: string | null; event_type?: string; notes?: string; occurred_at?: string }) =>
+    update: (tankId: string, entryId: string, body: { tank_fish_id?: string | null; case_id?: string | null; event_type?: string; notes?: string; occurred_at?: string }) =>
       patch<JournalEntry>(`/tanks/${tankId}/journal/${entryId}`, body),
     delete: (tankId: string, entryId: string) => del(`/tanks/${tankId}/journal/${entryId}`),
+  },
+  healthCases: {
+    list: (tankId: string) => get<HealthCase[]>(`/tanks/${tankId}/health-cases`),
+    add: (tankId: string, body: { tank_fish_id?: string | null; title: string; started_at?: string; treatment?: string | null }) =>
+      post<HealthCase>(`/tanks/${tankId}/health-cases`, body),
+    update: (tankId: string, caseId: string, body: { tank_fish_id?: string | null; title?: string; status?: string; started_at?: string; treatment?: string | null }) =>
+      patch<HealthCase>(`/tanks/${tankId}/health-cases/${caseId}`, body),
+    delete: (tankId: string, caseId: string) => del(`/tanks/${tankId}/health-cases/${caseId}`),
   },
   images: {
     speciesUrl: (slug: string) => `/api/images/species/${slug}`,

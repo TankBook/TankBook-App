@@ -2,7 +2,7 @@ from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from app.database import get_db
-from app.models.models import JournalEntry, TankFish
+from app.models.models import JournalEntry, TankFish, HealthCase
 from app.schemas.schemas import JournalEntryCreate, JournalEntryUpdate, JournalEntryOut
 from app.services.species import species_service
 
@@ -22,6 +22,7 @@ def _enrich(entry: JournalEntry, db: Session) -> dict:
         "id": entry.id,
         "tank_id": entry.tank_id,
         "tank_fish_id": entry.tank_fish_id,
+        "case_id": entry.case_id,
         "event_type": entry.event_type,
         "notes": entry.notes,
         "occurred_at": entry.occurred_at,
@@ -48,6 +49,10 @@ def add_journal(tank_id: str, body: JournalEntryCreate, db: Session = Depends(ge
         fish = db.query(TankFish).filter_by(id=body.tank_fish_id, tank_id=tank_id).first()
         if not fish:
             raise HTTPException(404, "Fish entry not found in this tank")
+    if body.case_id:
+        case = db.query(HealthCase).filter_by(id=body.case_id, tank_id=tank_id).first()
+        if not case:
+            raise HTTPException(404, "Case not found in this tank")
     data = body.model_dump()
     if data.get("occurred_at") is None:
         data["occurred_at"] = datetime.utcnow()
@@ -67,6 +72,10 @@ def update_journal(tank_id: str, entry_id: str, body: JournalEntryUpdate, db: Se
         if body.tank_fish_id != "" and not db.query(TankFish).filter_by(id=body.tank_fish_id, tank_id=tank_id).first():
             raise HTTPException(404, "Fish entry not found in this tank")
         entry.tank_fish_id = body.tank_fish_id or None
+    if body.case_id is not None:
+        if body.case_id != "" and not db.query(HealthCase).filter_by(id=body.case_id, tank_id=tank_id).first():
+            raise HTTPException(404, "Case not found in this tank")
+        entry.case_id = body.case_id or None
     if body.event_type is not None:
         entry.event_type = body.event_type
     if body.notes is not None:
