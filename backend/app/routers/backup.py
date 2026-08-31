@@ -8,8 +8,11 @@ from app.models.models import (
     Alert, DailyTask, JournalEntry, AppSettings, Expense, InventoryItem,
     Room, RoomTankPosition,
 )
+from app.services.permissions import require_permission
 
 router = APIRouter()
+
+require_general_edit = Depends(require_permission("general", "edit"))
 
 BACKUP_VERSION = 1
 
@@ -28,7 +31,7 @@ def _parse_dt(s: str | None) -> datetime | None:
 
 
 @router.get("/export")
-def export_backup(db: Session = Depends(get_db)):
+def export_backup(db: Session = Depends(get_db), _perm=require_general_edit):
     settings = db.query(AppSettings).filter_by(id="default").first()
 
     tanks_out = []
@@ -131,7 +134,7 @@ def export_backup(db: Session = Depends(get_db)):
 
 
 @router.post("/import")
-def import_backup(payload: dict, db: Session = Depends(get_db)):
+def import_backup(payload: dict, db: Session = Depends(get_db), _perm=require_general_edit):
     if payload.get("version") != BACKUP_VERSION:
         raise HTTPException(400, f"Unsupported backup version: {payload.get('version')}. Expected {BACKUP_VERSION}.")
 

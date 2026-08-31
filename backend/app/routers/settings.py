@@ -7,8 +7,11 @@ from app.models.models import AppSettings
 from app.schemas.schemas import AppSettingsOut, AppSettingsUpdate, SettingsStatsOut
 from app.routers.images import IMAGES_PATH
 from app.services.species import species_service
+from app.services.permissions import require_permission
 
 router = APIRouter()
+
+require_general_edit = Depends(require_permission("general", "edit"))
 
 
 def get_or_create_settings(db: Session) -> AppSettings:
@@ -27,7 +30,7 @@ def get_settings(db: Session = Depends(get_db)):
 
 
 @router.patch("/", response_model=AppSettingsOut)
-def update_settings(body: AppSettingsUpdate, db: Session = Depends(get_db)):
+def update_settings(body: AppSettingsUpdate, db: Session = Depends(get_db), _perm=require_general_edit):
     settings = get_or_create_settings(db)
     data = body.model_dump(exclude_unset=True)
     if "feeding_amount_presets" in data:
@@ -41,7 +44,7 @@ def update_settings(body: AppSettingsUpdate, db: Session = Depends(get_db)):
 
 
 @router.get("/stats", response_model=SettingsStatsOut)
-def get_settings_stats():
+def get_settings_stats(_perm=require_general_edit):
     storage_bytes = 0
     if IMAGES_PATH.exists():
         for path in IMAGES_PATH.rglob("*"):

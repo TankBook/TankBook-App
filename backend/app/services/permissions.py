@@ -5,8 +5,8 @@ from app.database import get_db
 from app.models.models import Permission, User
 from app.services.auth import get_current_user
 
-PERMISSION_KEYS = ["ai"]
-DEFAULT_LEVELS = {"ai": "edit"}
+PERMISSION_KEYS = ["ai", "general", "users"]
+DEFAULT_LEVELS = {"ai": "edit", "general": "edit", "users": "edit"}
 LEVEL_RANK = {"none": 0, "use": 1, "edit": 2}
 
 

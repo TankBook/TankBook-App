@@ -15,8 +15,11 @@ from app.services.auth import (
     oidc_configured, build_oidc_client, SESSION_COOKIE,
 )
 from app.services import permissions as permissions_service
+from app.services.permissions import require_permission
 
 router = APIRouter()
+
+require_users_edit = Depends(require_permission("users", "edit"))
 
 MIN_PASSWORD_LENGTH = 8
 VALID_DATE_FORMATS = ["DD/MM/YYYY", "MM/DD/YYYY", "YYYY-MM-DD"]
@@ -122,13 +125,13 @@ def update_profile(body: ProfileUpdate, user: User = Depends(get_current_user), 
 
 
 @router.get("/users", response_model=list[UserListItemOut])
-def list_users(db: DBSession = Depends(get_db), _user: User = Depends(get_current_user)):
+def list_users(db: DBSession = Depends(get_db), _perm=require_users_edit):
     users = db.query(User).order_by(User.created_at.asc()).all()
     return [_to_list_item(u) for u in users]
 
 
 @router.patch("/users/{user_id}", response_model=UserListItemOut)
-def update_user(user_id: str, body: UserUpdateRequest, db: DBSession = Depends(get_db), _user: User = Depends(get_current_user)):
+def update_user(user_id: str, body: UserUpdateRequest, db: DBSession = Depends(get_db), _perm=require_users_edit):
     target = db.query(User).filter_by(id=user_id).first()
     if not target:
         raise HTTPException(404, "User not found")
@@ -151,7 +154,7 @@ def update_user(user_id: str, body: UserUpdateRequest, db: DBSession = Depends(g
 
 
 @router.delete("/users/{user_id}", status_code=204)
-def delete_user(user_id: str, db: DBSession = Depends(get_db), user: User = Depends(get_current_user)):
+def delete_user(user_id: str, db: DBSession = Depends(get_db), user: User = require_users_edit):
     if user_id == user.id:
         raise HTTPException(400, "You can't delete your own account from here")
     target = db.query(User).filter_by(id=user_id).first()
@@ -164,14 +167,14 @@ def delete_user(user_id: str, db: DBSession = Depends(get_db), user: User = Depe
 
 
 @router.get("/users/{user_id}/permissions", response_model=PermissionsOut)
-def get_user_permissions(user_id: str, db: DBSession = Depends(get_db), _user: User = Depends(get_current_user)):
+def get_user_permissions(user_id: str, db: DBSession = Depends(get_db), _perm=require_users_edit):
     if not db.query(User).filter_by(id=user_id).first():
         raise HTTPException(404, "User not found")
     return PermissionsOut(**permissions_service.get_all_for_user(db, user_id))
 
 
 @router.put("/users/{user_id}/permissions", response_model=PermissionsOut)
-def update_user_permissions(user_id: str, body: PermissionsUpdate, db: DBSession = Depends(get_db), _user: User = Depends(get_current_user)):
+def update_user_permissions(user_id: str, body: PermissionsUpdate, db: DBSession = Depends(get_db), _perm=require_users_edit):
     if not db.query(User).filter_by(id=user_id).first():
         raise HTTPException(404, "User not found")
     for key, level in body.model_dump(exclude_unset=True).items():
@@ -191,12 +194,12 @@ def change_password(body: ChangePasswordRequest, user: User = Depends(get_curren
 
 
 @router.get("/settings", response_model=AuthSettingsOut)
-def get_auth_settings(db: DBSession = Depends(get_db), _user: User = Depends(get_current_user)):
+def get_auth_settings(db: DBSession = Depends(get_db), _perm=require_users_edit):
     return _settings_to_out(get_or_create_auth_settings(db))
 
 
 @router.patch("/settings", response_model=AuthSettingsOut)
-def update_auth_settings(body: AuthSettingsUpdate, db: DBSession = Depends(get_db), _user: User = Depends(get_current_user)):
+def update_auth_settings(body: AuthSettingsUpdate, db: DBSession = Depends(get_db), _perm=require_users_edit):
     settings = get_or_create_auth_settings(db)
     data = body.model_dump(exclude_unset=True)
     if "oidc_client_secret" in data:

@@ -520,6 +520,36 @@ function UsersSection() {
                 </select>
               </div>
 
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+                <div>
+                  <p style={{ margin: 0, fontSize: 13, color: 'var(--text)', fontWeight: 500 }}>General</p>
+                  <p style={{ margin: 0, fontSize: 12, color: 'var(--text-2)' }}>General settings tab and the About section (backup, storage)</p>
+                </div>
+                <select
+                  value={permissionsDraft.general}
+                  onChange={e => setPermissionsDraft(d => (d ? { ...d, general: e.target.value as PermissionLevel } : d))}
+                  style={{ flexShrink: 0 }}
+                >
+                  <option value="none">No</option>
+                  <option value="edit">Yes</option>
+                </select>
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+                <div>
+                  <p style={{ margin: 0, fontSize: 13, color: 'var(--text)', fontWeight: 500 }}>Manage Users</p>
+                  <p style={{ margin: 0, fontSize: 12, color: 'var(--text-2)' }}>The Users section: accounts, permissions, registration, and SSO</p>
+                </div>
+                <select
+                  value={permissionsDraft.users}
+                  onChange={e => setPermissionsDraft(d => (d ? { ...d, users: e.target.value as PermissionLevel } : d))}
+                  style={{ flexShrink: 0 }}
+                >
+                  <option value="none">No</option>
+                  <option value="edit">Yes</option>
+                </select>
+              </div>
+
               {permissionsError && <p style={{ margin: 0, fontSize: 12, color: 'var(--red)' }}>{permissionsError}</p>}
 
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 6 }}>
@@ -589,6 +619,14 @@ export default function Settings() {
   const { defaultTank, setDefaultTank, alertRetentionDays, setAlertRetentionDays, appUrl, setAppUrl, feedingAmountPresets, setFeedingAmountPresets, loading } = useSettings()
   const { user: loggedInUser } = useAuth()
   const canEditAi = hasPermission(loggedInUser?.permissions.ai, 'edit')
+  const canEditGeneral = hasPermission(loggedInUser?.permissions.general, 'edit')
+  const canManageUsers = hasPermission(loggedInUser?.permissions.users, 'edit')
+  const visibleTabs = SETTINGS_TABS.filter(t =>
+    t.id === 'ai' ? canEditAi :
+    t.id === 'users' ? canManageUsers :
+    t.id === 'general' || t.id === 'about' ? canEditGeneral :
+    true
+  )
   const [tanks, setTanks] = useState<Tank[]>([])
   const [draftDefaultTank, setDraftDefaultTank] = useState(defaultTank ?? '')
   const [draftAlertRetentionDays, setDraftAlertRetentionDays] = useState<number | null>(alertRetentionDays)
@@ -598,7 +636,7 @@ export default function Settings() {
   const [settingsSaved, setSettingsSaved] = useState(false)
   const [newPreset, setNewPreset] = useState('')
   const [isMobile, setIsMobile] = useState(() => window.matchMedia('(max-width: 768px)').matches)
-  const [activeTab, setActiveTab] = useState(SETTINGS_TABS[0].id)
+  const [activeTab, setActiveTab] = useState(visibleTabs[0]?.id ?? SETTINGS_TABS[0].id)
 
   useEffect(() => {
     const mq = window.matchMedia('(max-width: 768px)')
@@ -752,7 +790,7 @@ export default function Settings() {
 
         <Card style={{ width: isMobile ? '100%' : 200, flexShrink: 0, padding: 8, boxSizing: 'border-box' }}>
           <div style={{ display: 'flex', flexDirection: isMobile ? 'row' : 'column', gap: 2, overflowX: isMobile ? 'auto' : 'visible' }}>
-            {SETTINGS_TABS.filter(t => t.id !== 'ai' || canEditAi).map(t => (
+            {visibleTabs.map(t => (
               <button
                 key={t.id}
                 onClick={() => setActiveTab(t.id)}
@@ -772,7 +810,7 @@ export default function Settings() {
           </div>
         </Card>
 
-        {activeTab === 'general' && (
+        {activeTab === 'general' && canEditGeneral && (
       <Card style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 16, padding: 24, flex: 1, minWidth: 0, width: '100%', boxSizing: 'border-box' }}>
 
         <section style={{ paddingBottom: 20, borderBottom: '0.5px solid var(--border-sub)' }}>
@@ -904,7 +942,7 @@ export default function Settings() {
       </Card>
         )}
 
-        {activeTab === 'users' && (
+        {activeTab === 'users' && canManageUsers && (
       <Card style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 16, padding: 24, flex: 1, minWidth: 0, width: '100%', boxSizing: 'border-box' }}>
         <UsersSection />
       </Card>
@@ -916,7 +954,7 @@ export default function Settings() {
       </Card>
         )}
 
-        {activeTab === 'about' && (
+        {activeTab === 'about' && canEditGeneral && (
       <Card style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 16, padding: 24, flex: 1, minWidth: 0, width: '100%', boxSizing: 'border-box' }}>
 
         <section style={{ paddingBottom: 20, borderBottom: '0.5px solid var(--border-sub)' }}>

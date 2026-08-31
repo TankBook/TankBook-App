@@ -527,7 +527,11 @@ class AuthSettingsUpdate(BaseModel):
 
 class PermissionsOut(BaseModel):
     ai: Literal["none", "use", "edit"]
+    general: Literal["none", "use", "edit"]
+    users: Literal["none", "use", "edit"]
 
 
 class PermissionsUpdate(BaseModel):
     ai: Literal["none", "use", "edit"] | None = None
+    general: Literal["none", "use", "edit"] | None = None
+    users: Literal["none", "use", "edit"] | None = None
