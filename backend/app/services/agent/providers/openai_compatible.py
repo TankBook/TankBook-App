@@ -3,6 +3,7 @@ import httpx
 
 from app.services.agent.errors import AgentNotConfigured, AgentProviderError
 from app.services.agent.providers.base import AgentResponse, ToolCall
+from app.services.url_safety import assert_not_metadata_endpoint, UnsafeUrlError
 
 
 class OpenAICompatibleProvider:
@@ -51,8 +52,14 @@ class OpenAICompatibleProvider:
             headers["Authorization"] = f"Bearer {self.api_key}"
 
         try:
+            # base_url is user-configured and intentionally allowed to reach LAN/localhost
+            # (e.g. a self-hosted Ollama instance) — only block cloud metadata endpoints,
+            # which are never a legitimate target regardless of who set this.
+            assert_not_metadata_endpoint(self.base_url)
             resp = httpx.post(f"{self.base_url}/chat/completions", json=body, headers=headers, timeout=60)
             resp.raise_for_status()
+        except UnsafeUrlError as e:
+            raise AgentProviderError(f"Refusing to contact this provider: {e}")
         except httpx.HTTPStatusError as e:
             raise AgentProviderError(f"Provider returned an error: {e.response.status_code} {e.response.text[:300]}")
         except httpx.HTTPError as e:

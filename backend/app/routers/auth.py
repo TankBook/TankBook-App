@@ -1,4 +1,6 @@
 import json
+from collections import defaultdict
+from datetime import datetime, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from fastapi.responses import RedirectResponse
@@ -17,7 +19,7 @@ from app.services.auth import (
     oidc_configured, build_oidc_client, SESSION_COOKIE,
 )
 from app.services import permissions as permissions_service
-from app.services.permissions import require_permission
+from app.services.permissions import require_permission, PERMISSION_KEYS
 
 router = APIRouter()
 
@@ -26,6 +28,26 @@ require_users_edit = Depends(require_permission("users", "edit"))
 MIN_PASSWORD_LENGTH = 8
 VALID_DATE_FORMATS = ["DD/MM/YYYY", "MM/DD/YYYY", "YYYY-MM-DD"]
 VALID_UNIT_SYSTEMS = ["mm", "cm", "m", "imperial"]
+
+# In-process login attempt tracking — fine for this app's single-container deployment
+# (no multi-replica concerns, same assumption already made by the push-notification
+# sweep loop). Keyed by email so brute-forcing one known account is blocked regardless
+# of source IP.
+_failed_logins: dict[str, list[datetime]] = defaultdict(list)
+LOGIN_MAX_ATTEMPTS = 5
+LOGIN_LOCKOUT_WINDOW = timedelta(minutes=15)
+
+
+def _check_login_rate_limit(email: str) -> None:
+    now = datetime.utcnow()
+    attempts = [t for t in _failed_logins[email] if now - t < LOGIN_LOCKOUT_WINDOW]
+    _failed_logins[email] = attempts
+    if len(attempts) >= LOGIN_MAX_ATTEMPTS:
+        raise HTTPException(429, "Too many failed login attempts. Try again in a few minutes.")
+
+
+def _record_login_failure(email: str) -> None:
+    _failed_logins[email].append(datetime.utcnow())
 
 
 def _to_out(db: DBSession, user: User) -> UserOut:
@@ -44,6 +66,15 @@ def _to_list_item(user: User) -> UserListItemOut:
         has_password=bool(user.password_hash), has_oidc=bool(user.oidc_subject),
         created_at=user.created_at, last_login_at=user.last_login_at,
     )
+
+
+def _bootstrap_admin_if_first_user(db: DBSession, user: User) -> None:
+    """New accounts get no permissions by default (see services/permissions.py) — except
+    the very first account ever created on an instance, which needs to be able to
+    administer the fresh install."""
+    if db.query(User).count() == 1:
+        for key in PERMISSION_KEYS:
+            permissions_service.set_level(db, user.id, key, "edit")
 
 
 def _settings_to_out(settings: AuthSettings) -> AuthSettingsOut:
@@ -84,6 +115,7 @@ def register(body: RegisterRequest, response: Response, request: Request, db: DB
     db.add(user)
     db.commit()
     db.refresh(user)
+    _bootstrap_admin_if_first_user(db, user)
 
     token = create_session(db, user)
     set_session_cookie(response, request, token)
@@ -92,9 +124,13 @@ def register(body: RegisterRequest, response: Response, request: Request, db: DB
 
 @router.post("/login", response_model=UserOut)
 def login(body: LoginRequest, response: Response, request: Request, db: DBSession = Depends(get_db)):
-    user = db.query(User).filter_by(email=body.email.strip().lower()).first()
+    email = body.email.strip().lower()
+    _check_login_rate_limit(email)
+    user = db.query(User).filter_by(email=email).first()
     if not user or not user.password_hash or not verify_password(body.password, user.password_hash):
+        _record_login_failure(email)
         raise HTTPException(401, "Incorrect email or password")
+    _failed_logins.pop(email, None)
 
     token = create_session(db, user)
     set_session_cookie(response, request, token)
@@ -251,6 +287,7 @@ async def oidc_callback(request: Request, db: DBSession = Depends(get_db)):
         db.add(user)
         db.commit()
         db.refresh(user)
+        _bootstrap_admin_if_first_user(db, user)
     elif not user.oidc_subject:
         user.oidc_subject = subject
         db.commit()

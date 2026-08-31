@@ -1,15 +1,18 @@
 import urllib.request
 import urllib.error
-from fastapi import APIRouter, Query, UploadFile, File, HTTPException
+from fastapi import APIRouter, Depends, Query, UploadFile, File, HTTPException
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from app.services.species import species_service
+from app.services.permissions import require_permission
+from app.services.url_safety import assert_public_url, UnsafeUrlError
 import yaml
 
 REQUIRED_FIELDS = ("slug", "type", "common_name", "latin_name")
 VALID_TYPES = {"fish", "plant", "invertebrate", "amphibian"}
 
 router = APIRouter()
+require_general_edit = Depends(require_permission("general", "edit"))
 
 
 def _parse_and_save(contents: bytes) -> dict:
@@ -139,7 +142,7 @@ def list_species(type: str | None = Query(None), search: str | None = Query(None
 
 
 @router.post("/upload")
-async def upload_species(file: UploadFile = File(...)):
+async def upload_species(file: UploadFile = File(...), _perm=require_general_edit):
     if not file.filename or not file.filename.lower().endswith((".yaml", ".yml")):
         raise HTTPException(status_code=400, detail="File must be a .yaml or .yml file")
     contents = await file.read()
@@ -151,13 +154,20 @@ class UrlImportBody(BaseModel):
 
 
 @router.post("/upload-url")
-async def upload_species_from_url(body: UrlImportBody):
+async def upload_species_from_url(body: UrlImportBody, _perm=require_general_edit):
     url = body.url.strip()
     if not url.startswith(("http://", "https://")):
         raise HTTPException(status_code=400, detail="URL must start with http:// or https://")
 
     if "github.com" in url and "/blob/" in url:
         url = url.replace("github.com", "raw.githubusercontent.com").replace("/blob/", "/")
+
+    try:
+        # Species import should only ever reach the public internet — block anything
+        # that resolves to a private/loopback/link-local address (SSRF hardening).
+        assert_public_url(url)
+    except UnsafeUrlError as e:
+        raise HTTPException(status_code=400, detail=f"Refusing to fetch this URL: {e}")
 
     try:
         req = urllib.request.Request(url, headers={"User-Agent": "TankBook/0.5.0"})
@@ -180,7 +190,7 @@ def download_species_yaml(slug: str):
 
 
 @router.post("/create")
-def create_species(body: SpeciesBody):
+def create_species(body: SpeciesBody, _perm=require_general_edit):
     if body.type not in VALID_TYPES:
         raise HTTPException(400, f"type must be one of: {', '.join(sorted(VALID_TYPES))}")
     if not body.slug.strip() or not body.common_name.strip() or not body.latin_name.strip():
@@ -193,7 +203,7 @@ def create_species(body: SpeciesBody):
 
 
 @router.put("/{slug}")
-def update_species(slug: str, body: SpeciesBody):
+def update_species(slug: str, body: SpeciesBody, _perm=require_general_edit):
     if not species_service.validate_slug(slug):
         raise HTTPException(404, f"Species not found: {slug}")
     if body.type not in VALID_TYPES:

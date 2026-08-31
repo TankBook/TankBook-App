@@ -5,8 +5,12 @@ from app.database import get_db
 from app.models.models import Permission, User
 from app.services.auth import get_current_user
 
+# Deny by default — a fresh account gets no admin capability until an existing admin
+# (users:edit) explicitly grants it. The one exception is the very first account on an
+# instance, which is granted edit on everything at registration time (see auth.py's
+# register()) so there's always someone able to administer a fresh install.
 PERMISSION_KEYS = ["ai", "general", "users"]
-DEFAULT_LEVELS = {"ai": "edit", "general": "edit", "users": "edit"}
+DEFAULT_LEVELS = {"ai": "none", "general": "none", "users": "none"}
 LEVEL_RANK = {"none": 0, "use": 1, "edit": 2}
 
 

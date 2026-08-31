@@ -164,9 +164,14 @@ _static = Path("/app/static")
 if _static.is_dir():
     app.mount("/assets", StaticFiles(directory=_static / "assets"), name="assets")
 
+    _static_resolved = _static.resolve()
+
     @app.get("/{full_path:path}")
     async def spa_fallback(full_path: str):
-        candidate = _static / full_path
-        if candidate.is_file():
+        # full_path is attacker-controlled — resolve it and verify it's still inside
+        # _static before ever touching the filesystem, or "../../etc/passwd"-style
+        # traversal serves arbitrary files off the container.
+        candidate = (_static / full_path).resolve()
+        if candidate.is_relative_to(_static_resolved) and candidate.is_file():
             return FileResponse(candidate)
         return FileResponse(_static / "index.html")

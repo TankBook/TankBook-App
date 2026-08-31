@@ -3,10 +3,13 @@ import urllib.parse
 import urllib.request
 import uuid
 from pathlib import Path
-from fastapi import APIRouter, UploadFile, File, HTTPException, Query
+from fastapi import APIRouter, Depends, UploadFile, File, HTTPException, Query
 from fastapi.responses import FileResponse
+from app.services.permissions import require_permission
+from app.services.url_safety import assert_public_url, UnsafeUrlError
 
 router = APIRouter()
+require_general_edit = Depends(require_permission("general", "edit"))
 
 IMAGES_PATH = Path("/app/images")
 
@@ -24,7 +27,7 @@ def _find(slug: str) -> Path | None:
 
 
 @router.post("/species/{slug}")
-async def upload_species_image(slug: str, file: UploadFile = File(...)):
+async def upload_species_image(slug: str, file: UploadFile = File(...), _perm=require_general_edit):
     if file.content_type not in ALLOWED_TYPES:
         raise HTTPException(400, f"Unsupported type: {file.content_type}. Use JPEG, PNG, WebP, or GIF.")
     ext = EXT_MAP[file.content_type]
@@ -49,7 +52,7 @@ def get_species_image(slug: str):
 
 
 @router.post("/species/{slug}/fetch")
-def fetch_species_image(slug: str, latin_name: str = Query(...)):
+def fetch_species_image(slug: str, latin_name: str = Query(...), _perm=require_general_edit):
     """Download a species image from iNaturalist by Latin name and store it locally."""
     if not latin_name.strip():
         raise HTTPException(400, "latin_name is required")
@@ -74,6 +77,10 @@ def fetch_species_image(slug: str, latin_name: str = Query(...)):
     image_url = photo.get("large_url") or photo.get("medium_url") or photo.get("url")
     if not image_url:
         raise HTTPException(404, "No image URL in iNaturalist response")
+    try:
+        assert_public_url(image_url)
+    except UnsafeUrlError as e:
+        raise HTTPException(502, f"Refusing to fetch image URL: {e}")
 
     # Guess extension from URL path (before any query string)
     url_path = image_url.split("?")[0].lower()
@@ -102,7 +109,7 @@ def fetch_species_image(slug: str, latin_name: str = Query(...)):
 
 
 @router.delete("/species/{slug}")
-def delete_species_image(slug: str):
+def delete_species_image(slug: str, _perm=require_general_edit):
     path = _find(slug)
     if not path:
         raise HTTPException(404, "No image for this species")
