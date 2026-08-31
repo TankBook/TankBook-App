@@ -20,6 +20,26 @@ export default function AssistantWidget() {
 
   const conv = useAssistantConversation(localStorage.getItem(STORAGE_KEY))
 
+  // The panel grows upward from its fixed bottom offset — cap its chat area so the
+  // panel as a whole never rises above the navbar (keeping the same 20px gap below
+  // it that the panel already keeps from the screen edges).
+  const [chatHeight, setChatHeight] = useState(360)
+
+  useEffect(() => {
+    if (!open) return
+    function recalc() {
+      const navBottom = document.querySelector('nav')?.getBoundingClientRect().bottom ?? 0
+      const panelBottomOffset = 84
+      const gapBelowNav = 20
+      const chrome = 110 // header + input row + borders, the panel's non-scrolling parts
+      const available = window.innerHeight - navBottom - gapBelowNav - panelBottomOffset - chrome
+      setChatHeight(Math.max(120, Math.min(360, available)))
+    }
+    recalc()
+    window.addEventListener('resize', recalc)
+    return () => window.removeEventListener('resize', recalc)
+  }, [open])
+
   useEffect(() => {
     if (!canUse || !canEdit) return
     api.agent.getSettings()
@@ -85,7 +105,7 @@ export default function AssistantWidget() {
             error={conv.error}
             loadingConversation={conv.loadingConversation}
             onSend={conv.send}
-            height={360}
+            height={chatHeight}
             emptyHint='Ask me anything about your tanks.'
           />
         </div>
