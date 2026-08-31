@@ -66,15 +66,17 @@ def _send_one(db: Session, settings: AppSettings, sub: PushSubscription, payload
 
 def _notify_for_task(db: Session, settings: AppSettings, task: MaintenanceTask) -> None:
     tank = db.query(Tank).filter_by(id=task.tank_id).first()
+    if not tank:
+        return
     payload = json.dumps({
         "title": f"{task.task_type} due",
-        "body": task.description or (f"Due for {tank.name}" if tank else "A maintenance task is due"),
+        "body": task.description or f"Due for {tank.name}",
         "url": f"/tanks/{task.tank_id}",
     })
     subs = (
         db.query(PushSubscription)
         .join(User, PushSubscription.user_id == User.id)
-        .filter(User.notifications_enabled == True)  # noqa: E712
+        .filter(User.notifications_enabled == True, User.id == tank.owner_id)  # noqa: E712
         .all()
     )
     for sub in subs:

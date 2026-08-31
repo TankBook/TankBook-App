@@ -5,11 +5,14 @@ import uuid
 from pathlib import Path
 from fastapi import APIRouter, Depends, UploadFile, File, HTTPException, Query
 from fastapi.responses import FileResponse
+from app.models.models import Tank
 from app.services.permissions import require_permission
+from app.services.ownership import require_owned_tank
 from app.services.url_safety import assert_public_url, UnsafeUrlError
 
 router = APIRouter()
-require_general_edit = Depends(require_permission("general", "edit"))
+require_species_edit = Depends(require_permission("species", "edit"))
+require_species_delete = Depends(require_permission("species", "delete"))
 
 IMAGES_PATH = Path("/app/images")
 
@@ -27,7 +30,7 @@ def _find(slug: str) -> Path | None:
 
 
 @router.post("/species/{slug}")
-async def upload_species_image(slug: str, file: UploadFile = File(...), _perm=require_general_edit):
+async def upload_species_image(slug: str, file: UploadFile = File(...), _perm=require_species_edit):
     if file.content_type not in ALLOWED_TYPES:
         raise HTTPException(400, f"Unsupported type: {file.content_type}. Use JPEG, PNG, WebP, or GIF.")
     ext = EXT_MAP[file.content_type]
@@ -52,7 +55,7 @@ def get_species_image(slug: str):
 
 
 @router.post("/species/{slug}/fetch")
-def fetch_species_image(slug: str, latin_name: str = Query(...), _perm=require_general_edit):
+def fetch_species_image(slug: str, latin_name: str = Query(...), _perm=require_species_edit):
     """Download a species image from iNaturalist by Latin name and store it locally."""
     if not latin_name.strip():
         raise HTTPException(400, "latin_name is required")
@@ -109,7 +112,7 @@ def fetch_species_image(slug: str, latin_name: str = Query(...), _perm=require_g
 
 
 @router.delete("/species/{slug}")
-def delete_species_image(slug: str, _perm=require_general_edit):
+def delete_species_image(slug: str, _perm=require_species_delete):
     path = _find(slug)
     if not path:
         raise HTTPException(404, "No image for this species")
@@ -129,7 +132,7 @@ def _safe_filename(filename: str) -> str:
 
 
 @router.post("/tanks/{tank_id}")
-async def upload_tank_image(tank_id: str, file: UploadFile = File(...)):
+async def upload_tank_image(tank_id: str, file: UploadFile = File(...), _tank: Tank = Depends(require_owned_tank)):
     if file.content_type not in ALLOWED_TYPES:
         raise HTTPException(400, f"Unsupported type: {file.content_type}. Use JPEG, PNG, WebP, or GIF.")
     ext = EXT_MAP[file.content_type]
@@ -142,7 +145,7 @@ async def upload_tank_image(tank_id: str, file: UploadFile = File(...)):
 
 
 @router.get("/tanks/{tank_id}")
-def list_tank_images(tank_id: str):
+def list_tank_images(tank_id: str, _tank: Tank = Depends(require_owned_tank)):
     tank_dir = _tank_dir(tank_id)
     if not tank_dir.exists():
         return []
@@ -154,7 +157,7 @@ def list_tank_images(tank_id: str):
 
 
 @router.get("/tanks/{tank_id}/{filename}")
-def get_tank_image(tank_id: str, filename: str):
+def get_tank_image(tank_id: str, filename: str, _tank: Tank = Depends(require_owned_tank)):
     filename = _safe_filename(filename)
     path = _tank_dir(tank_id) / filename
     if not path.exists():
@@ -163,7 +166,7 @@ def get_tank_image(tank_id: str, filename: str):
 
 
 @router.delete("/tanks/{tank_id}/{filename}")
-def delete_tank_image(tank_id: str, filename: str):
+def delete_tank_image(tank_id: str, filename: str, _tank: Tank = Depends(require_owned_tank)):
     filename = _safe_filename(filename)
     path = _tank_dir(tank_id) / filename
     if not path.exists():

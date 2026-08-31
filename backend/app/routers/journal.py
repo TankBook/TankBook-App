@@ -2,9 +2,10 @@ from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from app.database import get_db
-from app.models.models import JournalEntry, TankFish, HealthCase
+from app.models.models import JournalEntry, TankFish, HealthCase, Tank
 from app.schemas.schemas import JournalEntryCreate, JournalEntryUpdate, JournalEntryOut
 from app.services.species import species_service
+from app.services.ownership import require_owned_tank
 
 router = APIRouter()
 
@@ -33,7 +34,7 @@ def _enrich(entry: JournalEntry, db: Session) -> dict:
 
 
 @router.get("/{tank_id}/journal", response_model=list[JournalEntryOut])
-def list_journal(tank_id: str, db: Session = Depends(get_db)):
+def list_journal(tank_id: str, db: Session = Depends(get_db), _tank: Tank = Depends(require_owned_tank)):
     entries = (
         db.query(JournalEntry)
         .filter_by(tank_id=tank_id)
@@ -44,7 +45,7 @@ def list_journal(tank_id: str, db: Session = Depends(get_db)):
 
 
 @router.post("/{tank_id}/journal", status_code=201)
-def add_journal(tank_id: str, body: JournalEntryCreate, db: Session = Depends(get_db)):
+def add_journal(tank_id: str, body: JournalEntryCreate, db: Session = Depends(get_db), _tank: Tank = Depends(require_owned_tank)):
     if body.tank_fish_id:
         fish = db.query(TankFish).filter_by(id=body.tank_fish_id, tank_id=tank_id).first()
         if not fish:
@@ -64,7 +65,7 @@ def add_journal(tank_id: str, body: JournalEntryCreate, db: Session = Depends(ge
 
 
 @router.patch("/{tank_id}/journal/{entry_id}")
-def update_journal(tank_id: str, entry_id: str, body: JournalEntryUpdate, db: Session = Depends(get_db)):
+def update_journal(tank_id: str, entry_id: str, body: JournalEntryUpdate, db: Session = Depends(get_db), _tank: Tank = Depends(require_owned_tank)):
     entry = db.query(JournalEntry).filter_by(id=entry_id, tank_id=tank_id).first()
     if not entry:
         raise HTTPException(404, "Journal entry not found")
@@ -88,7 +89,7 @@ def update_journal(tank_id: str, entry_id: str, body: JournalEntryUpdate, db: Se
 
 
 @router.delete("/{tank_id}/journal/{entry_id}", status_code=204)
-def delete_journal(tank_id: str, entry_id: str, db: Session = Depends(get_db)):
+def delete_journal(tank_id: str, entry_id: str, db: Session = Depends(get_db), _tank: Tank = Depends(require_owned_tank)):
     entry = db.query(JournalEntry).filter_by(id=entry_id, tank_id=tank_id).first()
     if not entry:
         raise HTTPException(404, "Journal entry not found")

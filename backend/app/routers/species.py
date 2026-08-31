@@ -12,7 +12,8 @@ REQUIRED_FIELDS = ("slug", "type", "common_name", "latin_name")
 VALID_TYPES = {"fish", "plant", "invertebrate", "amphibian"}
 
 router = APIRouter()
-require_general_edit = Depends(require_permission("general", "edit"))
+require_species_edit = Depends(require_permission("species", "edit"))
+require_species_delete = Depends(require_permission("species", "delete"))
 
 
 def _parse_and_save(contents: bytes) -> dict:
@@ -142,7 +143,7 @@ def list_species(type: str | None = Query(None), search: str | None = Query(None
 
 
 @router.post("/upload")
-async def upload_species(file: UploadFile = File(...), _perm=require_general_edit):
+async def upload_species(file: UploadFile = File(...), _perm=require_species_edit):
     if not file.filename or not file.filename.lower().endswith((".yaml", ".yml")):
         raise HTTPException(status_code=400, detail="File must be a .yaml or .yml file")
     contents = await file.read()
@@ -154,7 +155,7 @@ class UrlImportBody(BaseModel):
 
 
 @router.post("/upload-url")
-async def upload_species_from_url(body: UrlImportBody, _perm=require_general_edit):
+async def upload_species_from_url(body: UrlImportBody, _perm=require_species_edit):
     url = body.url.strip()
     if not url.startswith(("http://", "https://")):
         raise HTTPException(status_code=400, detail="URL must start with http:// or https://")
@@ -190,7 +191,7 @@ def download_species_yaml(slug: str):
 
 
 @router.post("/create")
-def create_species(body: SpeciesBody, _perm=require_general_edit):
+def create_species(body: SpeciesBody, _perm=require_species_edit):
     if body.type not in VALID_TYPES:
         raise HTTPException(400, f"type must be one of: {', '.join(sorted(VALID_TYPES))}")
     if not body.slug.strip() or not body.common_name.strip() or not body.latin_name.strip():
@@ -203,7 +204,7 @@ def create_species(body: SpeciesBody, _perm=require_general_edit):
 
 
 @router.put("/{slug}")
-def update_species(slug: str, body: SpeciesBody, _perm=require_general_edit):
+def update_species(slug: str, body: SpeciesBody, _perm=require_species_edit):
     if not species_service.validate_slug(slug):
         raise HTTPException(404, f"Species not found: {slug}")
     if body.type not in VALID_TYPES:
@@ -214,3 +215,12 @@ def update_species(slug: str, body: SpeciesBody, _perm=require_general_edit):
     species_service.save_yaml(body.slug, body.type, contents)
     species_service.load()
     return {"ok": True, "slug": body.slug, "common_name": body.common_name, "type": body.type}
+
+
+@router.delete("/{slug}")
+def delete_species(slug: str, _perm=require_species_delete):
+    if not species_service.validate_slug(slug):
+        raise HTTPException(404, f"Species not found: {slug}")
+    species_service.delete_yaml_for_slug(slug)
+    species_service.load()
+    return {"ok": True}

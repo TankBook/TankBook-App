@@ -595,9 +595,11 @@ class PermissionsOut(BaseModel):
     ai: Literal["none", "use", "edit"]
     general: Literal["none", "use", "edit"]
     users: Literal["none", "use", "edit"]
+    species: Literal["none", "use", "edit", "delete"]
 
 
 class PermissionsUpdate(BaseModel):
     ai: Literal["none", "use", "edit"] | None = None
     general: Literal["none", "use", "edit"] | None = None
     users: Literal["none", "use", "edit"] | None = None
+    species: Literal["none", "use", "edit", "delete"] | None = None

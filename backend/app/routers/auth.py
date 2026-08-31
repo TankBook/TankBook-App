@@ -75,6 +75,8 @@ def _bootstrap_admin_if_first_user(db: DBSession, user: User) -> None:
     if db.query(User).count() == 1:
         for key in PERMISSION_KEYS:
             permissions_service.set_level(db, user.id, key, "edit")
+        # species has a 4th tier above "edit" — give the instance's first account full access
+        permissions_service.set_level(db, user.id, "species", "delete")
 
 
 def _settings_to_out(settings: AuthSettings) -> AuthSettingsOut:

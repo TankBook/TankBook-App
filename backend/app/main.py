@@ -14,6 +14,7 @@ from app.routers import tanks, fish, plants, parameters, alerts, species, mainte
 from app.services.species import species_service, check_compatibility
 from app.services.auth import get_current_user
 from app.services.push import notification_loop
+from app.services.ownership import require_owned_tank
 from app.database import get_db
 
 
@@ -69,7 +70,7 @@ app.include_router(push.router, prefix="/api/push", tags=["push"], dependencies=
 
 
 @app.get("/api/tanks/{tank_id}/compatibility")
-def get_compatibility(tank_id: str, slug: str, db=Depends(get_db), _user=Depends(get_current_user)):
+def get_compatibility(tank_id: str, slug: str, db=Depends(get_db), _tank=Depends(require_owned_tank)):
     return check_compatibility(db, tank_id, slug)
 
 
@@ -84,7 +85,7 @@ def dashboard_stats(db=Depends(get_db), _user=Depends(get_current_user)):
     from sqlalchemy import func
     from datetime import datetime
 
-    tanks = db.query(Tank).order_by(Tank.sort_order, Tank.created_at).all()
+    tanks = db.query(Tank).filter_by(owner_id=_user.id).order_by(Tank.sort_order, Tank.created_at).all()
     tank_ids = [t.id for t in tanks]
 
     today_start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)

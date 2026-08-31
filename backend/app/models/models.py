@@ -38,7 +38,9 @@ class Tank(Base):
     light_technology: Mapped[str | None] = mapped_column(String)
     setup_date: Mapped[datetime | None] = mapped_column(DateTime)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    owner_id: Mapped[str] = mapped_column(String, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
 
+    owner: Mapped["User"] = relationship()
     fish: Mapped[list["TankFish"]] = relationship(back_populates="tank", cascade="all, delete-orphan")
     plants: Mapped[list["TankPlant"]] = relationship(back_populates="tank", cascade="all, delete-orphan")
     parameters: Mapped[list["WaterParameter"]] = relationship(back_populates="tank", cascade="all, delete-orphan")

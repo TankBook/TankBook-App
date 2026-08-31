@@ -87,7 +87,7 @@ def delete_conversation(conversation_id: str, db: Session = Depends(get_db), _pe
 
 
 @router.post("/chat", response_model=AgentChatResponse)
-def chat(body: AgentChatRequest, db: Session = Depends(get_db), _perm=require_ai_use):
+def chat(body: AgentChatRequest, db: Session = Depends(get_db), user=require_ai_use):
     if body.conversation_id:
         conversation = db.query(Conversation).filter_by(id=body.conversation_id).first()
         if not conversation:
@@ -101,7 +101,7 @@ def chat(body: AgentChatRequest, db: Session = Depends(get_db), _perm=require_ai
     history.append(ChatMessage(role="user", content=body.message))
 
     try:
-        reply = run_agent(db, history)
+        reply = run_agent(db, history, user.id)
     except AgentNotConfigured as e:
         db.rollback()
         raise HTTPException(400, str(e))

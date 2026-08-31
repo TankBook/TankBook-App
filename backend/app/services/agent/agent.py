@@ -124,7 +124,7 @@ def draft_species(db: Session, name: str) -> dict:
     return response.tool_calls[0].arguments
 
 
-def run_agent(db: Session, messages: list[ChatMessage]) -> str:
+def run_agent(db: Session, messages: list[ChatMessage], owner_id: str) -> str:
     settings = _get_settings(db)
     provider = _build_provider(settings)
 
@@ -141,7 +141,7 @@ def run_agent(db: Session, messages: list[ChatMessage]) -> str:
             "tool_calls": [{"id": tc.id, "name": tc.name, "arguments": tc.arguments} for tc in response.tool_calls],
         })
         for tc in response.tool_calls:
-            result = execute_tool(db, tc.name, tc.arguments)
+            result = execute_tool(db, tc.name, tc.arguments, owner_id)
             convo.append({
                 "role": "tool",
                 "tool_call_id": tc.id,

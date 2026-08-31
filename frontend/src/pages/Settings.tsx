@@ -361,7 +361,7 @@ function UsersSection() {
       <section style={{ paddingBottom: 20, borderBottom: '0.5px solid var(--border-sub)' }}>
         <p style={{ fontWeight: 500, fontSize: 14, margin: '0 0 4px', color: 'var(--text)', display: 'flex', alignItems: 'center', gap: 6 }}><Lock size={14} color="var(--text-2)" />Access</p>
         <p style={{ fontSize: 12, color: 'var(--text-2)', margin: '0 0 14px' }}>
-          Everyone who's logged in shares the same tanks and data for now — this instance doesn't have per-user permissions yet.
+          Each account only sees the tanks it created. Shared, instance-wide areas like the species catalog and AI assistant are controlled per-user below.
         </p>
         <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: 'var(--text-label)' }}>
           <input
@@ -535,6 +535,23 @@ function UsersSection() {
                 >
                   <option value="none">No</option>
                   <option value="edit">Yes</option>
+                </select>
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+                <div>
+                  <p style={{ margin: 0, fontSize: 13, color: 'var(--text)', fontWeight: 500 }}>Species</p>
+                  <p style={{ margin: 0, fontSize: 12, color: 'var(--text-2)' }}>The species catalog — Use browses it, Edit can add/correct entries, Delete can also remove them</p>
+                </div>
+                <select
+                  value={permissionsDraft.species}
+                  onChange={e => setPermissionsDraft(d => (d ? { ...d, species: e.target.value as PermissionLevel } : d))}
+                  style={{ flexShrink: 0 }}
+                >
+                  <option value="none">None</option>
+                  <option value="use">Use</option>
+                  <option value="edit">Edit</option>
+                  <option value="delete">Delete</option>
                 </select>
               </div>
 

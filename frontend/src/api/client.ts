@@ -240,7 +240,7 @@ export interface ConversationDetail extends Conversation {
   messages: (ChatMessage & { created_at: string })[]
 }
 
-export type PermissionLevel = 'none' | 'use' | 'edit'
+export type PermissionLevel = 'none' | 'use' | 'edit' | 'delete'
 
 export interface DashboardSectionLayout {
   id: string
@@ -259,7 +259,7 @@ export interface AuthUser {
   dashboard_layout: DashboardSectionLayout[]
 }
 
-const PERMISSION_LEVEL_RANK: Record<PermissionLevel, number> = { none: 0, use: 1, edit: 2 }
+const PERMISSION_LEVEL_RANK: Record<PermissionLevel, number> = { none: 0, use: 1, edit: 2, delete: 3 }
 
 export function hasPermission(level: PermissionLevel | string | undefined, required: PermissionLevel): boolean {
   return (PERMISSION_LEVEL_RANK[(level as PermissionLevel) ?? 'none'] ?? 0) >= PERMISSION_LEVEL_RANK[required]
@@ -517,6 +517,7 @@ export const api = {
       post<{ ok: boolean; slug: string; common_name: string; type: string }>('/species/create', body),
     update: (slug: string, body: SpeciesBody) =>
       put<{ ok: boolean; slug: string; common_name: string; type: string }>(`/species/${slug}`, body),
+    remove: (slug: string) => del(`/species/${slug}`),
     upload: async (file: File): Promise<{ ok: boolean; slug: string; common_name: string; type: string }> => {
       const fd = new FormData()
       fd.append('file', file)

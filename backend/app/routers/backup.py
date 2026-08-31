@@ -6,7 +6,7 @@ from app.database import get_db
 from app.models.models import (
     Tank, TankFish, TankPlant, WaterParameter, MaintenanceTask,
     Alert, DailyTask, JournalEntry, AppSettings, Expense, InventoryItem,
-    Room, RoomTankPosition,
+    Room, RoomTankPosition, User,
 )
 from app.services.permissions import require_permission
 
@@ -46,6 +46,7 @@ def export_backup(db: Session = Depends(get_db), _perm=require_general_edit):
 
         tanks_out.append({
             "id": tank.id, "name": tank.name, "volume_litres": tank.volume_litres,
+            "owner_id": tank.owner_id,
             "water_type": tank.water_type, "sort_order": tank.sort_order,
             "substrate": tank.substrate, "lighting": tank.lighting,
             "has_filter": tank.has_filter, "filter_flow_lph": tank.filter_flow_lph,
@@ -134,7 +135,7 @@ def export_backup(db: Session = Depends(get_db), _perm=require_general_edit):
 
 
 @router.post("/import")
-def import_backup(payload: dict, db: Session = Depends(get_db), _perm=require_general_edit):
+def import_backup(payload: dict, db: Session = Depends(get_db), user: User = require_general_edit):
     if payload.get("version") != BACKUP_VERSION:
         raise HTTPException(400, f"Unsupported backup version: {payload.get('version')}. Expected {BACKUP_VERSION}.")
 
@@ -169,10 +170,17 @@ def import_backup(payload: dict, db: Session = Depends(get_db), _perm=require_ge
     s.feeding_amount_presets_json = json.dumps(presets) if presets else None
     db.commit()
 
+    valid_user_ids = {u.id for u in db.query(User.id).all()}
+
     tanks_restored = 0
     for t in payload.get("tanks", []):
+        owner_id = t.get("owner_id")
+        if owner_id not in valid_user_ids:
+            # Backup predates ownership, or was made on a different instance —
+            # fall back to whoever is running this restore.
+            owner_id = user.id
         tank = Tank(
-            id=t["id"], name=t["name"], volume_litres=t["volume_litres"],
+            id=t["id"], name=t["name"], volume_litres=t["volume_litres"], owner_id=owner_id,
             water_type=t.get("water_type", "freshwater"), sort_order=t.get("sort_order", 0),
             substrate=t.get("substrate"), lighting=t.get("lighting"),
             has_filter=t.get("has_filter", False), filter_flow_lph=t.get("filter_flow_lph"),

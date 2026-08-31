@@ -2,9 +2,10 @@ from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from app.database import get_db
-from app.models.models import HealthCase, TankFish
+from app.models.models import HealthCase, TankFish, Tank
 from app.schemas.schemas import HealthCaseCreate, HealthCaseUpdate, HealthCaseOut
 from app.services.species import species_service
+from app.services.ownership import require_owned_tank
 
 router = APIRouter()
 
@@ -34,7 +35,7 @@ def _enrich(case: HealthCase, db: Session) -> dict:
 
 
 @router.get("/{tank_id}/health-cases", response_model=list[HealthCaseOut])
-def list_health_cases(tank_id: str, db: Session = Depends(get_db)):
+def list_health_cases(tank_id: str, db: Session = Depends(get_db), _tank: Tank = Depends(require_owned_tank)):
     cases = (
         db.query(HealthCase)
         .filter_by(tank_id=tank_id)
@@ -45,7 +46,7 @@ def list_health_cases(tank_id: str, db: Session = Depends(get_db)):
 
 
 @router.post("/{tank_id}/health-cases", status_code=201)
-def add_health_case(tank_id: str, body: HealthCaseCreate, db: Session = Depends(get_db)):
+def add_health_case(tank_id: str, body: HealthCaseCreate, db: Session = Depends(get_db), _tank: Tank = Depends(require_owned_tank)):
     fish = None
     if body.tank_fish_id:
         fish = db.query(TankFish).filter_by(id=body.tank_fish_id, tank_id=tank_id).first()
@@ -66,7 +67,7 @@ def add_health_case(tank_id: str, body: HealthCaseCreate, db: Session = Depends(
 
 
 @router.patch("/{tank_id}/health-cases/{case_id}")
-def update_health_case(tank_id: str, case_id: str, body: HealthCaseUpdate, db: Session = Depends(get_db)):
+def update_health_case(tank_id: str, case_id: str, body: HealthCaseUpdate, db: Session = Depends(get_db), _tank: Tank = Depends(require_owned_tank)):
     case = db.query(HealthCase).filter_by(id=case_id, tank_id=tank_id).first()
     if not case:
         raise HTTPException(404, "Case not found")
@@ -96,7 +97,7 @@ def update_health_case(tank_id: str, case_id: str, body: HealthCaseUpdate, db: S
 
 
 @router.delete("/{tank_id}/health-cases/{case_id}", status_code=204)
-def delete_health_case(tank_id: str, case_id: str, db: Session = Depends(get_db)):
+def delete_health_case(tank_id: str, case_id: str, db: Session = Depends(get_db), _tank: Tank = Depends(require_owned_tank)):
     case = db.query(HealthCase).filter_by(id=case_id, tank_id=tank_id).first()
     if not case:
         raise HTTPException(404, "Case not found")

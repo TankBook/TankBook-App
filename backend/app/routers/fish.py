@@ -1,9 +1,10 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from app.database import get_db
-from app.models.models import TankFish
+from app.models.models import TankFish, Tank
 from app.schemas.schemas import TankFishCreate, TankFishOut, TankFishUpdate
 from app.services.species import species_service
+from app.services.ownership import require_owned_tank
 
 router = APIRouter()
 
@@ -29,12 +30,12 @@ def _enrich(row: TankFish) -> dict:
 
 
 @router.get("/{tank_id}/fish")
-def list_fish(tank_id: str, db: Session = Depends(get_db)):
+def list_fish(tank_id: str, db: Session = Depends(get_db), _tank: Tank = Depends(require_owned_tank)):
     return [_enrich(row) for row in db.query(TankFish).filter_by(tank_id=tank_id).all()]
 
 
 @router.post("/{tank_id}/fish", status_code=201)
-def add_fish(tank_id: str, body: TankFishCreate, db: Session = Depends(get_db)):
+def add_fish(tank_id: str, body: TankFishCreate, db: Session = Depends(get_db), _tank: Tank = Depends(require_owned_tank)):
     if not species_service.validate_slug(body.species_slug):
         raise HTTPException(422, f"Unknown species slug: {body.species_slug}")
     target = (db.query(TankFish)
@@ -51,7 +52,7 @@ def add_fish(tank_id: str, body: TankFishCreate, db: Session = Depends(get_db)):
 
 
 @router.patch("/{tank_id}/fish/{fish_id}")
-def update_fish(tank_id: str, fish_id: str, body: TankFishUpdate, db: Session = Depends(get_db)):
+def update_fish(tank_id: str, fish_id: str, body: TankFishUpdate, db: Session = Depends(get_db), _tank: Tank = Depends(require_owned_tank)):
     row = db.query(TankFish).filter_by(id=fish_id, tank_id=tank_id).first()
     if not row:
         raise HTTPException(404, "Fish entry not found")
@@ -81,7 +82,7 @@ def update_fish(tank_id: str, fish_id: str, body: TankFishUpdate, db: Session = 
 
 
 @router.delete("/{tank_id}/fish/{fish_id}", status_code=204)
-def remove_fish(tank_id: str, fish_id: str, db: Session = Depends(get_db)):
+def remove_fish(tank_id: str, fish_id: str, db: Session = Depends(get_db), _tank: Tank = Depends(require_owned_tank)):
     row = db.query(TankFish).filter_by(id=fish_id, tank_id=tank_id).first()
     if not row: raise HTTPException(404, "Fish entry not found")
     db.delete(row); db.commit()
