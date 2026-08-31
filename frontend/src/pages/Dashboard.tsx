@@ -77,13 +77,17 @@ function DashboardSection({
   const visible = layout.find(s => s.id === id)?.visible ?? true
   if (!editMode && !visible) return null
   return (
-    <div style={{ position: 'relative', opacity: editMode && !visible ? 0.5 : 1, paddingTop: editMode ? 34 : 0 }}>
+    <div style={editMode ? {
+      position: 'relative', opacity: visible ? 1 : 0.5,
+      border: '1px dashed var(--border)', borderRadius: 14,
+      padding: '40px 12px 12px', margin: '0 0 16px',
+    } : { position: 'relative' }}>
       {editMode && (
         <button
           onClick={() => onToggle(id)}
           title={visible ? 'Hide this section' : 'Show this section'}
           style={{
-            position: 'absolute', top: 0, right: 0, zIndex: 1,
+            position: 'absolute', top: 8, right: 8, zIndex: 1,
             display: 'flex', alignItems: 'center', gap: 6,
             padding: '4px 10px', borderRadius: 999, fontSize: 12, fontWeight: 500,
             border: `0.5px solid ${visible ? 'var(--blue-border)' : 'var(--btn-border)'}`,
