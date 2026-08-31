@@ -701,7 +701,7 @@ function EditTankPanel({ tank, onSave }: { tank: any; onSave: () => void }) {
           <div style={{ background: 'var(--red-bg)', border: '0.5px solid var(--red-border)', borderRadius: 10, padding: '14px 16px' }}>
             <p style={{ margin: '0 0 4px', fontSize: 13, fontWeight: 500, color: 'var(--red)' }}>Delete "{tank.name}"?</p>
             <p style={{ margin: '0 0 14px', fontSize: 12, color: 'var(--red)', opacity: 0.8 }}>
-              This will permanently remove the tank and all its fish, plants, water parameters, maintenance tasks, and journal entries. This cannot be undone.
+              This will permanently remove the tank and everything tied to it — fish, plants, water parameters, maintenance and daily tasks, alerts, journal entries, and health cases. This cannot be undone.
             </p>
             <div style={{ display: 'flex', gap: 8 }}>
               <button

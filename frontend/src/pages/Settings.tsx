@@ -286,7 +286,7 @@ function UsersSection() {
       <section style={{ paddingBottom: 20, borderBottom: '0.5px solid var(--border-sub)', minWidth: 0 }}>
         <p style={{ fontWeight: 500, fontSize: 14, margin: '0 0 4px', color: 'var(--text)', display: 'flex', alignItems: 'center', gap: 6 }}><UsersIcon size={14} color="var(--text-2)" />Users</p>
         <p style={{ fontSize: 12, color: 'var(--text-2)', margin: '0 0 14px' }}>
-          Everyone with an account on this instance, local or via SSO. There's no role system yet — every account has the same access.
+          Everyone with an account on this instance, local or via SSO. New accounts start with no admin access — use the shield icon to grant AI, Species, General, or User-management permissions per account.
         </p>
 
         {loadingUsers ? (
