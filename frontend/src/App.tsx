@@ -412,7 +412,6 @@ function Nav() {
       {isMobile ? (
         <>
           <QuickAdd />
-          {logoutButton}
           <button
             onClick={() => setMenuOpen(o => !o)}
             style={{
