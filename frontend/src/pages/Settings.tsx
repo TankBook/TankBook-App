@@ -305,21 +305,23 @@ function UsersSection() {
                 </tr>
               </thead>
               <tbody>
-                {users.map(u => (
+                {users.map((u, i) => {
+                  const border = i === users.length - 1 ? 'none' : '0.5px solid var(--border-sub)'
+                  return (
                   <tr key={u.id}>
-                    <td style={{ padding: '8px 10px', color: 'var(--text)', borderBottom: '0.5px solid var(--border-sub)' }}>{u.display_name || '—'}</td>
-                    <td style={{ padding: '8px 10px', color: 'var(--text)', borderBottom: '0.5px solid var(--border-sub)' }}>{u.email}</td>
-                    <td style={{ padding: '8px 10px', borderBottom: '0.5px solid var(--border-sub)' }}>
+                    <td style={{ padding: '8px 10px', color: 'var(--text)', borderBottom: border }}>{u.display_name || '—'}</td>
+                    <td style={{ padding: '8px 10px', color: 'var(--text)', borderBottom: border }}>{u.email}</td>
+                    <td style={{ padding: '8px 10px', borderBottom: border }}>
                       <span style={{ display: 'inline-flex', gap: 4 }}>
                         {u.has_password && <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 6, background: 'var(--surface-2)', color: 'var(--text-2)' }}>Local</span>}
                         {u.has_oidc && <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 6, background: 'var(--blue-bg)', color: 'var(--blue)' }}>SSO</span>}
                       </span>
                     </td>
-                    <td style={{ padding: '8px 10px', color: 'var(--text-2)', borderBottom: '0.5px solid var(--border-sub)' }}>{formatDate(u.created_at, dateFormat)}</td>
-                    <td style={{ padding: '8px 10px', color: 'var(--text-2)', borderBottom: '0.5px solid var(--border-sub)' }}>
+                    <td style={{ padding: '8px 10px', color: 'var(--text-2)', borderBottom: border }}>{formatDate(u.created_at, dateFormat)}</td>
+                    <td style={{ padding: '8px 10px', color: 'var(--text-2)', borderBottom: border }}>
                       {u.last_login_at ? formatDateTime(u.last_login_at, dateFormat) : 'Never'}
                     </td>
-                    <td style={{ padding: '8px 10px', borderBottom: '0.5px solid var(--border-sub)', textAlign: 'right', whiteSpace: 'nowrap' }}>
+                    <td style={{ padding: '8px 10px', borderBottom: border, textAlign: 'right', whiteSpace: 'nowrap' }}>
                       <button
                         onClick={() => openEdit(u)}
                         title="Edit user"
@@ -348,7 +350,8 @@ function UsersSection() {
                       </button>
                     </td>
                   </tr>
-                ))}
+                  )
+                })}
               </tbody>
             </table>
           </div>
