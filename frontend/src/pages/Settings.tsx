@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
-import { Info, Download, Upload, Droplets, RefreshCw, Bell, Globe, Utensils, X, AlertTriangle, HardDrive, Fish, Image as ImageIcon, Bot, Lock, SlidersHorizontal, Users as UsersIcon, KeyRound, Pencil, Trash2, Shield, type LucideIcon } from 'lucide-react'
+import { Info, Download, Upload, Droplets, RefreshCw, Bell, Globe, Utensils, X, AlertTriangle, HardDrive, Fish, Image as ImageIcon, Bot, Lock, SlidersHorizontal, Users as UsersIcon, KeyRound, Pencil, Trash2, Shield, HelpCircle, type LucideIcon } from 'lucide-react'
 import { useSettings, formatDate, formatDateTime } from '../context/SettingsContext'
 import { Card, Modal, ConfirmDialog, StatCard, FieldLabel } from '../components/ui'
 import { api, hasPermission, Tank, AgentSettings, AuthSettings, UserListItem, PermissionLevel, ExportSelection } from '../api/client'
@@ -140,7 +140,7 @@ function AgentSettingsSection() {
 }
 
 function UsersSection() {
-  const { dateFormat } = useSettings()
+  const { dateFormat, appUrl } = useSettings()
   const { user: currentUser } = useAuth()
   const [users, setUsers] = useState<UserListItem[]>([])
   const [loadingUsers, setLoadingUsers] = useState(true)
@@ -169,6 +169,7 @@ function UsersSection() {
   const [loadingOidc, setLoadingOidc] = useState(true)
   const [savingOidc, setSavingOidc] = useState(false)
   const [oidcSaved, setOidcSaved] = useState(false)
+  const [showOidcHelp, setShowOidcHelp] = useState(false)
   const [oidcError, setOidcError] = useState<string | null>(null)
 
   function refreshUsers() {
@@ -376,7 +377,16 @@ function UsersSection() {
 
       {!loadingOidc && (
         <section>
-          <p style={{ fontWeight: 500, fontSize: 14, margin: '0 0 4px', color: 'var(--text)', display: 'flex', alignItems: 'center', gap: 6 }}><KeyRound size={14} color="var(--text-2)" />Single Sign-On (OIDC)</p>
+          <p style={{ fontWeight: 500, fontSize: 14, margin: '0 0 4px', color: 'var(--text)', display: 'flex', alignItems: 'center', gap: 6 }}>
+            <KeyRound size={14} color="var(--text-2)" />Single Sign-On (OIDC)
+            <button
+              onClick={() => setShowOidcHelp(true)}
+              title="What does the OIDC provider need to be configured with?"
+              style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 18, height: 18, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-3)', padding: 0, lineHeight: 0 }}
+            >
+              <HelpCircle size={14} />
+            </button>
+          </p>
           <p style={{ fontSize: 12, color: 'var(--text-2)', margin: '0 0 14px' }}>
             Let people sign in with an external identity provider (Authentik, Keycloak, Google, etc). Leave the issuer URL blank to turn SSO off — the login screen will only show local email/password.
           </p>
@@ -438,6 +448,72 @@ function UsersSection() {
             </div>
           </div>
         </section>
+      )}
+
+      {showOidcHelp && (
+        <Modal title="OIDC Provider Setup" onClose={() => setShowOidcHelp(false)} width={460}>
+          <p style={{ margin: '0 0 16px', fontSize: 12, color: 'var(--text-2)', lineHeight: 1.5 }}>
+            Register TankBook as a client application on your identity provider (Authentik, Keycloak, Google, etc)
+            with the settings below, then copy the values it gives you into the fields on the left.
+          </p>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+            <div>
+              <p style={{ margin: '0 0 4px', fontSize: 12, fontWeight: 600, color: 'var(--text)' }}>Redirect / Callback URI</p>
+              <p style={{
+                margin: '0 0 4px', fontSize: 12, fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
+                background: 'var(--tag-bg)', padding: '6px 10px', borderRadius: 6, color: 'var(--text)',
+                wordBreak: 'break-all',
+              }}>
+                {(appUrl ? appUrl.replace(/\/$/, '') : window.location.origin)}/api/auth/oidc/callback
+              </p>
+              <p style={{ margin: 0, fontSize: 11, color: 'var(--text-3)' }}>
+                Must be registered exactly, path included. Set the "App URL" in General settings first if this
+                instance sits behind a different address than the one you're viewing it from now.
+              </p>
+            </div>
+
+            <div>
+              <p style={{ margin: '0 0 4px', fontSize: 12, fontWeight: 600, color: 'var(--text)' }}>Client type</p>
+              <p style={{ margin: 0, fontSize: 12, color: 'var(--text-2)' }}>
+                Confidential / server-side client using the Authorization Code grant — TankBook sends a Client Secret
+                when exchanging the code, so a public/SPA-only client won't work.
+              </p>
+            </div>
+
+            <div>
+              <p style={{ margin: '0 0 4px', fontSize: 12, fontWeight: 600, color: 'var(--text)' }}>Scopes</p>
+              <p style={{ margin: 0, fontSize: 12, color: 'var(--text-2)' }}>
+                <code style={{ fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace' }}>openid email profile</code> — make
+                sure the provider is set to actually release the <code style={{ fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace' }}>email</code> claim
+                to this client; sign-in fails without it. The <code style={{ fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace' }}>name</code> claim
+                is optional and only used to pre-fill a display name the first time someone signs in.
+              </p>
+            </div>
+
+            <div>
+              <p style={{ margin: '0 0 4px', fontSize: 12, fontWeight: 600, color: 'var(--text)' }}>Issuer URL</p>
+              <p style={{ margin: 0, fontSize: 12, color: 'var(--text-2)' }}>
+                Enter the base issuer URL your provider advertises — TankBook discovers everything else itself from
+                <code style={{ fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace' }}> {'{issuer}'}/.well-known/openid-configuration</code>,
+                so that endpoint needs to be reachable from this server.
+              </p>
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 20 }}>
+            <button
+              onClick={() => setShowOidcHelp(false)}
+              style={{
+                fontSize: 13, padding: '7px 16px', borderRadius: 8,
+                border: '0.5px solid var(--btn-border)', background: 'transparent', color: 'var(--text)',
+                cursor: 'pointer',
+              }}
+            >
+              Close
+            </button>
+          </div>
+        </Modal>
       )}
 
       {editingUser && (
