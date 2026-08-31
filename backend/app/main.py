@@ -83,21 +83,38 @@ def health():
 def dashboard_stats(db=Depends(get_db), _user=Depends(get_current_user)):
     from app.models.models import Tank, TankFish, TankPlant, WaterParameter, MaintenanceTask, Alert
     from sqlalchemy import func
-    from datetime import datetime
+    from datetime import datetime, timedelta
 
     tanks = db.query(Tank).filter_by(owner_id=_user.id).order_by(Tank.sort_order, Tank.created_at).all()
     tank_ids = [t.id for t in tanks]
 
     today_start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+    today_end = today_start + timedelta(days=1)
 
-    fish_count = db.query(func.sum(TankFish.quantity)).filter(TankFish.tank_id.in_(tank_ids), TankFish.fish_status == "added").scalar() or 0
-    plant_count = db.query(func.sum(TankPlant.quantity)).filter(TankPlant.tank_id.in_(tank_ids)).scalar() or 0
-    species_count = db.query(func.count(func.distinct(TankFish.species_slug))).filter(TankFish.tank_id.in_(tank_ids), TankFish.fish_status == "added").scalar() or 0
+    def _species_count(organism_type: str) -> int:
+        return db.query(func.count(func.distinct(TankFish.species_slug))).filter(
+            TankFish.tank_id.in_(tank_ids), TankFish.fish_status == "added",
+            TankFish.organism_type == organism_type,
+        ).scalar() or 0
+
+    fish_count = db.query(func.sum(TankFish.quantity)).filter(
+        TankFish.tank_id.in_(tank_ids), TankFish.fish_status == "added", TankFish.organism_type == "fish",
+    ).scalar() or 0
+    fish_species = _species_count("fish")
+    invertebrate_species = _species_count("invertebrate")
+    amphibian_species = _species_count("amphibian")
+    plant_species = db.query(func.count(func.distinct(TankPlant.species_slug))).filter(TankPlant.tank_id.in_(tank_ids)).scalar() or 0
     unack_alerts = db.query(Alert).filter(Alert.tank_id.in_(tank_ids), Alert.acknowledged == False).count()
     overdue_tasks = db.query(MaintenanceTask).filter(
         MaintenanceTask.tank_id.in_(tank_ids),
         MaintenanceTask.status == "pending",
         MaintenanceTask.due_at < today_start
+    ).count()
+    tasks_due_today = db.query(MaintenanceTask).filter(
+        MaintenanceTask.tank_id.in_(tank_ids),
+        MaintenanceTask.status == "pending",
+        MaintenanceTask.due_at >= today_start,
+        MaintenanceTask.due_at < today_end,
     ).count()
     upcoming_tasks = db.query(MaintenanceTask).filter(
         MaintenanceTask.tank_id.in_(tank_ids),
@@ -144,11 +161,14 @@ def dashboard_stats(db=Depends(get_db), _user=Depends(get_current_user)):
 
     return {
         "total_tanks": len(tanks),
-        "total_fish": fish_count,
-        "total_species": species_count,
-        "total_plants": plant_count,
+        "fish_count": fish_count,
+        "fish_species": fish_species,
+        "invertebrate_species": invertebrate_species,
+        "amphibian_species": amphibian_species,
+        "plant_species": plant_species,
         "unack_alerts": unack_alerts,
         "overdue_tasks": overdue_tasks,
+        "tasks_due_today": tasks_due_today,
         "upcoming_tasks": [
             {
                 "id": t.id, "tank_id": t.tank_id, "task_type": t.task_type,

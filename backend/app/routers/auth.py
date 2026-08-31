@@ -7,7 +7,7 @@ from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session as DBSession
 
 from app.database import get_db
-from app.models.models import User, AuthSettings, DASHBOARD_SECTION_IDS
+from app.models.models import User, AuthSettings, DASHBOARD_SECTION_IDS, DASHBOARD_STAT_KEYS
 from app.schemas.schemas import (
     RegisterRequest, LoginRequest, ChangePasswordRequest, UserOut, UserListItemOut, UserUpdateRequest,
     AuthConfigOut, AuthSettingsOut, AuthSettingsUpdate, PermissionsOut, PermissionsUpdate, ProfileUpdate,
@@ -57,6 +57,7 @@ def _to_out(db: DBSession, user: User) -> UserOut:
         date_format=user.date_format, unit_system=user.unit_system,
         notifications_enabled=user.notifications_enabled,
         dashboard_layout=user.dashboard_layout,
+        dashboard_stats=user.dashboard_stats,
     )
 
 
@@ -163,6 +164,10 @@ def update_profile(body: ProfileUpdate, user: User = Depends(get_current_user), 
         layout = data.pop("dashboard_layout")
         cleaned = [item for item in layout if item.get("id") in DASHBOARD_SECTION_IDS]
         user.dashboard_layout_json = json.dumps(cleaned) if cleaned else None
+    if "dashboard_stats" in data:
+        keys = data.pop("dashboard_stats")
+        cleaned_keys = [k for k in keys if k in DASHBOARD_STAT_KEYS][:6]
+        user.dashboard_stats_json = json.dumps(cleaned_keys) if cleaned_keys else None
     for k, v in data.items():
         setattr(user, k, v)
     db.commit()

@@ -21,6 +21,8 @@ interface SettingsContextValue {
   setFeedingAmountPresets: (presets: string[]) => Promise<void>
   dashboardLayout: DashboardSectionLayout[]
   setDashboardLayout: (layout: DashboardSectionLayout[]) => Promise<void>
+  dashboardStats: string[]
+  setDashboardStats: (keys: string[]) => Promise<void>
   theme: Theme
   toggleTheme: () => void
   loading: boolean
@@ -41,6 +43,8 @@ const SettingsContext = createContext<SettingsContextValue>({
   setFeedingAmountPresets: async () => {},
   dashboardLayout: [],
   setDashboardLayout: async () => {},
+  dashboardStats: [],
+  setDashboardStats: async () => {},
   theme: 'light',
   toggleTheme: () => {},
   loading: true,
@@ -53,6 +57,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
   const dateFormat = (user?.date_format as DateFormat) ?? 'DD/MM/YYYY'
   const unitSystem = (user?.unit_system as UnitSystem) ?? 'cm'
   const dashboardLayout = user?.dashboard_layout ?? []
+  const dashboardStats = user?.dashboard_stats ?? []
   const [defaultTank, setDefaultTankState] = useState<string | null>(null)
   const [alertRetentionDays, setAlertRetentionDaysState] = useState<number | null>(null)
   const [appUrl, setAppUrlState] = useState<string | null>(null)
@@ -90,6 +95,10 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
 
   async function setDashboardLayout(layout: DashboardSectionLayout[]) {
     await updateProfile({ dashboard_layout: layout })
+  }
+
+  async function setDashboardStats(keys: string[]) {
+    await updateProfile({ dashboard_stats: keys })
   }
 
   async function setDefaultTank(id: string | null) {
@@ -133,7 +142,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
   }
 
   return (
-    <SettingsContext.Provider value={{ dateFormat, setDateFormat, unitSystem, setUnitSystem, defaultTank, setDefaultTank, alertRetentionDays, setAlertRetentionDays, appUrl, setAppUrl, feedingAmountPresets, setFeedingAmountPresets, dashboardLayout, setDashboardLayout, theme, toggleTheme, loading }}>
+    <SettingsContext.Provider value={{ dateFormat, setDateFormat, unitSystem, setUnitSystem, defaultTank, setDefaultTank, alertRetentionDays, setAlertRetentionDays, appUrl, setAppUrl, feedingAmountPresets, setFeedingAmountPresets, dashboardLayout, setDashboardLayout, dashboardStats, setDashboardStats, theme, toggleTheme, loading }}>
       {children}
     </SettingsContext.Provider>
   )

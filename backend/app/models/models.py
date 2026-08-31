@@ -331,6 +331,14 @@ class InventoryItem(Base):
 
 DASHBOARD_SECTION_IDS = ["stats", "tanks", "tasks", "tap_water"]
 
+# The 6 stat-card slots along the top of the dashboard — static in number and
+# position, but each slot's content is chosen from this set, per user.
+DASHBOARD_STAT_KEYS = [
+    "tanks", "fish", "fish_species", "invertebrate_species", "amphibian_species",
+    "tasks_due_today", "plant_species", "alerts", "overdue_tasks",
+]
+DEFAULT_DASHBOARD_STATS = ["tanks", "fish", "fish_species", "plant_species", "alerts", "overdue_tasks"]
+
 
 class User(Base):
     __tablename__ = "users"
@@ -344,6 +352,7 @@ class User(Base):
     unit_system: Mapped[str] = mapped_column(String, default="cm")
     notifications_enabled: Mapped[bool] = mapped_column(Boolean, default=False)
     dashboard_layout_json: Mapped[str | None] = mapped_column(Text, nullable=True)
+    dashboard_stats_json: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     last_login_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
@@ -355,6 +364,17 @@ class User(Base):
         saved = json.loads(self.dashboard_layout_json) if self.dashboard_layout_json else []
         visible_by_id = {item["id"]: item.get("visible", True) for item in saved if isinstance(item, dict) and "id" in item}
         return [{"id": sid, "visible": visible_by_id.get(sid, True)} for sid in DASHBOARD_SECTION_IDS]
+
+    @property
+    def dashboard_stats(self) -> list[str]:
+        saved = json.loads(self.dashboard_stats_json) if self.dashboard_stats_json else []
+        keys = [k for k in saved if k in DASHBOARD_STAT_KEYS][:6]
+        for default in DEFAULT_DASHBOARD_STATS:
+            if len(keys) >= 6:
+                break
+            if default not in keys:
+                keys.append(default)
+        return keys
 
 
 class Session(Base):

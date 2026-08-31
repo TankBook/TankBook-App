@@ -544,6 +544,7 @@ class UserOut(BaseModel):
     unit_system: str
     notifications_enabled: bool
     dashboard_layout: list[DashboardSectionLayout] = []
+    dashboard_stats: list[str] = []
 
 
 class ProfileUpdate(BaseModel):
@@ -551,6 +552,7 @@ class ProfileUpdate(BaseModel):
     unit_system: str | None = None
     notifications_enabled: bool | None = None
     dashboard_layout: list[DashboardSectionLayout] | None = None
+    dashboard_stats: list[str] | None = None
 
 
 class UserListItemOut(BaseModel):

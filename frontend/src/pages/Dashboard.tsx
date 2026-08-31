@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Layers, Fish, Leaf, Bug, Waves, Bell, Clock, Plus, AlertTriangle, Timer, Thermometer, FlaskConical, GripVertical, Filter, Droplets, X, ChevronUp, ChevronDown, Eye, EyeOff, Pencil } from 'lucide-react'
+import { Layers, Fish, Leaf, Bug, Waves, Bell, Clock, CalendarClock, Plus, AlertTriangle, Timer, Thermometer, FlaskConical, GripVertical, Filter, Droplets, X, ChevronUp, ChevronDown, Eye, EyeOff, Pencil, type LucideIcon } from 'lucide-react'
 import { useTanks } from '../hooks'
 import { api, type TapWaterTest, type DashboardSectionLayout } from '../api/client'
 import { useSettings, formatDate, toMM, dimInputProps } from '../context/SettingsContext'
@@ -8,11 +8,14 @@ import { Card, FieldLabel, StatCard, Tag } from '../components/ui'
 
 interface DashboardStats {
   total_tanks: number
-  total_fish: number
-  total_species: number
-  total_plants: number
+  fish_count: number
+  fish_species: number
+  invertebrate_species: number
+  amphibian_species: number
+  plant_species: number
   unack_alerts: number
   overdue_tasks: number
+  tasks_due_today: number
   upcoming_tasks: Array<{
     id: string; tank_id: string; task_type: string
     description: string | null; due_at: string; is_recurring: boolean; recur_every_weeks: number | null
@@ -28,6 +31,54 @@ interface DashboardStats {
     latest_ammonia: number | null; latest_nitrite: number | null; latest_nitrate: number | null
     latest_recorded: string | null
   }>
+}
+
+// The 6 stat-card slots along the top are static in number/position, but each
+// slot's content is user-configurable in edit mode, picked from this set.
+const STAT_DEFS: Record<string, { label: string; icon: LucideIcon; value: (s: DashboardStats) => number; accent?: (v: number) => string | undefined }> = {
+  tanks:                 { label: 'Tanks',                 icon: Layers,        value: s => s.total_tanks },
+  fish:                  { label: 'Fish',                  icon: Fish,          value: s => s.fish_count },
+  fish_species:          { label: 'Fish Species',           icon: Fish,          value: s => s.fish_species },
+  invertebrate_species:  { label: 'Invertebrate Species',   icon: Bug,           value: s => s.invertebrate_species },
+  amphibian_species:     { label: 'Amphibian Species',      icon: Waves,         value: s => s.amphibian_species },
+  tasks_due_today:       { label: 'Tasks Due Today',        icon: CalendarClock, value: s => s.tasks_due_today, accent: v => v > 0 ? 'var(--amber)' : undefined },
+  plant_species:         { label: 'Plant Species',          icon: Leaf,          value: s => s.plant_species },
+  alerts:                { label: 'Alerts',                 icon: Bell,          value: s => s.unack_alerts, accent: v => v > 0 ? 'var(--amber)' : undefined },
+  overdue_tasks:         { label: 'Overdue Tasks',           icon: Clock,         value: s => s.overdue_tasks, accent: v => v > 0 ? 'var(--red)' : undefined },
+}
+const STAT_KEYS = Object.keys(STAT_DEFS)
+const DEFAULT_STAT_KEYS = ['tanks', 'fish', 'fish_species', 'plant_species', 'alerts', 'overdue_tasks']
+
+function ConfigurableStatCard({ statKey, stats, editMode, usedElsewhere, onChange }: {
+  statKey: string
+  stats: DashboardStats
+  editMode: boolean
+  usedElsewhere: Set<string>
+  onChange: (key: string) => void
+}) {
+  const def = STAT_DEFS[statKey] ?? STAT_DEFS[DEFAULT_STAT_KEYS[0]]
+  const value = def.value(stats)
+  const accent = def.accent?.(value)
+  if (!editMode) {
+    return <StatCard label={def.label} value={value} icon={def.icon} accent={accent} />
+  }
+  return (
+    <div style={{ background: 'var(--surface)', border: '0.5px solid var(--border)', borderRadius: 12, padding: '10px 16px 14px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4, gap: 6 }}>
+        <select
+          value={statKey}
+          onChange={e => onChange(e.target.value)}
+          style={{ fontSize: 11, color: 'var(--text-2)', border: '0.5px solid var(--btn-border)', borderRadius: 6, background: 'var(--surface)', padding: '2px 4px', maxWidth: '100%' }}
+        >
+          {STAT_KEYS.filter(k => k === statKey || !usedElsewhere.has(k)).map(k => (
+            <option key={k} value={k}>{STAT_DEFS[k].label}</option>
+          ))}
+        </select>
+        <def.icon size={14} color="var(--text-3)" />
+      </div>
+      <p style={{ fontSize: 24, fontWeight: 500, margin: 0, color: accent ?? 'var(--text)' }}>{value}</p>
+    </div>
+  )
 }
 
 const WATER_TYPE_STYLES: Record<string, { bg: string; color: string; label: string }> = {
@@ -285,7 +336,7 @@ function todayIso() {
 
 export default function Dashboard() {
   const { loading, reload } = useTanks()
-  const { dateFormat, unitSystem, dashboardLayout, setDashboardLayout } = useSettings()
+  const { dateFormat, unitSystem, dashboardLayout, setDashboardLayout, dashboardStats, setDashboardStats } = useSettings()
   const dimProps = dimInputProps(unitSystem)
   const [stats, setStats] = useState<DashboardStats | null>(null)
   const [showForm, setShowForm] = useState(false)
@@ -457,14 +508,26 @@ export default function Dashboard() {
   const hasAnyTwValue = [twPh, twGh, twKh, twChlorine, twNitrate, twTds].some(v => v.trim() !== '')
   const latestTapWater = tapWaterTests[0]
 
+  const statSlots = dashboardStats.length === 6 ? dashboardStats : DEFAULT_STAT_KEYS
+
+  function handleStatSlotChange(slotIndex: number, key: string) {
+    const next = [...statSlots]
+    next[slotIndex] = key
+    setDashboardStats(next)
+  }
+
   const statsRow = (
     <div style={{ display: 'grid', gridTemplateColumns: `repeat(${isMobile ? 2 : isTabletWidth ? 3 : 6}, 1fr)`, gap: 10, marginBottom: 24 }}>
-      <StatCard label="Tanks" value={stats.total_tanks} icon={Layers} />
-      <StatCard label="Fish" value={stats.total_fish} icon={Fish} />
-      <StatCard label="Fish species" value={stats.total_species} icon={Fish} />
-      <StatCard label="Plant species" value={stats.total_plants} icon={Leaf} />
-      <StatCard label="Alerts" value={stats.unack_alerts} icon={Bell} accent={stats.unack_alerts > 0 ? 'var(--amber)' : undefined} />
-      <StatCard label="Overdue tasks" value={stats.overdue_tasks} icon={Clock} accent={stats.overdue_tasks > 0 ? 'var(--red)' : undefined} />
+      {statSlots.map((key, i) => (
+        <ConfigurableStatCard
+          key={i}
+          statKey={key}
+          stats={stats}
+          editMode={editMode}
+          usedElsewhere={new Set(statSlots.filter((_, j) => j !== i))}
+          onChange={newKey => handleStatSlotChange(i, newKey)}
+        />
+      ))}
     </div>
   )
 
