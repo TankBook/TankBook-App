@@ -49,13 +49,13 @@ const STAT_DEFS: Record<string, { label: string; icon: LucideIcon; value: (s: Da
 const STAT_KEYS = Object.keys(STAT_DEFS)
 const DEFAULT_STAT_KEYS = ['tanks', 'fish', 'fish_species', 'plant_species', 'alerts', 'overdue_tasks']
 
-function ConfigurableStatCard({ statKey, stats, editMode, usedElsewhere, onChange }: {
+function ConfigurableStatCard({ statKey, stats, editMode, onEdit }: {
   statKey: string
   stats: DashboardStats
   editMode: boolean
-  usedElsewhere: Set<string>
-  onChange: (key: string) => void
+  onEdit: () => void
 }) {
+  const [hovered, setHovered] = useState(false)
   const def = STAT_DEFS[statKey] ?? STAT_DEFS[DEFAULT_STAT_KEYS[0]]
   const value = def.value(stats)
   const accent = def.accent?.(value)
@@ -63,20 +63,27 @@ function ConfigurableStatCard({ statKey, stats, editMode, usedElsewhere, onChang
     return <StatCard label={def.label} value={value} icon={def.icon} accent={accent} />
   }
   return (
-    <div style={{ background: 'var(--surface)', border: '0.5px solid var(--border)', borderRadius: 12, padding: '10px 16px 14px' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4, gap: 6 }}>
-        <select
-          value={statKey}
-          onChange={e => onChange(e.target.value)}
-          style={{ fontSize: 11, color: 'var(--text-2)', border: '0.5px solid var(--btn-border)', borderRadius: 6, background: 'var(--surface)', padding: '2px 4px', maxWidth: '100%' }}
+    <div
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      style={{ position: 'relative' }}
+    >
+      <StatCard label={def.label} value={value} icon={def.icon} accent={accent} />
+      {hovered && (
+        <button
+          onClick={onEdit}
+          title="Change this stat"
+          style={{
+            position: 'absolute', top: 8, right: 8,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            width: 22, height: 22, borderRadius: 6,
+            border: '0.5px solid var(--blue-border)', background: 'var(--blue-bg)', color: 'var(--blue)',
+            cursor: 'pointer', padding: 0,
+          }}
         >
-          {STAT_KEYS.filter(k => k === statKey || !usedElsewhere.has(k)).map(k => (
-            <option key={k} value={k}>{STAT_DEFS[k].label}</option>
-          ))}
-        </select>
-        <def.icon size={14} color="var(--text-3)" />
-      </div>
-      <p style={{ fontSize: 24, fontWeight: 500, margin: 0, color: accent ?? 'var(--text)' }}>{value}</p>
+          <Pencil size={12} />
+        </button>
+      )}
     </div>
   )
 }
@@ -341,6 +348,8 @@ export default function Dashboard() {
   const [stats, setStats] = useState<DashboardStats | null>(null)
   const [showForm, setShowForm] = useState(false)
   const [editMode, setEditMode] = useState(false)
+  const [editingStatSlot, setEditingStatSlot] = useState<number | null>(null)
+  const [statSlotDraft, setStatSlotDraft] = useState('')
   const [completingId, setCompletingId] = useState<string | null>(null)
   const [skipTaskId, setSkipTaskId] = useState<string | null>(null)
   const [skipTimes, setSkipTimes] = useState('1')
@@ -524,8 +533,7 @@ export default function Dashboard() {
           statKey={key}
           stats={stats}
           editMode={editMode}
-          usedElsewhere={new Set(statSlots.filter((_, j) => j !== i))}
-          onChange={newKey => handleStatSlotChange(i, newKey)}
+          onEdit={() => { setEditingStatSlot(i); setStatSlotDraft(key) }}
         />
       ))}
     </div>
@@ -826,6 +834,46 @@ export default function Dashboard() {
                 onClick={logTapWaterTest}
                 disabled={!hasAnyTwValue}
                 style={{ fontSize: 13, padding: '7px 18px', borderRadius: 8, border: '0.5px solid var(--blue-border)', background: hasAnyTwValue ? 'var(--blue-bg)' : 'var(--surface-2)', cursor: hasAnyTwValue ? 'pointer' : 'default', color: hasAnyTwValue ? 'var(--blue)' : 'var(--text-3)', fontWeight: 500 }}
+              >
+                Save
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {editingStatSlot !== null && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}
+          onClick={e => { if (e.target === e.currentTarget) setEditingStatSlot(null) }}>
+          <div style={{ background: 'var(--surface)', borderRadius: 12, border: '0.5px solid var(--border)', width: '100%', maxWidth: 340, display: 'flex', flexDirection: 'column' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 20px', borderBottom: '0.5px solid var(--border)' }}>
+              <span style={{ fontWeight: 600, fontSize: 15, color: 'var(--text)' }}>Change Stat</span>
+              <button onClick={() => setEditingStatSlot(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-2)', lineHeight: 0 }}><X size={18} /></button>
+            </div>
+            <div style={{ padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <div>
+                <FieldLabel>Show in this slot</FieldLabel>
+                <select
+                  value={statSlotDraft}
+                  onChange={e => setStatSlotDraft(e.target.value)}
+                  style={{ width: '100%', boxSizing: 'border-box' }}
+                >
+                  {STAT_KEYS.filter(k => k === statSlotDraft || !statSlots.includes(k)).map(k => (
+                    <option key={k} value={k}>{STAT_DEFS[k].label}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, padding: '12px 20px 16px' }}>
+              <button
+                onClick={() => setEditingStatSlot(null)}
+                style={{ fontSize: 13, padding: '7px 16px', borderRadius: 8, border: '0.5px solid var(--btn-border)', background: 'transparent', color: 'var(--text)', cursor: 'pointer' }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => { handleStatSlotChange(editingStatSlot, statSlotDraft); setEditingStatSlot(null) }}
+                style={{ fontSize: 13, padding: '7px 18px', borderRadius: 8, fontWeight: 500, border: '0.5px solid var(--blue-border)', background: 'var(--blue-bg)', color: 'var(--blue)', cursor: 'pointer' }}
               >
                 Save
               </button>
