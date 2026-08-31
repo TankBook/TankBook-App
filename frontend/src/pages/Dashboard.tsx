@@ -71,13 +71,13 @@ type DragProps = {
   isLast: boolean
 }
 
-function TankOverviewCard({ tank, drag }: { tank: DashboardStats['tanks'][0]; drag: DragProps }) {
+function TankOverviewCard({ tank, drag, isMobile }: { tank: DashboardStats['tanks'][0]; drag: DragProps; isMobile: boolean }) {
   const navigate = useNavigate()
   const hasAlerts = tank.unack_alerts > 0 || tank.overdue_tasks > 0
 
   return (
     <div
-      draggable
+      draggable={!isMobile}
       onClick={() => navigate(`/tanks/${tank.id}`)}
       onDragStart={drag.onDragStart}
       onDragOver={drag.onDragOver}
@@ -124,27 +124,30 @@ function TankOverviewCard({ tank, drag }: { tank: DashboardStats['tanks'][0]; dr
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
           <WaterTypeBadge type={tank.water_type} />
-          <div style={{ display: 'flex', flexDirection: 'column', flexShrink: 0 }}>
-            <button
-              type="button"
-              aria-label="Move tank earlier"
-              disabled={drag.isFirst}
-              onClick={e => { e.stopPropagation(); drag.onMoveUp() }}
-              style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 26, height: 22, padding: 0, border: 'none', background: 'none', color: drag.isFirst ? 'var(--text-4)' : 'var(--text-2)', cursor: drag.isFirst ? 'default' : 'pointer' }}
-            >
-              <ChevronUp size={13} />
-            </button>
-            <button
-              type="button"
-              aria-label="Move tank later"
-              disabled={drag.isLast}
-              onClick={e => { e.stopPropagation(); drag.onMoveDown() }}
-              style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 26, height: 22, padding: 0, border: 'none', background: 'none', color: drag.isLast ? 'var(--text-4)' : 'var(--text-2)', cursor: drag.isLast ? 'default' : 'pointer' }}
-            >
-              <ChevronDown size={13} />
-            </button>
-          </div>
-          <GripVertical size={14} style={{ color: 'var(--text-4)', flexShrink: 0 }} />
+          {isMobile ? (
+            <div style={{ display: 'flex', flexDirection: 'column', flexShrink: 0 }}>
+              <button
+                type="button"
+                aria-label="Move tank earlier"
+                disabled={drag.isFirst}
+                onClick={e => { e.stopPropagation(); drag.onMoveUp() }}
+                style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 26, height: 22, padding: 0, border: 'none', background: 'none', color: drag.isFirst ? 'var(--text-4)' : 'var(--text-2)', cursor: drag.isFirst ? 'default' : 'pointer' }}
+              >
+                <ChevronUp size={13} />
+              </button>
+              <button
+                type="button"
+                aria-label="Move tank later"
+                disabled={drag.isLast}
+                onClick={e => { e.stopPropagation(); drag.onMoveDown() }}
+                style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 26, height: 22, padding: 0, border: 'none', background: 'none', color: drag.isLast ? 'var(--text-4)' : 'var(--text-2)', cursor: drag.isLast ? 'default' : 'pointer' }}
+              >
+                <ChevronDown size={13} />
+              </button>
+            </div>
+          ) : (
+            <GripVertical size={14} style={{ color: 'var(--text-4)', flexShrink: 0 }} />
+          )}
         </div>
       </div>
 
@@ -543,6 +546,7 @@ export default function Dashboard() {
               <TankOverviewCard
                 key={t.id}
                 tank={t}
+                isMobile={isMobile}
                 drag={{
                   isDragging: dragId === t.id,
                   isDragOver: dragOverId === t.id,
