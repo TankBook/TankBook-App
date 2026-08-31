@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { BrowserRouter, Routes, Route, Link, useLocation } from 'react-router-dom'
 import { LayoutDashboard, BookOpen, Cog, NotebookPen, ShieldCheck, Calculator, Receipt, Menu, X, Plus, Fish, Droplets, ChevronLeft, Package, Building, Sun, Moon, Bot, LogOut, UserCircle, type LucideIcon } from 'lucide-react'
-import { api, hasPermission } from './api/client'
+import { api, hasPermission, hasAnyPermission } from './api/client'
 import RoomLayout from './pages/RoomLayout'
 import RoomDetail from './pages/RoomDetail'
 
@@ -351,6 +351,7 @@ function Nav() {
   const [isMobile, setIsMobile] = useState(() => window.matchMedia('(max-width: 1280px)').matches)
 
   const navLinks = NAV_LINKS.filter(([to]) => to !== '/assistant' || hasPermission(user?.permissions.ai, 'use'))
+  const canAccessAdmin = hasAnyPermission(user?.permissions, 'edit')
 
   useEffect(() => {
     const mq = window.matchMedia('(max-width: 1280px)')
@@ -427,7 +428,7 @@ function Nav() {
         <>
           <QuickAdd />
           {link('/profile', 'Profile', UserCircle)}
-          {link('/settings', 'Admin', Cog)}
+          {canAccessAdmin && link('/settings', 'Admin', Cog)}
           {logoutButton}
         </>
       )}
@@ -442,7 +443,7 @@ function Nav() {
           {navLinks.map(([to, label, Icon]) => link(to, label, Icon, () => setMenuOpen(false)))}
           <div style={{ height: 1, background: 'var(--border-sub)', margin: '4px 0' }} />
           {link('/profile', 'Profile', UserCircle, () => setMenuOpen(false))}
-          {link('/settings', 'Admin', Cog, () => setMenuOpen(false))}
+          {canAccessAdmin && link('/settings', 'Admin', Cog, () => setMenuOpen(false))}
           <button
             onClick={() => { setMenuOpen(false); logout() }}
             style={{

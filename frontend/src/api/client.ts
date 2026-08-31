@@ -243,6 +243,10 @@ export function hasPermission(level: PermissionLevel | string | undefined, requi
   return (PERMISSION_LEVEL_RANK[(level as PermissionLevel) ?? 'none'] ?? 0) >= PERMISSION_LEVEL_RANK[required]
 }
 
+export function hasAnyPermission(permissions: Record<string, PermissionLevel> | undefined, required: PermissionLevel): boolean {
+  return Object.values(permissions ?? {}).some(level => hasPermission(level, required))
+}
+
 export interface AuthConfig {
   allow_registration_effective: boolean
   oidc_enabled: boolean
