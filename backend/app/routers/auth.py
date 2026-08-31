@@ -1,9 +1,11 @@
+import json
+
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session as DBSession
 
 from app.database import get_db
-from app.models.models import User, AuthSettings
+from app.models.models import User, AuthSettings, DASHBOARD_SECTION_IDS
 from app.schemas.schemas import (
     RegisterRequest, LoginRequest, ChangePasswordRequest, UserOut, UserListItemOut, UserUpdateRequest,
     AuthConfigOut, AuthSettingsOut, AuthSettingsUpdate, PermissionsOut, PermissionsUpdate, ProfileUpdate,
@@ -32,6 +34,7 @@ def _to_out(db: DBSession, user: User) -> UserOut:
         permissions=permissions_service.get_all_for_user(db, user.id),
         date_format=user.date_format, unit_system=user.unit_system,
         notifications_enabled=user.notifications_enabled,
+        dashboard_layout=user.dashboard_layout,
     )
 
 
@@ -118,6 +121,10 @@ def update_profile(body: ProfileUpdate, user: User = Depends(get_current_user), 
         data.pop("date_format")
     if "unit_system" in data and data["unit_system"] not in VALID_UNIT_SYSTEMS:
         data.pop("unit_system")
+    if "dashboard_layout" in data:
+        layout = data.pop("dashboard_layout")
+        cleaned = [item for item in layout if item.get("id") in DASHBOARD_SECTION_IDS]
+        user.dashboard_layout_json = json.dumps(cleaned) if cleaned else None
     for k, v in data.items():
         setattr(user, k, v)
     db.commit()

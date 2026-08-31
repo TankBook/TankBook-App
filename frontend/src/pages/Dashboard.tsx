@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Layers, Fish, Leaf, Bug, Waves, Bell, Clock, Plus, AlertTriangle, Timer, Thermometer, FlaskConical, GripVertical, Filter, Droplets, X, ChevronUp, ChevronDown } from 'lucide-react'
+import { Layers, Fish, Leaf, Bug, Waves, Bell, Clock, Plus, AlertTriangle, Timer, Thermometer, FlaskConical, GripVertical, Filter, Droplets, X, ChevronUp, ChevronDown, Eye, EyeOff, Pencil } from 'lucide-react'
 import { useTanks } from '../hooks'
-import { api, type TapWaterTest } from '../api/client'
+import { api, type TapWaterTest, type DashboardSectionLayout } from '../api/client'
 import { useSettings, formatDate, toMM, dimInputProps } from '../context/SettingsContext'
 import { Card, FieldLabel, StatCard, Tag } from '../components/ui'
 
@@ -57,6 +57,49 @@ const TAP_WATER_PARAMS = [
   { key: 'nitrate_ppm',  label: 'NO₃',      color: 'var(--green)',              fmt: (v: number) => v.toFixed(0) },
   { key: 'tds_ppm',      label: 'TDS',      color: 'var(--violet, #7c4dff)',    fmt: (v: number) => v.toFixed(0) },
 ] as const
+
+const DASHBOARD_SECTIONS: { id: string; label: string }[] = [
+  { id: 'stats', label: 'Stats' },
+  { id: 'tanks', label: 'Your Tanks' },
+  { id: 'tasks', label: 'Upcoming Tasks' },
+  { id: 'tap_water', label: 'Tap Water' },
+]
+
+function DashboardSection({
+  id, editMode, layout, onToggle, children,
+}: {
+  id: string
+  editMode: boolean
+  layout: DashboardSectionLayout[]
+  onToggle: (id: string) => void
+  children: React.ReactNode
+}) {
+  const visible = layout.find(s => s.id === id)?.visible ?? true
+  if (!editMode && !visible) return null
+  return (
+    <div style={{ position: 'relative', opacity: editMode && !visible ? 0.5 : 1, paddingTop: editMode ? 34 : 0 }}>
+      {editMode && (
+        <button
+          onClick={() => onToggle(id)}
+          title={visible ? 'Hide this section' : 'Show this section'}
+          style={{
+            position: 'absolute', top: 0, right: 0, zIndex: 1,
+            display: 'flex', alignItems: 'center', gap: 6,
+            padding: '4px 10px', borderRadius: 999, fontSize: 12, fontWeight: 500,
+            border: `0.5px solid ${visible ? 'var(--blue-border)' : 'var(--btn-border)'}`,
+            background: visible ? 'var(--blue-bg)' : 'var(--surface)',
+            color: visible ? 'var(--blue)' : 'var(--text-2)',
+            cursor: 'pointer',
+          }}
+        >
+          {visible ? <Eye size={13} /> : <EyeOff size={13} />}
+          {visible ? 'Visible' : 'Hidden'}
+        </button>
+      )}
+      {children}
+    </div>
+  )
+}
 
 type DragProps = {
   isDragging: boolean
@@ -238,10 +281,11 @@ function todayIso() {
 
 export default function Dashboard() {
   const { loading, reload } = useTanks()
-  const { dateFormat, unitSystem } = useSettings()
+  const { dateFormat, unitSystem, dashboardLayout, setDashboardLayout } = useSettings()
   const dimProps = dimInputProps(unitSystem)
   const [stats, setStats] = useState<DashboardStats | null>(null)
   const [showForm, setShowForm] = useState(false)
+  const [editMode, setEditMode] = useState(false)
   const [completingId, setCompletingId] = useState<string | null>(null)
   const [skipTaskId, setSkipTaskId] = useState<string | null>(null)
   const [skipTimes, setSkipTimes] = useState('1')
@@ -399,6 +443,11 @@ export default function Dashboard() {
     })
   }
 
+  function toggleSection(id: string) {
+    const next = dashboardLayout.map(s => s.id === id ? { ...s, visible: !s.visible } : s)
+    setDashboardLayout(next)
+  }
+
   if (loading || !stats) return <p style={{ color: 'var(--text-2)' }}>Loading dashboard…</p>
 
   const hasAnyTwValue = [twPh, twGh, twKh, twChlorine, twNitrate, twTds].some(v => v.trim() !== '')
@@ -415,9 +464,9 @@ export default function Dashboard() {
     </div>
   )
 
-  const upcomingTasks = stats.upcoming_tasks.length > 0 && (
-    <div style={{ marginTop: 24 }}>
-      <p style={{ fontWeight: 500, fontSize: 15, margin: '0 0 12px', color: 'var(--text)' }}>Upcoming Tasks</p>
+  const hasUpcomingTasks = stats.upcoming_tasks.length > 0
+
+  const upcomingTasksContent = (
       <Card>
         {stats.upcoming_tasks.map((t, i) => {
           const tank = stats.tanks.find(tk => tk.id === t.tank_id)
@@ -529,17 +578,34 @@ export default function Dashboard() {
           )
         })}
       </Card>
-    </div>
   )
 
   return (
     <div>
-      <h1 style={{ margin: '0 0 20px', fontSize: 22, fontWeight: 500, color: 'var(--text)' }}>Dashboard</h1>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: '0 0 20px' }}>
+        <h1 style={{ margin: 0, fontSize: 22, fontWeight: 500, color: 'var(--text)' }}>Dashboard</h1>
+        <button
+          onClick={() => setEditMode(v => !v)}
+          style={{
+            display: 'flex', alignItems: 'center', gap: 6,
+            padding: '7px 14px', borderRadius: 8, fontSize: 13, fontWeight: 500,
+            border: `0.5px solid ${editMode ? 'var(--blue-border)' : 'var(--btn-border)'}`,
+            background: editMode ? 'var(--blue-bg)' : 'transparent',
+            color: editMode ? 'var(--blue)' : 'var(--text-2)',
+            cursor: 'pointer',
+          }}
+        >
+          <Pencil size={13} />
+          {editMode ? 'Done' : 'Edit Dashboard'}
+        </button>
+      </div>
 
-      {statsRow}
+      <DashboardSection id="stats" editMode={editMode} layout={dashboardLayout} onToggle={toggleSection}>
+        {statsRow}
+      </DashboardSection>
 
-      <div style={{ display: 'flex', gap: 20, alignItems: 'flex-start' }}>
-        <div style={{ flex: 1, minWidth: 0 }}>
+      <DashboardSection id="tanks" editMode={editMode} layout={dashboardLayout} onToggle={toggleSection}>
+        <div style={{ marginTop: 24 }}>
           <p style={{ fontWeight: 500, fontSize: 15, margin: '0 0 12px', color: 'var(--text)' }}>Your Tanks</p>
           <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(2, 1fr)', gap: 16 }}>
             {orderedTanks.map((t, i) => (
@@ -590,48 +656,58 @@ export default function Dashboard() {
               <span style={{ fontSize: 13, fontWeight: 500 }}>Add Tank</span>
             </button>
           </div>
-          {upcomingTasks}
         </div>
-      </div>
+      </DashboardSection>
 
-      <div style={{ marginTop: 24 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-          <p style={{ fontWeight: 500, fontSize: 15, margin: 0, color: 'var(--text)' }}>Tap Water</p>
-          <button
-            onClick={() => setShowTapWaterModal(true)}
-            style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 12, padding: '5px 12px', borderRadius: 8, border: '0.5px solid var(--blue-border)', background: 'var(--blue-bg)', color: 'var(--blue)', cursor: 'pointer', fontWeight: 500 }}
-          >
-            <Plus size={13} />Log Test
-          </button>
-        </div>
-        <Card>
-          {!latestTapWater ? (
-            <p style={{ fontSize: 13, color: 'var(--text-2)', margin: 0 }}>No tap water tests logged yet.</p>
-          ) : (
-            <>
-              <div style={{ display: 'grid', gridTemplateColumns: `repeat(${isMobile ? 3 : 6}, 1fr)`, gap: 8 }}>
-                {TAP_WATER_PARAMS.map(({ key, label, color, fmt }) => {
-                  const val = latestTapWater[key]
-                  return (
-                    <div key={key} style={{ textAlign: 'center', background: 'var(--surface-2)', borderRadius: 8, padding: '8px 2px', border: '0.5px solid var(--border-sub)' }}>
-                      <p style={{ fontSize: 9, fontWeight: 600, color: 'var(--text-3)', margin: '0 0 5px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-                        {label}
-                      </p>
-                      <p style={{ fontSize: 14, fontWeight: 500, margin: 0, color: val != null ? color : 'var(--text-4)' }}>
-                        {val != null ? fmt(val) : '—'}
-                      </p>
-                    </div>
-                  )
-                })}
-              </div>
-              <p style={{ fontSize: 11, color: 'var(--text-3)', margin: '10px 0 0' }}>
-                Last tested {formatDate(latestTapWater.recorded_at, dateFormat)}
-                {latestTapWater.notes && ` · ${latestTapWater.notes}`}
-              </p>
-            </>
+      <DashboardSection id="tasks" editMode={editMode} layout={dashboardLayout} onToggle={toggleSection}>
+        <div style={{ marginTop: 24 }}>
+          <p style={{ fontWeight: 500, fontSize: 15, margin: '0 0 12px', color: 'var(--text)' }}>Upcoming Tasks</p>
+          {hasUpcomingTasks ? upcomingTasksContent : (
+            <Card><p style={{ fontSize: 13, color: 'var(--text-2)', margin: 0 }}>Nothing due right now.</p></Card>
           )}
-        </Card>
-      </div>
+        </div>
+      </DashboardSection>
+
+      <DashboardSection id="tap_water" editMode={editMode} layout={dashboardLayout} onToggle={toggleSection}>
+        <div style={{ marginTop: 24 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+            <p style={{ fontWeight: 500, fontSize: 15, margin: 0, color: 'var(--text)' }}>Tap Water</p>
+            <button
+              onClick={() => setShowTapWaterModal(true)}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 12, padding: '5px 12px', borderRadius: 8, border: '0.5px solid var(--blue-border)', background: 'var(--blue-bg)', color: 'var(--blue)', cursor: 'pointer', fontWeight: 500 }}
+            >
+              <Plus size={13} />Log Test
+            </button>
+          </div>
+          <Card>
+            {!latestTapWater ? (
+              <p style={{ fontSize: 13, color: 'var(--text-2)', margin: 0 }}>No tap water tests logged yet.</p>
+            ) : (
+              <>
+                <div style={{ display: 'grid', gridTemplateColumns: `repeat(${isMobile ? 3 : 6}, 1fr)`, gap: 8 }}>
+                  {TAP_WATER_PARAMS.map(({ key, label, color, fmt }) => {
+                    const val = latestTapWater[key]
+                    return (
+                      <div key={key} style={{ textAlign: 'center', background: 'var(--surface-2)', borderRadius: 8, padding: '8px 2px', border: '0.5px solid var(--border-sub)' }}>
+                        <p style={{ fontSize: 9, fontWeight: 600, color: 'var(--text-3)', margin: '0 0 5px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                          {label}
+                        </p>
+                        <p style={{ fontSize: 14, fontWeight: 500, margin: 0, color: val != null ? color : 'var(--text-4)' }}>
+                          {val != null ? fmt(val) : '—'}
+                        </p>
+                      </div>
+                    )
+                  })}
+                </div>
+                <p style={{ fontSize: 11, color: 'var(--text-3)', margin: '10px 0 0' }}>
+                  Last tested {formatDate(latestTapWater.recorded_at, dateFormat)}
+                  {latestTapWater.notes && ` · ${latestTapWater.notes}`}
+                </p>
+              </>
+            )}
+          </Card>
+        </div>
+      </DashboardSection>
 
       {showTapWaterModal && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}

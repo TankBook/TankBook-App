@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react'
-import { api, AuthUser } from '../api/client'
+import { api, AuthUser, DashboardSectionLayout } from '../api/client'
 
 interface AuthContextValue {
   user: AuthUser | null
@@ -7,7 +7,7 @@ interface AuthContextValue {
   login: (email: string, password: string) => Promise<void>
   register: (email: string, password: string, displayName?: string) => Promise<void>
   logout: () => Promise<void>
-  updateProfile: (body: { date_format?: string; unit_system?: string; notifications_enabled?: boolean }) => Promise<void>
+  updateProfile: (body: { date_format?: string; unit_system?: string; notifications_enabled?: boolean; dashboard_layout?: DashboardSectionLayout[] }) => Promise<void>
 }
 
 const AuthContext = createContext<AuthContextValue>({
@@ -43,7 +43,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null)
   }
 
-  async function updateProfile(body: { date_format?: string; unit_system?: string; notifications_enabled?: boolean }) {
+  async function updateProfile(body: { date_format?: string; unit_system?: string; notifications_enabled?: boolean; dashboard_layout?: DashboardSectionLayout[] }) {
     setUser(await api.auth.updateProfile(body))
   }
 

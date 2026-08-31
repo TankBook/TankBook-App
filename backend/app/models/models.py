@@ -304,6 +304,9 @@ class InventoryItem(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
 
+DASHBOARD_SECTION_IDS = ["stats", "tanks", "tasks", "tap_water"]
+
+
 class User(Base):
     __tablename__ = "users"
 
@@ -315,11 +318,18 @@ class User(Base):
     date_format: Mapped[str] = mapped_column(String, default="DD/MM/YYYY")
     unit_system: Mapped[str] = mapped_column(String, default="cm")
     notifications_enabled: Mapped[bool] = mapped_column(Boolean, default=False)
+    dashboard_layout_json: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     last_login_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
     sessions: Mapped[list["Session"]] = relationship(back_populates="user", cascade="all, delete-orphan")
     push_subscriptions: Mapped[list["PushSubscription"]] = relationship(back_populates="user", cascade="all, delete-orphan")
+
+    @property
+    def dashboard_layout(self) -> list[dict]:
+        saved = json.loads(self.dashboard_layout_json) if self.dashboard_layout_json else []
+        visible_by_id = {item["id"]: item.get("visible", True) for item in saved if isinstance(item, dict) and "id" in item}
+        return [{"id": sid, "visible": visible_by_id.get(sid, True)} for sid in DASHBOARD_SECTION_IDS]
 
 
 class Session(Base):

@@ -495,6 +495,11 @@ class ChangePasswordRequest(BaseModel):
     new_password: str
 
 
+class DashboardSectionLayout(BaseModel):
+    id: str
+    visible: bool
+
+
 class UserOut(BaseModel):
     id: str
     email: str
@@ -504,12 +509,14 @@ class UserOut(BaseModel):
     date_format: str
     unit_system: str
     notifications_enabled: bool
+    dashboard_layout: list[DashboardSectionLayout] = []
 
 
 class ProfileUpdate(BaseModel):
     date_format: str | None = None
     unit_system: str | None = None
     notifications_enabled: bool | None = None
+    dashboard_layout: list[DashboardSectionLayout] | None = None
 
 
 class UserListItemOut(BaseModel):
