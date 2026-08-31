@@ -160,6 +160,9 @@ class MaintenanceTaskOut(MaintenanceTaskCreate):
 class MaintenanceTaskSkip(BaseModel):
     times: int
 
+class MaintenanceTaskPostpone(BaseModel):
+    due_at: datetime
+
 class MaintenanceTaskCompletionUpdate(BaseModel):
     completed_at: datetime
 

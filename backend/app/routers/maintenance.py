@@ -2,7 +2,7 @@ from datetime import datetime, timedelta
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from app.database import get_db
-from app.schemas.schemas import MaintenanceTaskCreate, MaintenanceTaskOut, MaintenanceTaskSkip, MaintenanceTaskCompletionUpdate
+from app.schemas.schemas import MaintenanceTaskCreate, MaintenanceTaskOut, MaintenanceTaskSkip, MaintenanceTaskPostpone, MaintenanceTaskCompletionUpdate
 from app.models.models import MaintenanceTask
 
 router = APIRouter()
@@ -92,6 +92,20 @@ def skip_task(tank_id: str, task_id: str, body: MaintenanceTaskSkip, db: Session
         task.due_at = task.due_at + timedelta(weeks=(task.recur_every_weeks or 1) * body.times)
     else:
         task.due_at = task.due_at + timedelta(days=body.times)
+    db.commit(); db.refresh(task)
+    return task
+
+
+@router.patch("/{tank_id}/maintenance/{task_id}/postpone", response_model=MaintenanceTaskOut)
+def postpone_task(tank_id: str, task_id: str, body: MaintenanceTaskPostpone, db: Session = Depends(get_db)):
+    task = db.query(MaintenanceTask).filter_by(id=task_id, tank_id=tank_id).first()
+    if not task:
+        raise HTTPException(404, "Task not found")
+    if task.status != "pending":
+        raise HTTPException(422, "Only pending tasks can be postponed")
+    if body.due_at.date() < datetime.utcnow().date():
+        raise HTTPException(422, "Reminder date can't be in the past")
+    task.due_at = body.due_at
     db.commit(); db.refresh(task)
     return task
 

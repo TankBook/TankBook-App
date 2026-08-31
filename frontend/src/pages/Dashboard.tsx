@@ -228,6 +228,11 @@ function TankOverviewCard({ tank, drag }: { tank: DashboardStats['tanks'][0]; dr
   )
 }
 
+function todayIso() {
+  const d = new Date()
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
 export default function Dashboard() {
   const { loading, reload } = useTanks()
   const { dateFormat, unitSystem } = useSettings()
@@ -237,6 +242,8 @@ export default function Dashboard() {
   const [completingId, setCompletingId] = useState<string | null>(null)
   const [skipTaskId, setSkipTaskId] = useState<string | null>(null)
   const [skipTimes, setSkipTimes] = useState('1')
+  const [postponeTaskId, setPostponeTaskId] = useState<string | null>(null)
+  const [postponeDate, setPostponeDate] = useState('')
   const [isMobile, setIsMobile] = useState(() => window.matchMedia('(max-width: 768px)').matches)
   const [isTabletWidth, setIsTabletWidth] = useState(() => window.matchMedia('(max-width: 960px)').matches)
 
@@ -368,6 +375,14 @@ export default function Dashboard() {
     await loadStats()
   }
 
+  async function postponeTask(tankId: string, taskId: string) {
+    if (!postponeDate) return
+    await api.maintenance.postpone(tankId, taskId, new Date(postponeDate).toISOString())
+    setPostponeTaskId(null)
+    setPostponeDate('')
+    await loadStats()
+  }
+
   function moveTank(tankId: string, direction: -1 | 1) {
     setOrderedTanks(prev => {
       const from = prev.findIndex(t => t.id === tankId)
@@ -404,12 +419,13 @@ export default function Dashboard() {
         {stats.upcoming_tasks.map((t, i) => {
           const tank = stats.tanks.find(tk => tk.id === t.tank_id)
           const skipping = skipTaskId === t.id
+          const postponing = postponeTaskId === t.id
           const isLast = i === stats.upcoming_tasks.length - 1
           const today = new Date(); today.setHours(0, 0, 0, 0)
           const due = new Date(t.due_at); due.setHours(0, 0, 0, 0)
           const dueToday = due.getTime() === today.getTime()
           return (
-            <div key={t.id} style={{ padding: '8px 0', borderBottom: !isLast || skipping ? '0.5px solid var(--border-sub)' : 'none' }}>
+            <div key={t.id} style={{ padding: '8px 0', borderBottom: !isLast || skipping || postponing ? '0.5px solid var(--border-sub)' : 'none' }}>
               {isMobile ? (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 6 }}>
@@ -431,9 +447,13 @@ export default function Dashboard() {
                       {completingId === t.id ? '…' : 'Done'}
                     </button>
                     <button
-                      onClick={() => { setSkipTaskId(skipping ? null : t.id); setSkipTimes('1') }}
+                      onClick={() => { setSkipTaskId(skipping ? null : t.id); setSkipTimes('1'); setPostponeTaskId(null) }}
                       style={{ flex: 1, fontSize: 12, padding: '5px 8px', borderRadius: 6, border: '0.5px solid var(--amber-border)', background: skipping ? 'var(--amber-bg)' : 'transparent', color: 'var(--amber)', cursor: 'pointer' }}
                     >Skip</button>
+                    <button
+                      onClick={() => { setPostponeTaskId(postponing ? null : t.id); setPostponeDate(''); setSkipTaskId(null) }}
+                      style={{ flex: 1, fontSize: 12, padding: '5px 8px', borderRadius: 6, border: '0.5px solid var(--blue-border)', background: postponing ? 'var(--blue-bg)' : 'transparent', color: 'var(--blue)', cursor: 'pointer' }}
+                    >Postpone</button>
                   </div>
                 </div>
               ) : (
@@ -458,9 +478,13 @@ export default function Dashboard() {
                         {completingId === t.id ? '…' : 'Done'}
                       </button>
                       <button
-                        onClick={() => { setSkipTaskId(skipping ? null : t.id); setSkipTimes('1') }}
+                        onClick={() => { setSkipTaskId(skipping ? null : t.id); setSkipTimes('1'); setPostponeTaskId(null) }}
                         style={{ fontSize: 11, padding: '2px 8px', borderRadius: 6, border: '0.5px solid var(--amber-border)', background: skipping ? 'var(--amber-bg)' : 'transparent', color: 'var(--amber)', cursor: 'pointer' }}
                       >Skip</button>
+                      <button
+                        onClick={() => { setPostponeTaskId(postponing ? null : t.id); setPostponeDate(''); setSkipTaskId(null) }}
+                        style={{ fontSize: 11, padding: '2px 8px', borderRadius: 6, border: '0.5px solid var(--blue-border)', background: postponing ? 'var(--blue-bg)' : 'transparent', color: 'var(--blue)', cursor: 'pointer' }}
+                      >Postpone</button>
                     </div>
                   </div>
                 </div>
@@ -480,6 +504,22 @@ export default function Dashboard() {
                   </span>
                   <button onClick={() => skipTask(t.tank_id, t.id)} style={{ fontSize: 11, padding: '2px 8px', borderRadius: 6, border: '0.5px solid var(--amber-border)', background: 'var(--amber)', color: '#fff', cursor: 'pointer', fontWeight: 500 }}>Confirm</button>
                   <button onClick={() => setSkipTaskId(null)} style={{ fontSize: 11, padding: '2px 6px', borderRadius: 6, border: '0.5px solid var(--btn-border)', background: 'transparent', color: 'var(--text-2)', cursor: 'pointer' }}>Cancel</button>
+                </div>
+              )}
+              {postponing && (
+                <div style={{ marginTop: 6, display: 'flex', alignItems: 'center', gap: 6, padding: '6px 8px', borderRadius: 8, background: 'var(--blue-bg)', border: '0.5px solid var(--blue-border)', flexWrap: 'wrap' }}>
+                  <span style={{ fontSize: 11, color: 'var(--blue)', whiteSpace: 'nowrap' }}>Remind me on</span>
+                  <input
+                    type="date" value={postponeDate} min={todayIso()}
+                    onChange={e => setPostponeDate(e.target.value)}
+                    style={{ fontSize: 11, padding: '2px 4px', borderRadius: 6, border: '0.5px solid var(--blue-border)', background: 'var(--surface)', color: 'var(--text)' }}
+                  />
+                  <button
+                    onClick={() => postponeTask(t.tank_id, t.id)}
+                    disabled={!postponeDate}
+                    style={{ fontSize: 11, padding: '2px 8px', borderRadius: 6, border: '0.5px solid var(--blue-border)', background: postponeDate ? 'var(--blue)' : 'var(--surface-2)', color: postponeDate ? '#fff' : 'var(--text-3)', cursor: postponeDate ? 'pointer' : 'default', fontWeight: 500 }}
+                  >Confirm</button>
+                  <button onClick={() => setPostponeTaskId(null)} style={{ fontSize: 11, padding: '2px 6px', borderRadius: 6, border: '0.5px solid var(--btn-border)', background: 'transparent', color: 'var(--text-2)', cursor: 'pointer' }}>Cancel</button>
                 </div>
               )}
             </div>

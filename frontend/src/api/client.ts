@@ -408,6 +408,8 @@ export const api = {
       patch<MaintenanceTask>(`/tanks/${tankId}/maintenance/${taskId}/completed-date`, { completed_at: completedAt }),
     skip: (tankId: string, taskId: string, times: number) =>
       patch<MaintenanceTask>(`/tanks/${tankId}/maintenance/${taskId}/skip`, { times }),
+    postpone: (tankId: string, taskId: string, dueAt: string) =>
+      patch<MaintenanceTask>(`/tanks/${tankId}/maintenance/${taskId}/postpone`, { due_at: dueAt }),
     delete: (tankId: string, taskId: string) => del(`/tanks/${tankId}/maintenance/${taskId}`),
   },
   dailyTasks: {

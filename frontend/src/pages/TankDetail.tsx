@@ -1221,6 +1221,8 @@ export default function TankDetail() {
   const [recurDay, setRecurDay] = useState('0')
   const [skipTaskId, setSkipTaskId] = useState<string | null>(null)
   const [skipTimes, setSkipTimes] = useState('1')
+  const [postponeTaskId, setPostponeTaskId] = useState<string | null>(null)
+  const [postponeDate, setPostponeDate] = useState('')
   const [editingCompletedTaskId, setEditingCompletedTaskId] = useState<string | null>(null)
   const [editingCompletedDate, setEditingCompletedDate] = useState('')
   const [completedExpanded, setCompletedExpanded] = useState(false)
@@ -1341,6 +1343,14 @@ export default function TankDetail() {
     await api.maintenance.skip(id!, taskId, times)
     setSkipTaskId(null)
     setSkipTimes('1')
+    loadTasks()
+  }
+
+  async function postponeTask(taskId: string) {
+    if (!postponeDate) return
+    await api.maintenance.postpone(id!, taskId, new Date(postponeDate).toISOString())
+    setPostponeTaskId(null)
+    setPostponeDate('')
     loadTasks()
   }
 
@@ -2288,9 +2298,10 @@ ${taskRows ? `<h2>Pending Maintenance</h2>
                 const overdue = due < today
                 const dueToday = due.getTime() === today.getTime()
                 const skipping = skipTaskId === t.id
+                const postponing = postponeTaskId === t.id
                 const isLast = i === pendingTasks.length - 1
                 return (
-                  <div key={t.id} style={{ padding: '10px 0', borderBottom: (!isLast || skipping) ? '0.5px solid var(--border-sub)' : 'none' }}>
+                  <div key={t.id} style={{ padding: '10px 0', borderBottom: (!isLast || skipping || postponing) ? '0.5px solid var(--border-sub)' : 'none' }}>
                     {isMobile ? (
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                         <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 6 }}>
@@ -2310,9 +2321,13 @@ ${taskRows ? `<h2>Pending Maintenance</h2>
                         <div style={{ display: 'flex', gap: 6 }}>
                           <button onClick={() => completeTask(t.id)} style={{ flex: 1, fontSize: 12, padding: '5px 8px', borderRadius: 6, border: '0.5px solid var(--green-border)', background: 'var(--green-bg)', color: 'var(--green)', cursor: 'pointer' }}>Done</button>
                           <button
-                            onClick={() => { setSkipTaskId(skipping ? null : t.id); setSkipTimes('1') }}
+                            onClick={() => { setSkipTaskId(skipping ? null : t.id); setSkipTimes('1'); setPostponeTaskId(null) }}
                             style={{ flex: 1, fontSize: 12, padding: '5px 8px', borderRadius: 6, border: '0.5px solid var(--amber-border)', background: skipping ? 'var(--amber-bg)' : 'transparent', color: 'var(--amber)', cursor: 'pointer' }}
                           >Skip</button>
+                          <button
+                            onClick={() => { setPostponeTaskId(postponing ? null : t.id); setPostponeDate(''); setSkipTaskId(null) }}
+                            style={{ flex: 1, fontSize: 12, padding: '5px 8px', borderRadius: 6, border: '0.5px solid var(--blue-border)', background: postponing ? 'var(--blue-bg)' : 'transparent', color: 'var(--blue)', cursor: 'pointer' }}
+                          >Postpone</button>
                           <button onClick={() => deleteTask(t.id)} style={{ flex: 1, fontSize: 12, padding: '5px 8px', borderRadius: 6, border: '0.5px solid var(--btn-border)', background: 'transparent', color: 'var(--text-2)', cursor: 'pointer' }}>Remove</button>
                         </div>
                       </div>
@@ -2337,9 +2352,13 @@ ${taskRows ? `<h2>Pending Maintenance</h2>
                         <div style={{ display: 'flex', gap: 8 }}>
                           <button onClick={() => completeTask(t.id)} style={{ fontSize: 11, padding: '3px 10px', borderRadius: 6, border: '0.5px solid var(--green-border)', background: 'var(--green-bg)', color: 'var(--green)', cursor: 'pointer' }}>Done</button>
                           <button
-                            onClick={() => { setSkipTaskId(skipping ? null : t.id); setSkipTimes('1') }}
+                            onClick={() => { setSkipTaskId(skipping ? null : t.id); setSkipTimes('1'); setPostponeTaskId(null) }}
                             style={{ fontSize: 11, padding: '3px 10px', borderRadius: 6, border: '0.5px solid var(--amber-border)', background: skipping ? 'var(--amber-bg)' : 'transparent', color: 'var(--amber)', cursor: 'pointer' }}
                           >Skip</button>
+                          <button
+                            onClick={() => { setPostponeTaskId(postponing ? null : t.id); setPostponeDate(''); setSkipTaskId(null) }}
+                            style={{ fontSize: 11, padding: '3px 10px', borderRadius: 6, border: '0.5px solid var(--blue-border)', background: postponing ? 'var(--blue-bg)' : 'transparent', color: 'var(--blue)', cursor: 'pointer' }}
+                          >Postpone</button>
                           <button onClick={() => deleteTask(t.id)} style={{ fontSize: 11, padding: '3px 10px', borderRadius: 6, border: '0.5px solid var(--btn-border)', background: 'transparent', color: 'var(--text-2)', cursor: 'pointer' }}>Remove</button>
                         </div>
                       </div>
@@ -2359,6 +2378,22 @@ ${taskRows ? `<h2>Pending Maintenance</h2>
                         </span>
                         <button onClick={() => skipTask(t.id)} style={{ fontSize: 11, padding: '3px 10px', borderRadius: 6, border: '0.5px solid var(--amber-border)', background: 'var(--amber)', color: '#fff', cursor: 'pointer', fontWeight: 500 }}>Confirm</button>
                         <button onClick={() => setSkipTaskId(null)} style={{ fontSize: 11, padding: '3px 8px', borderRadius: 6, border: '0.5px solid var(--btn-border)', background: 'transparent', color: 'var(--text-2)', cursor: 'pointer' }}>Cancel</button>
+                      </div>
+                    )}
+                    {postponing && (
+                      <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', borderRadius: 8, background: 'var(--blue-bg)', border: '0.5px solid var(--blue-border)', flexWrap: 'wrap' }}>
+                        <span style={{ fontSize: 12, color: 'var(--blue)', whiteSpace: 'nowrap' }}>Remind me on</span>
+                        <input
+                          type="date" value={postponeDate} min={dateInputValue(new Date().toISOString())}
+                          onChange={e => setPostponeDate(e.target.value)}
+                          style={{ fontSize: 12, padding: '2px 6px', borderRadius: 6, border: '0.5px solid var(--blue-border)', background: 'var(--surface)', color: 'var(--text)' }}
+                        />
+                        <button
+                          onClick={() => postponeTask(t.id)}
+                          disabled={!postponeDate}
+                          style={{ fontSize: 11, padding: '3px 10px', borderRadius: 6, border: '0.5px solid var(--blue-border)', background: postponeDate ? 'var(--blue)' : 'var(--surface-2)', color: postponeDate ? '#fff' : 'var(--text-3)', cursor: postponeDate ? 'pointer' : 'default', fontWeight: 500 }}
+                        >Confirm</button>
+                        <button onClick={() => setPostponeTaskId(null)} style={{ fontSize: 11, padding: '3px 8px', borderRadius: 6, border: '0.5px solid var(--btn-border)', background: 'transparent', color: 'var(--text-2)', cursor: 'pointer' }}>Cancel</button>
                       </div>
                     )}
                   </div>
