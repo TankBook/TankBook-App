@@ -242,6 +242,23 @@ export interface ConversationDetail extends Conversation {
 
 export type PermissionLevel = 'none' | 'use' | 'edit' | 'delete'
 
+export interface ExportSelection {
+  tanks: boolean
+  tank_fish: boolean
+  tank_plants: boolean
+  tank_parameters: boolean
+  tank_maintenance: boolean
+  tank_daily_tasks: boolean
+  tank_alerts: boolean
+  tank_journal: boolean
+  tank_health_cases: boolean
+  rooms: boolean
+  expenses: boolean
+  inventory: boolean
+  tap_water: boolean
+  settings: boolean
+}
+
 export interface DashboardSectionLayout {
   id: string
   visible: boolean
@@ -447,7 +464,7 @@ export const api = {
     delete: (tankId: string, taskId: string) => del(`/tanks/${tankId}/daily/${taskId}`),
   },
   backup: {
-    export: () => get<unknown>('/backup/export'),
+    export: (selection: ExportSelection) => post<unknown>('/backup/export', selection),
     import: async (data: unknown): Promise<{ ok: boolean; tanks_restored: number }> => {
       const res = await fetch(`${BASE}/backup/import`, {
         method: 'POST',

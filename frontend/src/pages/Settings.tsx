@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from 'react'
 import { Info, Download, Upload, Droplets, RefreshCw, Bell, Globe, Utensils, X, AlertTriangle, HardDrive, Fish, Image as ImageIcon, Bot, Lock, SlidersHorizontal, Users as UsersIcon, KeyRound, Pencil, Trash2, Shield, type LucideIcon } from 'lucide-react'
 import { useSettings, formatDate, formatDateTime } from '../context/SettingsContext'
 import { Card, Modal, ConfirmDialog, StatCard, FieldLabel } from '../components/ui'
-import { api, hasPermission, Tank, AgentSettings, AuthSettings, UserListItem, PermissionLevel } from '../api/client'
+import { api, hasPermission, Tank, AgentSettings, AuthSettings, UserListItem, PermissionLevel, ExportSelection } from '../api/client'
 import { useAuth } from '../context/AuthContext'
 
 const PROVIDER_OPTIONS: { value: 'anthropic' | 'openai' | 'ollama'; label: string }[] = [
@@ -635,6 +635,32 @@ const SETTINGS_TABS: { id: string; label: string; icon: LucideIcon }[] = [
   { id: 'about', label: 'About', icon: Info },
 ]
 
+const DEFAULT_EXPORT_SELECTION: ExportSelection = {
+  tanks: true, tank_fish: true, tank_plants: true, tank_parameters: true,
+  tank_maintenance: true, tank_daily_tasks: true, tank_alerts: true,
+  tank_journal: true, tank_health_cases: true,
+  rooms: true, expenses: true, inventory: true, tap_water: true, settings: true,
+}
+
+const TANK_EXPORT_FIELDS: { key: keyof ExportSelection; label: string }[] = [
+  { key: 'tank_fish', label: 'Fish & Invertebrates' },
+  { key: 'tank_plants', label: 'Plants' },
+  { key: 'tank_parameters', label: 'Water Parameters' },
+  { key: 'tank_maintenance', label: 'Maintenance Tasks' },
+  { key: 'tank_daily_tasks', label: 'Daily Tasks' },
+  { key: 'tank_alerts', label: 'Alerts' },
+  { key: 'tank_journal', label: 'Journal Entries' },
+  { key: 'tank_health_cases', label: 'Health Cases (quarantine / disease)' },
+]
+
+const OTHER_EXPORT_FIELDS: { key: keyof ExportSelection; label: string }[] = [
+  { key: 'rooms', label: 'Rooms & Layout' },
+  { key: 'expenses', label: 'Expenses' },
+  { key: 'inventory', label: 'Inventory' },
+  { key: 'tap_water', label: 'Tap Water Tests' },
+  { key: 'settings', label: 'App Settings' },
+]
+
 export default function Settings() {
   const { defaultTank, setDefaultTank, alertRetentionDays, setAlertRetentionDays, appUrl, setAppUrl, feedingAmountPresets, setFeedingAmountPresets, loading } = useSettings()
   const { user: loggedInUser } = useAuth()
@@ -746,12 +772,18 @@ export default function Settings() {
   }, [])
 
   const [exporting, setExporting] = useState(false)
+  const [showExportModal, setShowExportModal] = useState(false)
+  const [exportSelection, setExportSelection] = useState<ExportSelection>(DEFAULT_EXPORT_SELECTION)
   const [importing, setImporting] = useState(false)
   const [importResult, setImportResult] = useState<{ ok: boolean; tanks_restored: number } | null>(null)
   const [importError, setImportError] = useState<string | null>(null)
   const [importFile, setImportFile] = useState<File | null>(null)
   const [showImportModal, setShowImportModal] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
+
+  function setExportField(key: keyof ExportSelection, value: boolean) {
+    setExportSelection(prev => ({ ...prev, [key]: value }))
+  }
 
   function closeImportModal() {
     setShowImportModal(false)
@@ -764,7 +796,7 @@ export default function Settings() {
   async function handleExport() {
     setExporting(true)
     try {
-      const data = await api.backup.export()
+      const data = await api.backup.export(exportSelection)
       const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
@@ -773,6 +805,7 @@ export default function Settings() {
       a.download = `tankbook-backup-${ts}.json`
       a.click()
       URL.revokeObjectURL(url)
+      setShowExportModal(false)
     } finally {
       setExporting(false)
     }
@@ -803,7 +836,7 @@ export default function Settings() {
     <div>
       <h1 style={{ margin: '0 0 4px', fontSize: 22, fontWeight: 500, color: 'var(--text)' }}>Admin</h1>
       <p style={{ margin: '0 0 24px', fontSize: 13, color: 'var(--text-2)' }}>
-        App-wide settings for TankBook. Every account on this instance shares the same tanks and data, so these settings apply to everyone.
+        App-wide settings for TankBook. These apply to every account on this instance — though each account's tanks are private to them.
       </p>
 
       <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', gap: 16, alignItems: 'flex-start' }}>
@@ -982,12 +1015,12 @@ export default function Settings() {
             <Download size={14} color="var(--text-2)" />Data Backup
           </p>
           <p style={{ fontSize: 12, color: 'var(--text-2)', margin: '0 0 14px' }}>
-            Export all tank data, parameters, livestock, and journal entries to a JSON file. Restoring replaces all current data with the backup.
+            Choose what to include in a downloadable JSON file. Restoring a backup only replaces the categories that file actually contains.
           </p>
 
           <div style={{ display: 'flex', gap: 8 }}>
             <button
-              onClick={handleExport}
+              onClick={() => setShowExportModal(true)}
               disabled={exporting}
               style={{
                 flex: 1, display: 'flex', flexDirection: isMobile && !exporting ? 'column' : 'row',
@@ -1043,12 +1076,104 @@ export default function Settings() {
           </div>
         </section>
 
+        {showExportModal && (
+          <Modal title="Export Backup" onClose={() => setShowExportModal(false)} width={460}>
+            <p style={{ margin: '0 0 14px', fontSize: 12, color: 'var(--text-2)', lineHeight: 1.5 }}>
+              Choose what to include in the downloaded file. It's safe to leave categories out —
+              restoring a backup later only replaces what the file actually contains.
+            </p>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 14, marginBottom: 10 }}>
+              <button
+                type="button"
+                onClick={() => setExportSelection({
+                  tanks: true, tank_fish: true, tank_plants: true, tank_parameters: true,
+                  tank_maintenance: true, tank_daily_tasks: true, tank_alerts: true,
+                  tank_journal: true, tank_health_cases: true,
+                  rooms: true, expenses: true, inventory: true, tap_water: true, settings: true,
+                })}
+                style={{ background: 'none', border: 'none', padding: 0, fontSize: 12, color: 'var(--blue)', cursor: 'pointer' }}
+              >
+                Select all
+              </button>
+              <button
+                type="button"
+                onClick={() => setExportSelection({
+                  tanks: false, tank_fish: false, tank_plants: false, tank_parameters: false,
+                  tank_maintenance: false, tank_daily_tasks: false, tank_alerts: false,
+                  tank_journal: false, tank_health_cases: false,
+                  rooms: false, expenses: false, inventory: false, tap_water: false, settings: false,
+                })}
+                style={{ background: 'none', border: 'none', padding: 0, fontSize: 12, color: 'var(--text-2)', cursor: 'pointer' }}
+              >
+                Select none
+              </button>
+            </div>
+
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, fontWeight: 500, color: 'var(--text)' }}>
+              <input type="checkbox" checked={exportSelection.tanks} onChange={e => setExportField('tanks', e.target.checked)} />
+              Tanks
+            </label>
+
+            <div style={{
+              marginLeft: 22, marginTop: 6, marginBottom: 16, display: 'flex', flexDirection: 'column', gap: 6,
+              opacity: exportSelection.tanks ? 1 : 0.4, pointerEvents: exportSelection.tanks ? 'auto' : 'none',
+            }}>
+              {TANK_EXPORT_FIELDS.map(f => (
+                <label key={f.key} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: 'var(--text-label)' }}>
+                  <input type="checkbox" checked={exportSelection[f.key]} onChange={e => setExportField(f.key, e.target.checked)} />
+                  {f.label}
+                </label>
+              ))}
+            </div>
+
+            <p style={{ fontSize: 10, fontWeight: 600, letterSpacing: '0.09em', color: 'var(--text-3)', textTransform: 'uppercase', margin: '0 0 10px' }}>
+              Other Data
+            </p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              {OTHER_EXPORT_FIELDS.map(f => (
+                <label key={f.key} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: 'var(--text-label)' }}>
+                  <input type="checkbox" checked={exportSelection[f.key]} onChange={e => setExportField(f.key, e.target.checked)} />
+                  {f.label}
+                </label>
+              ))}
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 20 }}>
+              <button
+                onClick={() => setShowExportModal(false)}
+                style={{
+                  fontSize: 13, padding: '7px 16px', borderRadius: 8,
+                  border: '0.5px solid var(--btn-border)', background: 'transparent', color: 'var(--text)',
+                  cursor: 'pointer', boxSizing: 'border-box',
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleExport}
+                disabled={exporting || !Object.values(exportSelection).some(Boolean)}
+                style={{
+                  fontSize: 13, padding: '7px 16px', borderRadius: 8, fontWeight: 500,
+                  border: '0.5px solid var(--blue-border)',
+                  background: exporting || !Object.values(exportSelection).some(Boolean) ? 'var(--surface-2)' : 'var(--blue-bg)',
+                  color: exporting || !Object.values(exportSelection).some(Boolean) ? 'var(--text-3)' : 'var(--blue)',
+                  cursor: exporting || !Object.values(exportSelection).some(Boolean) ? 'not-allowed' : 'pointer',
+                  boxSizing: 'border-box',
+                }}
+              >
+                {exporting ? 'Exporting…' : 'Download Backup'}
+              </button>
+            </div>
+          </Modal>
+        )}
+
         {showImportModal && (
           <Modal title="Restore Backup" onClose={closeImportModal}>
             <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start', background: 'var(--red-bg)', border: '0.5px solid var(--red-border)', borderRadius: 8, padding: '10px 12px', marginBottom: 16 }}>
               <AlertTriangle size={16} color="var(--red)" style={{ flexShrink: 0, marginTop: 1 }} />
               <p style={{ margin: 0, fontSize: 12, color: 'var(--red)', lineHeight: 1.5 }}>
-                Restoring a backup permanently deletes all current tanks, livestock, parameters, and journal entries, replacing them with the contents of the file you choose. This cannot be undone.
+                Restoring a backup permanently replaces every category present in the file you choose — anything it contains is wiped and re-created from the file. This cannot be undone.
               </p>
             </div>
 
