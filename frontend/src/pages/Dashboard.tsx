@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Layers, Fish, Leaf, Bug, Waves, Bell, Clock, CalendarClock, Plus, AlertTriangle, Timer, Thermometer, FlaskConical, GripVertical, Filter, Droplets, X, ChevronUp, ChevronDown, Eye, EyeOff, Pencil, type LucideIcon } from 'lucide-react'
+import { Layers, Fish, Leaf, Bug, Waves, Bell, Clock, CalendarClock, Plus, AlertTriangle, Timer, GripVertical, Droplets, X, ChevronUp, ChevronDown, Eye, EyeOff, Pencil, type LucideIcon } from 'lucide-react'
 import { useTanks } from '../hooks'
 import { api, hasPermission, type TapWaterTest, type DashboardSectionLayout, type Group } from '../api/client'
 import { useSettings, formatDate, toMM, dimInputProps } from '../context/SettingsContext'
@@ -201,6 +201,7 @@ function TankOverviewCard({ tank, drag, isMobile, editMode }: { tank: DashboardS
   const ring = ringStats(tank)
   const ringCircumference = 113.1
   const ringColor = ring.bad > 0 ? 'var(--red)' : 'var(--green)'
+  const restingBorderColor = ring.bad > 0 ? 'var(--red-border)' : 'var(--border)'
 
   return (
     <div
@@ -212,7 +213,7 @@ function TankOverviewCard({ tank, drag, isMobile, editMode }: { tank: DashboardS
       onDragEnd={drag.onDragEnd}
       style={{
         background: 'var(--surface)',
-        border: `0.5px solid ${drag.isDragOver ? 'var(--blue-border)' : 'var(--border)'}`,
+        border: `0.5px solid ${drag.isDragOver ? 'var(--blue-border)' : restingBorderColor}`,
         borderRadius: 14, padding: '1rem 1.1rem', cursor: draggableNow ? (drag.isDragging ? 'grabbing' : 'grab') : 'pointer',
         display: 'flex', flexDirection: 'column', gap: 12,
         transition: 'border-color 0.15s, opacity 0.15s',
@@ -220,7 +221,7 @@ function TankOverviewCard({ tank, drag, isMobile, editMode }: { tank: DashboardS
         boxShadow: drag.isDragOver ? '0 0 0 2px color-mix(in srgb, var(--blue) 20%, transparent)' : 'none',
       }}
       onMouseEnter={e => { if (!drag.isDragging) e.currentTarget.style.borderColor = 'var(--blue-border)' }}
-      onMouseLeave={e => { if (!drag.isDragOver) e.currentTarget.style.borderColor = 'var(--border)' }}
+      onMouseLeave={e => { if (!drag.isDragOver) e.currentTarget.style.borderColor = restingBorderColor }}
     >
       {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
@@ -232,21 +233,6 @@ function TankOverviewCard({ tank, drag, isMobile, editMode }: { tank: DashboardS
             <span style={{ fontSize: 11, color: 'var(--text-3)', background: 'var(--surface-2)', padding: '1px 7px', borderRadius: 5, border: '0.5px solid var(--border)' }}>
               {tank.volume_litres} L
             </span>
-            {tank.has_heater && (
-              <span title="Heater" style={{ display: 'inline-flex', alignItems: 'center', gap: 3, fontSize: 11, color: 'var(--orange, #ef6c00)', background: 'var(--orange-bg)', padding: '1px 6px', borderRadius: 5, border: '0.5px solid var(--orange-border, color-mix(in srgb, var(--orange, #ef6c00) 30%, transparent))' }}>
-                <Thermometer size={11} /> Heater
-              </span>
-            )}
-            {tank.filter_flow_lph && (
-              <span title={`Filter — ${tank.filter_flow_lph} L/h`} style={{ display: 'inline-flex', alignItems: 'center', gap: 3, fontSize: 11, color: 'var(--blue)', background: 'var(--blue-bg)', padding: '1px 6px', borderRadius: 5, border: '0.5px solid var(--blue-border, color-mix(in srgb, var(--blue) 30%, transparent))' }}>
-                <Filter size={11} /> Filter
-              </span>
-            )}
-            {tank.co2_injection && (
-              <span title="CO₂ Injection" style={{ display: 'inline-flex', alignItems: 'center', gap: 3, fontSize: 11, color: 'var(--green)', background: 'var(--green-bg)', padding: '1px 6px', borderRadius: 5, border: '0.5px solid var(--green-border, color-mix(in srgb, var(--green) 30%, transparent))' }}>
-                <FlaskConical size={11} /> CO₂
-              </span>
-            )}
             <WaterTypeBadge type={tank.water_type} />
             {tank.my_access !== 'owner' && (
               <span title={tank.my_access === 'edit' ? 'Shared with you — you can edit' : 'Shared with you — view only'} style={{ fontSize: 10, fontWeight: 500, color: 'var(--text-2)', background: 'var(--tag-bg)', border: '0.5px solid var(--border)', borderRadius: 5, padding: '1px 6px' }}>
