@@ -7,11 +7,11 @@ from app.models.models import AppSettings
 from app.schemas.schemas import AppSettingsOut, AppSettingsUpdate, SettingsStatsOut
 from app.routers.images import IMAGES_PATH
 from app.services.species import species_service
+from app.services.permissions import require_permission
 
 router = APIRouter()
 
-VALID_DATE_FORMATS = ["DD/MM/YYYY", "MM/DD/YYYY", "YYYY-MM-DD"]
-VALID_UNIT_SYSTEMS = ["mm", "cm", "m", "imperial"]
+require_general_edit = Depends(require_permission("general", "edit"))
 
 
 def get_or_create_settings(db: Session) -> AppSettings:
@@ -30,13 +30,9 @@ def get_settings(db: Session = Depends(get_db)):
 
 
 @router.patch("/", response_model=AppSettingsOut)
-def update_settings(body: AppSettingsUpdate, db: Session = Depends(get_db)):
+def update_settings(body: AppSettingsUpdate, db: Session = Depends(get_db), _perm=require_general_edit):
     settings = get_or_create_settings(db)
     data = body.model_dump(exclude_unset=True)
-    if "date_format" in data and data["date_format"] not in VALID_DATE_FORMATS:
-        data.pop("date_format")
-    if "unit_system" in data and data["unit_system"] not in VALID_UNIT_SYSTEMS:
-        data.pop("unit_system")
     if "feeding_amount_presets" in data:
         presets = data.pop("feeding_amount_presets")
         settings.feeding_amount_presets_json = json.dumps(presets) if presets else None
@@ -48,7 +44,7 @@ def update_settings(body: AppSettingsUpdate, db: Session = Depends(get_db)):
 
 
 @router.get("/stats", response_model=SettingsStatsOut)
-def get_settings_stats():
+def get_settings_stats(_perm=require_general_edit):
     storage_bytes = 0
     if IMAGES_PATH.exists():
         for path in IMAGES_PATH.rglob("*"):

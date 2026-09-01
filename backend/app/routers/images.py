@@ -3,12 +3,20 @@ import urllib.parse
 import urllib.request
 import uuid
 from pathlib import Path
-from fastapi import APIRouter, UploadFile, File, HTTPException, Query
+from fastapi import APIRouter, Depends, UploadFile, File, HTTPException, Query
 from fastapi.responses import FileResponse
+from app.models.models import Tank
+from app.services.permissions import require_permission
+from app.services.ownership import require_tank_view, require_tank_edit
+from app.services.url_safety import fetch_guard, UnsafeUrlError
 
 router = APIRouter()
+require_species_edit = Depends(require_permission("species", "edit"))
+require_species_delete = Depends(require_permission("species", "delete"))
 
 IMAGES_PATH = Path("/app/images")
+
+MAX_IMAGE_BYTES = 10 * 1024 * 1024
 
 ALLOWED_TYPES = {"image/jpeg", "image/png", "image/webp", "image/gif"}
 EXT_MAP = {"image/jpeg": ".jpg", "image/png": ".png", "image/webp": ".webp", "image/gif": ".gif"}
@@ -24,9 +32,12 @@ def _find(slug: str) -> Path | None:
 
 
 @router.post("/species/{slug}")
-async def upload_species_image(slug: str, file: UploadFile = File(...)):
+async def upload_species_image(slug: str, file: UploadFile = File(...), _perm=require_species_edit):
     if file.content_type not in ALLOWED_TYPES:
         raise HTTPException(400, f"Unsupported type: {file.content_type}. Use JPEG, PNG, WebP, or GIF.")
+    contents = await file.read()
+    if len(contents) > MAX_IMAGE_BYTES:
+        raise HTTPException(413, f"Image too large (max {MAX_IMAGE_BYTES // (1024 * 1024)}MB)")
     ext = EXT_MAP[file.content_type]
     dest_dir = IMAGES_PATH / "species"
     dest_dir.mkdir(parents=True, exist_ok=True)
@@ -35,7 +46,6 @@ async def upload_species_image(slug: str, file: UploadFile = File(...)):
         old = dest_dir / f"{slug}{old_ext}"
         if old.exists():
             old.unlink()
-    contents = await file.read()
     (dest_dir / f"{slug}{ext}").write_bytes(contents)
     return {"ok": True, "url": f"/api/images/species/{slug}"}
 
@@ -49,7 +59,7 @@ def get_species_image(slug: str):
 
 
 @router.post("/species/{slug}/fetch")
-def fetch_species_image(slug: str, latin_name: str = Query(...)):
+def fetch_species_image(slug: str, latin_name: str = Query(...), _perm=require_species_edit):
     """Download a species image from iNaturalist by Latin name and store it locally."""
     if not latin_name.strip():
         raise HTTPException(400, "latin_name is required")
@@ -74,7 +84,6 @@ def fetch_species_image(slug: str, latin_name: str = Query(...)):
     image_url = photo.get("large_url") or photo.get("medium_url") or photo.get("url")
     if not image_url:
         raise HTTPException(404, "No image URL in iNaturalist response")
-
     # Guess extension from URL path (before any query string)
     url_path = image_url.split("?")[0].lower()
     ext = ".jpg"
@@ -84,11 +93,21 @@ def fetch_species_image(slug: str, latin_name: str = Query(...)):
             break
 
     try:
-        req2 = urllib.request.Request(image_url, headers={"User-Agent": "TankBook/1.0"})
-        with urllib.request.urlopen(req2, timeout=15) as resp2:
-            image_data = resp2.read()
+        # Pin DNS for the duration of the fetch so the address checked is the address
+        # connected to (closes a DNS-rebinding bypass of the public-URL check).
+        with fetch_guard(image_url):
+            req2 = urllib.request.Request(image_url, headers={"User-Agent": "TankBook/1.0"})
+            with urllib.request.urlopen(req2, timeout=15) as resp2:
+                # Read one byte past the cap so an oversized response is caught below
+                # rather than trusting a (spoofable) Content-Length header.
+                image_data = resp2.read(MAX_IMAGE_BYTES + 1)
+    except UnsafeUrlError as e:
+        raise HTTPException(502, f"Refusing to fetch image URL: {e}")
     except Exception as e:
         raise HTTPException(502, f"Failed to download image: {e}")
+
+    if len(image_data) > MAX_IMAGE_BYTES:
+        raise HTTPException(502, f"Image too large (max {MAX_IMAGE_BYTES // (1024 * 1024)}MB)")
 
     dest_dir = IMAGES_PATH / "species"
     dest_dir.mkdir(parents=True, exist_ok=True)
@@ -102,7 +121,7 @@ def fetch_species_image(slug: str, latin_name: str = Query(...)):
 
 
 @router.delete("/species/{slug}")
-def delete_species_image(slug: str):
+def delete_species_image(slug: str, _perm=require_species_delete):
     path = _find(slug)
     if not path:
         raise HTTPException(404, "No image for this species")
@@ -122,20 +141,22 @@ def _safe_filename(filename: str) -> str:
 
 
 @router.post("/tanks/{tank_id}")
-async def upload_tank_image(tank_id: str, file: UploadFile = File(...)):
+async def upload_tank_image(tank_id: str, file: UploadFile = File(...), _tank: Tank = Depends(require_tank_edit)):
     if file.content_type not in ALLOWED_TYPES:
         raise HTTPException(400, f"Unsupported type: {file.content_type}. Use JPEG, PNG, WebP, or GIF.")
+    contents = await file.read()
+    if len(contents) > MAX_IMAGE_BYTES:
+        raise HTTPException(413, f"Image too large (max {MAX_IMAGE_BYTES // (1024 * 1024)}MB)")
     ext = EXT_MAP[file.content_type]
     dest_dir = _tank_dir(tank_id)
     dest_dir.mkdir(parents=True, exist_ok=True)
     filename = f"{uuid.uuid4().hex}{ext}"
-    contents = await file.read()
     (dest_dir / filename).write_bytes(contents)
     return {"ok": True, "filename": filename, "url": f"/api/images/tanks/{tank_id}/{filename}"}
 
 
 @router.get("/tanks/{tank_id}")
-def list_tank_images(tank_id: str):
+def list_tank_images(tank_id: str, _tank: Tank = Depends(require_tank_view)):
     tank_dir = _tank_dir(tank_id)
     if not tank_dir.exists():
         return []
@@ -147,7 +168,7 @@ def list_tank_images(tank_id: str):
 
 
 @router.get("/tanks/{tank_id}/{filename}")
-def get_tank_image(tank_id: str, filename: str):
+def get_tank_image(tank_id: str, filename: str, _tank: Tank = Depends(require_tank_view)):
     filename = _safe_filename(filename)
     path = _tank_dir(tank_id) / filename
     if not path.exists():
@@ -156,7 +177,7 @@ def get_tank_image(tank_id: str, filename: str):
 
 
 @router.delete("/tanks/{tank_id}/{filename}")
-def delete_tank_image(tank_id: str, filename: str):
+def delete_tank_image(tank_id: str, filename: str, _tank: Tank = Depends(require_tank_edit)):
     filename = _safe_filename(filename)
     path = _tank_dir(tank_id) / filename
     if not path.exists():

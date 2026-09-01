@@ -5,6 +5,7 @@ export interface Tank {
   name: string
   volume_litres: number
   water_type: string
+  shape: 'rectangle' | 'cylinder'
   substrate: string | null
   lighting: string | null
   has_filter: boolean
@@ -23,6 +24,38 @@ export interface Tank {
   light_technology: string | null
   setup_date: string | null
   created_at: string
+  owner_id: string
+  group_id: string | null
+  my_access: 'owner' | 'edit' | 'view'
+}
+
+export interface TankShare {
+  user_id: string
+  email: string
+  display_name: string | null
+  level: 'view' | 'edit'
+}
+
+export interface GroupMember {
+  user_id: string
+  email: string
+  display_name: string | null
+  role: 'owner' | 'member'
+}
+
+export interface Group {
+  id: string
+  name: string
+  my_role: 'owner' | 'member'
+  members: GroupMember[]
+}
+
+export function canEditTank(tank: Pick<Tank, 'my_access'>): boolean {
+  return tank.my_access === 'owner' || tank.my_access === 'edit'
+}
+
+export function isTankOwner(tank: Pick<Tank, 'my_access'>): boolean {
+  return tank.my_access === 'owner'
 }
 
 export interface Expense {
@@ -30,11 +63,14 @@ export interface Expense {
   tank_id: string | null
   inventory_item_id: string | null
   amount: number
+  quantity: number
   category: string
   description: string | null
   purchase_date: string
   notes: string | null
   created_at: string
+  owner_id: string
+  group_id: string | null
 }
 
 export interface InventoryItem {
@@ -46,6 +82,8 @@ export interface InventoryItem {
   unit_label: string | null
   notes: string | null
   created_at: string
+  owner_id: string
+  group_id: string | null
 }
 
 export interface TankFish {
@@ -103,6 +141,8 @@ export interface TapWaterTest {
   tds_ppm: number | null
   recorded_at: string
   notes: string | null
+  owner_id: string
+  group_id: string | null
 }
 
 export interface MaintenanceTask {
@@ -132,9 +172,24 @@ export interface JournalEntry {
   id: string
   tank_id: string
   tank_fish_id: string | null
+  case_id: string | null
   event_type: string
   notes: string
   occurred_at: string
+  created_at: string
+  common_name: string | null
+  species_slug: string | null
+}
+
+export interface HealthCase {
+  id: string
+  tank_id: string
+  tank_fish_id: string | null
+  title: string
+  status: string
+  started_at: string
+  treatment: string | null
+  resolved_at: string | null
   created_at: string
   common_name: string | null
   species_slug: string | null
@@ -179,6 +234,8 @@ export interface Room {
   name: string
   width_m: number
   length_m: number
+  owner_id: string
+  group_id: string | null
   tank_positions: RoomTankPosition[]
 }
 
@@ -193,12 +250,133 @@ export interface Alert {
   triggered_at: string
 }
 
+export interface AgentSettings {
+  provider: 'anthropic' | 'openai' | 'ollama' | null
+  model: string | null
+  base_url: string | null
+  api_key_set: boolean
+  updated_at: string
+}
+
+export interface AgentSettingsUpdate {
+  provider?: 'anthropic' | 'openai' | 'ollama'
+  model?: string
+  base_url?: string | null
+  api_key?: string | null
+}
+
+export interface ChatMessage {
+  role: 'user' | 'assistant'
+  content: string
+}
+
+export interface Conversation {
+  id: string
+  title: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface ConversationDetail extends Conversation {
+  messages: (ChatMessage & { created_at: string })[]
+}
+
+export type PermissionLevel = 'none' | 'use' | 'edit' | 'delete'
+
+export interface ExportSelection {
+  tanks: boolean
+  tank_fish: boolean
+  tank_plants: boolean
+  tank_parameters: boolean
+  tank_maintenance: boolean
+  tank_daily_tasks: boolean
+  tank_alerts: boolean
+  tank_journal: boolean
+  tank_health_cases: boolean
+  rooms: boolean
+  expenses: boolean
+  inventory: boolean
+  tap_water: boolean
+  settings: boolean
+}
+
+export interface DashboardSectionLayout {
+  id: string
+  visible: boolean
+}
+
+export interface AuthUser {
+  id: string
+  email: string
+  display_name: string | null
+  has_password: boolean
+  permissions: Record<string, PermissionLevel>
+  date_format: string
+  unit_system: string
+  default_tank_id: string | null
+  notifications_enabled: boolean
+  dashboard_layout: DashboardSectionLayout[]
+  dashboard_stats: string[]
+}
+
+const PERMISSION_LEVEL_RANK: Record<PermissionLevel, number> = { none: 0, use: 1, edit: 2, delete: 3 }
+
+export function hasPermission(level: PermissionLevel | string | undefined, required: PermissionLevel): boolean {
+  return (PERMISSION_LEVEL_RANK[(level as PermissionLevel) ?? 'none'] ?? 0) >= PERMISSION_LEVEL_RANK[required]
+}
+
+export function hasAnyPermission(permissions: Record<string, PermissionLevel> | undefined, required: PermissionLevel): boolean {
+  return Object.values(permissions ?? {}).some(level => hasPermission(level, required))
+}
+
+export interface AuthConfig {
+  allow_registration_effective: boolean
+  oidc_enabled: boolean
+  oidc_label: string | null
+}
+
+export interface AuthSettings {
+  allow_registration: boolean
+  oidc_issuer_url: string | null
+  oidc_client_id: string | null
+  oidc_client_secret_set: boolean
+  oidc_display_name: string | null
+  updated_at: string
+}
+
+export interface AuthSettingsUpdate {
+  allow_registration?: boolean
+  oidc_issuer_url?: string | null
+  oidc_client_id?: string | null
+  oidc_client_secret?: string | null
+  oidc_display_name?: string | null
+}
+
+export interface UserListItem {
+  id: string
+  email: string
+  display_name: string | null
+  has_password: boolean
+  has_oidc: boolean
+  created_at: string
+  last_login_at: string | null
+}
+
 // --- Fetch helpers ---
 
 const BASE = '/api'
 
+// A 401 from any already-authenticated route means the session has expired or
+// been logged out elsewhere — reload so AuthProvider's mount check picks it up
+// and falls back to the login screen. /auth/* itself legitimately returns 401
+// for a wrong password, which callers need to catch and display, not reload past.
+function handleUnauthorized(path: string) {
+  if (!path.startsWith('/auth/')) window.location.reload()
+}
+
 async function get<T>(path: string): Promise<T> {
   const res = await fetch(`${BASE}${path}`)
+  if (res.status === 401) handleUnauthorized(path)
   if (!res.ok) throw new Error(`GET ${path} failed: ${res.status}`)
   return res.json()
 }
@@ -209,7 +387,11 @@ async function post<T>(path: string, body: unknown): Promise<T> {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
   })
-  if (!res.ok) throw new Error(`POST ${path} failed: ${res.status}`)
+  if (res.status === 401) handleUnauthorized(path)
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}))
+    throw new Error((err as any).detail ?? `POST ${path} failed: ${res.status}`)
+  }
   return res.json()
 }
 
@@ -219,6 +401,7 @@ async function put<T>(path: string, body: unknown): Promise<T> {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
   })
+  if (res.status === 401) handleUnauthorized(path)
   if (!res.ok) throw new Error(`PUT ${path} failed: ${res.status}`)
   return res.json()
 }
@@ -229,13 +412,35 @@ async function patch<T>(path: string, body?: unknown): Promise<T> {
     headers: { 'Content-Type': 'application/json' },
     body: body ? JSON.stringify(body) : undefined,
   })
+  if (res.status === 401) handleUnauthorized(path)
   if (!res.ok) throw new Error(`PATCH ${path} failed: ${res.status}`)
   return res.json()
 }
 
-async function del(path: string): Promise<void> {
-  const res = await fetch(`${BASE}${path}`, { method: 'DELETE' })
+async function del(path: string, body?: unknown): Promise<void> {
+  const res = await fetch(`${BASE}${path}`, {
+    method: 'DELETE',
+    headers: body ? { 'Content-Type': 'application/json' } : undefined,
+    body: body ? JSON.stringify(body) : undefined,
+  })
+  if (res.status === 401) handleUnauthorized(path)
   if (!res.ok) throw new Error(`DELETE ${path} failed: ${res.status}`)
+}
+
+// Auth endpoints surface a meaningful `detail` message (e.g. "Incorrect email
+// or password") that the login/register forms need to show, unlike the
+// generic helpers above which just throw a status code.
+async function authPost<T>(path: string, body: unknown): Promise<T> {
+  const res = await fetch(`${BASE}${path}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  })
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}))
+    throw new Error((err as any).detail ?? `Request failed: ${res.status}`)
+  }
+  return res.status === 204 ? (undefined as T) : res.json()
 }
 
 // --- API surface ---
@@ -244,9 +449,13 @@ export const api = {
   tanks: {
     list: () => get<Tank[]>('/tanks/'),
     get: (id: string) => get<Tank>(`/tanks/${id}`),
-    create: (body: Omit<Tank, 'id' | 'created_at'>) => post<Tank>('/tanks/', body),
+    create: (body: Omit<Tank, 'id' | 'created_at' | 'owner_id' | 'my_access'>) => post<Tank>('/tanks/', body),
+    update: (id: string, body: Partial<Omit<Tank, 'id' | 'created_at' | 'owner_id' | 'my_access'>>) => patch<Tank>(`/tanks/${id}`, body),
     delete: (id: string) => del(`/tanks/${id}`),
     reorder: (order: { id: string; sort_order: number }[]) => patch<{ ok: boolean }>('/tanks/reorder', order),
+    listShares: (id: string) => get<TankShare[]>(`/tanks/${id}/shares`),
+    addShare: (id: string, body: { email: string; level: 'view' | 'edit' }) => post<TankShare>(`/tanks/${id}/shares`, body),
+    removeShare: (id: string, userId: string) => del(`/tanks/${id}/shares/${userId}`),
   },
   fish: {
     list: (tankId: string) => get<TankFish[]>(`/fish/${tankId}/fish`),
@@ -272,7 +481,7 @@ export const api = {
   },
   tapWater: {
     list: (limit = 50) => get<TapWaterTest[]>(`/tap-water/?limit=${limit}`),
-    log: (body: Omit<TapWaterTest, 'id' | 'recorded_at'>) => post<TapWaterTest>('/tap-water/', body),
+    log: (body: Omit<TapWaterTest, 'id' | 'recorded_at' | 'owner_id'>) => post<TapWaterTest>('/tap-water/', body),
   },
   alerts: {
     list: (tankId: string, unacknowledgedOnly = false) =>
@@ -292,6 +501,8 @@ export const api = {
       patch<MaintenanceTask>(`/tanks/${tankId}/maintenance/${taskId}/completed-date`, { completed_at: completedAt }),
     skip: (tankId: string, taskId: string, times: number) =>
       patch<MaintenanceTask>(`/tanks/${tankId}/maintenance/${taskId}/skip`, { times }),
+    postpone: (tankId: string, taskId: string, dueAt: string) =>
+      patch<MaintenanceTask>(`/tanks/${tankId}/maintenance/${taskId}/postpone`, { due_at: dueAt }),
     delete: (tankId: string, taskId: string) => del(`/tanks/${tankId}/maintenance/${taskId}`),
   },
   dailyTasks: {
@@ -303,7 +514,7 @@ export const api = {
     delete: (tankId: string, taskId: string) => del(`/tanks/${tankId}/daily/${taskId}`),
   },
   backup: {
-    export: () => get<unknown>('/backup/export'),
+    export: (selection: ExportSelection) => post<unknown>('/backup/export', selection),
     import: async (data: unknown): Promise<{ ok: boolean; tanks_restored: number }> => {
       const res = await fetch(`${BASE}/backup/import`, {
         method: 'POST',
@@ -319,11 +530,19 @@ export const api = {
   },
   journal: {
     list: (tankId: string) => get<JournalEntry[]>(`/tanks/${tankId}/journal`),
-    add: (tankId: string, body: { tank_fish_id?: string | null; event_type: string; notes: string; occurred_at?: string }) =>
+    add: (tankId: string, body: { tank_fish_id?: string | null; case_id?: string | null; event_type: string; notes: string; occurred_at?: string }) =>
       post<JournalEntry>(`/tanks/${tankId}/journal`, body),
-    update: (tankId: string, entryId: string, body: { tank_fish_id?: string | null; event_type?: string; notes?: string; occurred_at?: string }) =>
+    update: (tankId: string, entryId: string, body: { tank_fish_id?: string | null; case_id?: string | null; event_type?: string; notes?: string; occurred_at?: string }) =>
       patch<JournalEntry>(`/tanks/${tankId}/journal/${entryId}`, body),
     delete: (tankId: string, entryId: string) => del(`/tanks/${tankId}/journal/${entryId}`),
+  },
+  healthCases: {
+    list: (tankId: string) => get<HealthCase[]>(`/tanks/${tankId}/health-cases`),
+    add: (tankId: string, body: { tank_fish_id?: string | null; title: string; started_at?: string; treatment?: string | null }) =>
+      post<HealthCase>(`/tanks/${tankId}/health-cases`, body),
+    update: (tankId: string, caseId: string, body: { tank_fish_id?: string | null; title?: string; status?: string; started_at?: string; treatment?: string | null }) =>
+      patch<HealthCase>(`/tanks/${tankId}/health-cases/${caseId}`, body),
+    delete: (tankId: string, caseId: string) => del(`/tanks/${tankId}/health-cases/${caseId}`),
   },
   images: {
     speciesUrl: (slug: string) => `/api/images/species/${slug}`,
@@ -365,6 +584,7 @@ export const api = {
       post<{ ok: boolean; slug: string; common_name: string; type: string }>('/species/create', body),
     update: (slug: string, body: SpeciesBody) =>
       put<{ ok: boolean; slug: string; common_name: string; type: string }>(`/species/${slug}`, body),
+    remove: (slug: string) => del(`/species/${slug}`),
     upload: async (file: File): Promise<{ ok: boolean; slug: string; common_name: string; type: string }> => {
       const fd = new FormData()
       fd.append('file', file)
@@ -390,17 +610,17 @@ export const api = {
   },
   spending: {
     list: (tankId?: string) => get<Expense[]>(`/expenses${tankId ? `?tank_id=${tankId}` : ''}`),
-    add: (body: Pick<Expense, 'tank_id' | 'amount' | 'category' | 'description' | 'purchase_date' | 'notes'>) =>
+    add: (body: Pick<Expense, 'tank_id' | 'amount' | 'quantity' | 'category' | 'description' | 'purchase_date' | 'notes' | 'group_id'>) =>
       post<Expense>('/expenses', body),
-    update: (id: string, body: Partial<Pick<Expense, 'tank_id' | 'amount' | 'category' | 'description' | 'purchase_date' | 'notes'>>) =>
+    update: (id: string, body: Partial<Pick<Expense, 'tank_id' | 'amount' | 'quantity' | 'category' | 'description' | 'purchase_date' | 'notes' | 'group_id'>>) =>
       patch<Expense>(`/expenses/${id}`, body),
     remove: (id: string) => del(`/expenses/${id}`),
   },
   inventory: {
     list: () => get<InventoryItem[]>('/inventory/'),
-    create: (body: Pick<InventoryItem, 'name' | 'category' | 'quantity' | 'low_stock_threshold' | 'unit_label' | 'notes'>) =>
+    create: (body: Pick<InventoryItem, 'name' | 'category' | 'quantity' | 'low_stock_threshold' | 'unit_label' | 'notes' | 'group_id'>) =>
       post<InventoryItem>('/inventory/', body),
-    update: (id: string, body: Partial<Pick<InventoryItem, 'name' | 'category' | 'low_stock_threshold' | 'unit_label' | 'notes'>>) =>
+    update: (id: string, body: Partial<Pick<InventoryItem, 'name' | 'category' | 'low_stock_threshold' | 'unit_label' | 'notes' | 'group_id'>>) =>
       patch<InventoryItem>(`/inventory/${id}`, body),
     remove: (id: string) => del(`/inventory/${id}`),
     adjust: (id: string, delta: number) => patch<InventoryItem>(`/inventory/${id}/adjust`, { delta }),
@@ -409,13 +629,79 @@ export const api = {
   },
   rooms: {
     list: () => get<Room[]>('/rooms/'),
-    create: (body: { name: string; width_m?: number; length_m?: number }) =>
+    create: (body: { name: string; width_m?: number; length_m?: number; group_id?: string | null }) =>
       post<Room>('/rooms/', body),
-    update: (id: string, body: Partial<{ name: string; width_m: number; length_m: number }>) =>
+    update: (id: string, body: Partial<{ name: string; width_m: number; length_m: number; group_id: string | null }>) =>
       patch<Room>(`/rooms/${id}`, body),
     remove: (id: string) => del(`/rooms/${id}`),
     setTankPosition: (tankId: string, body: { room_id: string; x: number; y: number }) =>
       put<RoomTankPosition>(`/rooms/tank-positions/${tankId}`, body),
     unassignTank: (tankId: string) => del(`/rooms/tank-positions/${tankId}`),
+  },
+  groups: {
+    list: () => get<Group[]>('/groups/'),
+    create: (name: string) => post<Group>('/groups/', { name }),
+    rename: (id: string, name: string) => patch<Group>(`/groups/${id}`, { name }),
+    remove: (id: string) => del(`/groups/${id}`),
+    addMember: (id: string, email: string) => post<Group>(`/groups/${id}/members`, { email }),
+    removeMember: (id: string, userId: string) => del(`/groups/${id}/members/${userId}`),
+  },
+  agent: {
+    getSettings: () => get<AgentSettings>('/agent/settings'),
+    updateSettings: (body: AgentSettingsUpdate) => put<AgentSettings>('/agent/settings', body),
+    listConversations: () => get<Conversation[]>('/agent/conversations'),
+    getConversation: (id: string) => get<ConversationDetail>(`/agent/conversations/${id}`),
+    deleteConversation: (id: string) => del(`/agent/conversations/${id}`),
+    chat: async (message: string, conversationId?: string | null): Promise<{ conversation_id: string; reply: string }> => {
+      const res = await fetch(`${BASE}/agent/chat`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message, conversation_id: conversationId ?? null }),
+      })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        throw new Error((err as any).detail ?? `Chat failed: ${res.status}`)
+      }
+      return res.json()
+    },
+    draftSpecies: async (name: string): Promise<SpeciesBody> => {
+      const res = await fetch(`${BASE}/agent/species-draft`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name }),
+      })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        throw new Error((err as any).detail ?? `Draft failed: ${res.status}`)
+      }
+      return res.json()
+    },
+  },
+  auth: {
+    config: () => get<AuthConfig>('/auth/config'),
+    me: () => get<AuthUser>('/auth/me'),
+    register: (body: { email: string; password: string; display_name?: string }) =>
+      authPost<AuthUser>('/auth/register', body),
+    login: (body: { email: string; password: string }) => authPost<AuthUser>('/auth/login', body),
+    logout: () => authPost<void>('/auth/logout', {}),
+    changePassword: (body: { current_password?: string; new_password: string }) =>
+      authPost<AuthUser>('/auth/change-password', body),
+    updateProfile: (body: { date_format?: string; unit_system?: string; default_tank_id?: string | null; notifications_enabled?: boolean; dashboard_layout?: DashboardSectionLayout[]; dashboard_stats?: string[] }) =>
+      patch<AuthUser>('/auth/me', body),
+    getSettings: () => get<AuthSettings>('/auth/settings'),
+    updateSettings: (body: AuthSettingsUpdate) => patch<AuthSettings>('/auth/settings', body),
+    listUsers: () => get<UserListItem[]>('/auth/users'),
+    updateUser: (id: string, body: { email?: string; display_name?: string | null }) =>
+      patch<UserListItem>(`/auth/users/${id}`, body),
+    deleteUser: (id: string) => del(`/auth/users/${id}`),
+    getPermissions: (id: string) => get<Record<string, PermissionLevel>>(`/auth/users/${id}/permissions`),
+    updatePermissions: (id: string, body: Partial<Record<string, PermissionLevel>>) =>
+      put<Record<string, PermissionLevel>>(`/auth/users/${id}/permissions`, body),
+  },
+  push: {
+    getVapidPublicKey: () => get<{ public_key: string }>('/push/vapid-public-key'),
+    subscribe: (body: { endpoint: string; keys: { p256dh: string; auth: string } }) =>
+      post<{ ok: boolean }>('/push/subscribe', body),
+    unsubscribe: (endpoint: string) => del('/push/subscribe', { endpoint }),
   },
 }

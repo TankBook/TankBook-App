@@ -1,5 +1,16 @@
+import re
 import yaml
 from pathlib import Path
+from sqlalchemy.orm import Session
+
+# Slugs become filenames on disk (see save_yaml) — restrict to a safe filename
+# component so a slug like "../../../etc/whatever" can't escape the species-data
+# directory and write or overwrite an arbitrary .yaml file on the container.
+_SAFE_SLUG = re.compile(r"^[a-z0-9]+(-[a-z0-9]+)*$")
+
+
+def is_safe_slug(slug) -> bool:
+    return isinstance(slug, str) and bool(_SAFE_SLUG.match(slug))
 
 
 class SpeciesService:
@@ -32,6 +43,8 @@ class SpeciesService:
         return slug in self._index
 
     def save_yaml(self, slug: str, type_: str, contents: bytes) -> None:
+        if not is_safe_slug(slug):
+            raise ValueError(f"Invalid slug: {slug!r} (use lowercase letters, digits, and hyphens only)")
         subfolder = {"fish": "fish", "plant": "plants", "invertebrate": "invertebrates", "amphibian": "amphibians"}.get(type_, type_)
         path = self._data_path / subfolder / f"{slug}.yaml"
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -64,3 +77,28 @@ class SpeciesService:
 
 
 species_service = SpeciesService()
+
+
+def check_compatibility(db: Session, tank_id: str, slug: str) -> dict:
+    """Check if a species slug is compatible with existing fish in a tank."""
+    from app.models.models import TankFish
+
+    incoming = species_service.get(slug)
+    if not incoming:
+        return {"warnings": [], "errors": [f"Unknown species: {slug}"]}
+
+    existing_fish = db.query(TankFish).filter_by(tank_id=tank_id).all()
+    warnings = []
+    for row in existing_fish:
+        existing = species_service.get(row.species_slug)
+        if not existing:
+            continue
+        compat = incoming.get("compatibility", {})
+        incompat_list = compat.get("incompatible_with", [])
+        if existing["slug"] in incompat_list:
+            warnings.append(f"{incoming['common_name']} is incompatible with {existing['common_name']} already in this tank.")
+        existing_incompat = existing.get("compatibility", {}).get("incompatible_with", [])
+        if incoming["slug"] in existing_incompat:
+            warnings.append(f"{existing['common_name']} (already in tank) is incompatible with {incoming['common_name']}.")
+
+    return {"warnings": list(set(warnings)), "errors": []}

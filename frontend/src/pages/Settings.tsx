@@ -1,8 +1,700 @@
 import { useState, useRef, useEffect } from 'react'
-import { CalendarDays, Ruler, Info, Download, Upload, Droplets, RefreshCw, Bell, Globe, Utensils, X, AlertTriangle, HardDrive, Fish, Image as ImageIcon } from 'lucide-react'
-import { useSettings, formatDate, DateFormat, UnitSystem } from '../context/SettingsContext'
-import { Card, Modal, StatCard } from '../components/ui'
-import { api, Tank } from '../api/client'
+import { Info, Download, Upload, RefreshCw, Bell, Globe, Utensils, X, AlertTriangle, HardDrive, Fish, Image as ImageIcon, Bot, Lock, SlidersHorizontal, Users as UsersIcon, KeyRound, Pencil, Trash2, Shield, HelpCircle, type LucideIcon } from 'lucide-react'
+import { useSettings, formatDate, formatDateTime } from '../context/SettingsContext'
+import { Card, Modal, ConfirmDialog, StatCard, FieldLabel } from '../components/ui'
+import { api, hasPermission, AgentSettings, AuthSettings, UserListItem, PermissionLevel, ExportSelection } from '../api/client'
+import { useAuth } from '../context/AuthContext'
+
+const PROVIDER_OPTIONS: { value: 'anthropic' | 'openai' | 'ollama'; label: string }[] = [
+  { value: 'anthropic', label: 'Claude (Anthropic)' },
+  { value: 'openai', label: 'OpenAI' },
+  { value: 'ollama', label: 'Ollama (local / self-hosted)' },
+]
+
+const MODEL_PLACEHOLDER: Record<string, string> = {
+  anthropic: 'e.g. claude-sonnet-4-5-20250929',
+  openai: 'e.g. gpt-4o',
+  ollama: 'e.g. llama3.1',
+}
+
+function AgentSettingsSection() {
+  const [settings, setSettings] = useState<AgentSettings | null>(null)
+  const [provider, setProvider] = useState<'anthropic' | 'openai' | 'ollama'>('anthropic')
+  const [model, setModel] = useState('')
+  const [baseUrl, setBaseUrl] = useState('')
+  const [apiKey, setApiKey] = useState('')
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+  const [saved, setSaved] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    api.agent.getSettings()
+      .then(s => {
+        setSettings(s)
+        setProvider(s.provider ?? 'anthropic')
+        setModel(s.model ?? '')
+        setBaseUrl(s.base_url ?? '')
+      })
+      .catch(() => setError('Could not load assistant settings'))
+      .finally(() => setLoading(false))
+  }, [])
+
+  async function save() {
+    setSaving(true)
+    setSaved(false)
+    setError(null)
+    try {
+      const updated = await api.agent.updateSettings({
+        provider,
+        model: model.trim(),
+        base_url: baseUrl.trim() || null,
+        ...(apiKey.trim() ? { api_key: apiKey.trim() } : {}),
+      })
+      setSettings(updated)
+      setApiKey('')
+      setSaved(true)
+    } catch {
+      setError('Could not save assistant settings')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  if (loading) return null
+
+  return (
+    <section>
+      <p style={{ fontWeight: 500, fontSize: 14, margin: '0 0 4px', color: 'var(--text)', display: 'flex', alignItems: 'center', gap: 6 }}><Bot size={14} color="var(--text-2)" />AI Assistant</p>
+      <p style={{ fontSize: 12, color: 'var(--text-2)', margin: '0 0 14px' }}>
+        Connect an LLM to power the Assistant page, which can answer diagnostic questions using your tank data. The provider you choose is called directly from this server — its API key is stored here, not sent anywhere else.
+      </p>
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        <div>
+          <FieldLabel>Provider</FieldLabel>
+          <select
+            value={provider}
+            onChange={e => { setProvider(e.target.value as typeof provider); setSaved(false) }}
+            style={{ width: '100%' }}
+          >
+            {PROVIDER_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+          </select>
+        </div>
+
+        <div>
+          <FieldLabel>Model</FieldLabel>
+          <input
+            value={model}
+            onChange={e => { setModel(e.target.value); setSaved(false) }}
+            placeholder={MODEL_PLACEHOLDER[provider]}
+            style={{ width: '100%', boxSizing: 'border-box' }}
+          />
+        </div>
+
+        {(provider === 'ollama' || provider === 'openai') && (
+          <div>
+            <FieldLabel>{provider === 'ollama' ? 'Base URL' : 'Base URL (optional override)'}</FieldLabel>
+            <input
+              value={baseUrl}
+              onChange={e => { setBaseUrl(e.target.value); setSaved(false) }}
+              placeholder={provider === 'ollama' ? 'e.g. http://192.168.1.50:11434/v1' : 'https://api.openai.com/v1'}
+              style={{ width: '100%', boxSizing: 'border-box' }}
+            />
+          </div>
+        )}
+
+        {provider !== 'ollama' && (
+          <div>
+            <FieldLabel>API Key</FieldLabel>
+            <input
+              type="password"
+              value={apiKey}
+              onChange={e => { setApiKey(e.target.value); setSaved(false) }}
+              placeholder={settings?.api_key_set ? 'Key saved — enter a new key to replace it' : 'sk-…'}
+              style={{ width: '100%', boxSizing: 'border-box' }}
+            />
+          </div>
+        )}
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 4 }}>
+          <button
+            onClick={save}
+            disabled={saving || !model.trim()}
+            style={{
+              padding: '7px 16px', borderRadius: 8, fontSize: 13, fontWeight: 500,
+              cursor: saving || !model.trim() ? 'default' : 'pointer',
+              border: '0.5px solid var(--blue-border)',
+              background: !saving && model.trim() ? 'var(--blue-bg)' : 'var(--surface-2)',
+              color: !saving && model.trim() ? 'var(--blue)' : 'var(--text-3)',
+            }}
+          >
+            {saving ? 'Saving…' : 'Save Assistant Settings'}
+          </button>
+          {saved && <span style={{ fontSize: 12, color: 'var(--green)' }}>Saved</span>}
+          {error && <span style={{ fontSize: 12, color: 'var(--red)' }}>{error}</span>}
+        </div>
+      </div>
+    </section>
+  )
+}
+
+function UsersSection() {
+  const { dateFormat, appUrl } = useSettings()
+  const { user: currentUser } = useAuth()
+  const [users, setUsers] = useState<UserListItem[]>([])
+  const [loadingUsers, setLoadingUsers] = useState(true)
+
+  const [editingUser, setEditingUser] = useState<UserListItem | null>(null)
+  const [editEmail, setEditEmail] = useState('')
+  const [editDisplayName, setEditDisplayName] = useState('')
+  const [savingEdit, setSavingEdit] = useState(false)
+  const [editError, setEditError] = useState<string | null>(null)
+
+  const [deletingUser, setDeletingUser] = useState<UserListItem | null>(null)
+  const [deleteError, setDeleteError] = useState<string | null>(null)
+
+  const [permissionsUser, setPermissionsUser] = useState<UserListItem | null>(null)
+  const [permissionsDraft, setPermissionsDraft] = useState<Record<string, PermissionLevel> | null>(null)
+  const [loadingPermissions, setLoadingPermissions] = useState(false)
+  const [savingPermissions, setSavingPermissions] = useState(false)
+  const [permissionsError, setPermissionsError] = useState<string | null>(null)
+
+  const [authSettings, setAuthSettings] = useState<AuthSettings | null>(null)
+  const [savingRegistration, setSavingRegistration] = useState(false)
+  const [issuerUrl, setIssuerUrl] = useState('')
+  const [clientId, setClientId] = useState('')
+  const [clientSecret, setClientSecret] = useState('')
+  const [displayName, setDisplayName] = useState('')
+  const [loadingOidc, setLoadingOidc] = useState(true)
+  const [savingOidc, setSavingOidc] = useState(false)
+  const [oidcSaved, setOidcSaved] = useState(false)
+  const [showOidcHelp, setShowOidcHelp] = useState(false)
+  const [oidcError, setOidcError] = useState<string | null>(null)
+
+  function refreshUsers() {
+    return api.auth.listUsers().then(setUsers).catch(() => {})
+  }
+
+  useEffect(() => {
+    refreshUsers().finally(() => setLoadingUsers(false))
+    api.auth.getSettings()
+      .then(s => {
+        setAuthSettings(s)
+        setIssuerUrl(s.oidc_issuer_url ?? '')
+        setClientId(s.oidc_client_id ?? '')
+        setDisplayName(s.oidc_display_name ?? '')
+      })
+      .catch(() => {})
+      .finally(() => setLoadingOidc(false))
+  }, [])
+
+  async function toggleRegistration(allow: boolean) {
+    setSavingRegistration(true)
+    try {
+      setAuthSettings(await api.auth.updateSettings({ allow_registration: allow }))
+    } finally {
+      setSavingRegistration(false)
+    }
+  }
+
+  async function saveOidc() {
+    setSavingOidc(true)
+    setOidcSaved(false)
+    setOidcError(null)
+    try {
+      const updated = await api.auth.updateSettings({
+        oidc_issuer_url: issuerUrl.trim() || null,
+        oidc_client_id: clientId.trim() || null,
+        oidc_display_name: displayName.trim() || null,
+        ...(clientSecret.trim() ? { oidc_client_secret: clientSecret.trim() } : {}),
+      })
+      setAuthSettings(updated)
+      setClientSecret('')
+      setOidcSaved(true)
+    } catch {
+      setOidcError('Could not save OIDC settings')
+    } finally {
+      setSavingOidc(false)
+    }
+  }
+
+  function openEdit(u: UserListItem) {
+    setEditingUser(u)
+    setEditEmail(u.email)
+    setEditDisplayName(u.display_name ?? '')
+    setEditError(null)
+  }
+
+  async function saveEdit() {
+    if (!editingUser) return
+    setSavingEdit(true)
+    setEditError(null)
+    try {
+      const updated = await api.auth.updateUser(editingUser.id, {
+        email: editEmail.trim(),
+        display_name: editDisplayName.trim() || null,
+      })
+      setUsers(us => us.map(u => (u.id === updated.id ? updated : u)))
+      setEditingUser(null)
+    } catch (e: any) {
+      setEditError(e.message ?? 'Could not save changes')
+    } finally {
+      setSavingEdit(false)
+    }
+  }
+
+  async function confirmDelete() {
+    if (!deletingUser) return
+    setDeleteError(null)
+    try {
+      await api.auth.deleteUser(deletingUser.id)
+      setUsers(us => us.filter(u => u.id !== deletingUser.id))
+      setDeletingUser(null)
+    } catch (e: any) {
+      setDeleteError(e.message ?? 'Could not delete user')
+    }
+  }
+
+  function openPermissions(u: UserListItem) {
+    setPermissionsUser(u)
+    setPermissionsDraft(null)
+    setPermissionsError(null)
+    setLoadingPermissions(true)
+    api.auth.getPermissions(u.id)
+      .then(setPermissionsDraft)
+      .catch(() => setPermissionsError('Could not load permissions'))
+      .finally(() => setLoadingPermissions(false))
+  }
+
+  async function savePermissions() {
+    if (!permissionsUser || !permissionsDraft) return
+    setSavingPermissions(true)
+    setPermissionsError(null)
+    try {
+      const updated = await api.auth.updatePermissions(permissionsUser.id, permissionsDraft)
+      setPermissionsDraft(updated)
+      setPermissionsUser(null)
+    } catch (e: any) {
+      setPermissionsError(e.message ?? 'Could not save permissions')
+    } finally {
+      setSavingPermissions(false)
+    }
+  }
+
+  return (
+    <>
+      <section style={{ paddingBottom: 20, borderBottom: '0.5px solid var(--border-sub)', minWidth: 0 }}>
+        <p style={{ fontWeight: 500, fontSize: 14, margin: '0 0 4px', color: 'var(--text)', display: 'flex', alignItems: 'center', gap: 6 }}><UsersIcon size={14} color="var(--text-2)" />Users</p>
+        <p style={{ fontSize: 12, color: 'var(--text-2)', margin: '0 0 14px' }}>
+          Everyone with an account on this instance, local or via SSO. New accounts start with no admin access — use the shield icon to grant AI, Species, General, or User-management permissions per account.
+        </p>
+
+        {loadingUsers ? (
+          <p style={{ fontSize: 13, color: 'var(--text-3)' }}>Loading…</p>
+        ) : (
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+              <thead>
+                <tr>
+                  <th style={{ textAlign: 'left', padding: '6px 10px', color: 'var(--text-2)', fontWeight: 500, fontSize: 11, borderBottom: '0.5px solid var(--border)' }}>Name</th>
+                  <th style={{ textAlign: 'left', padding: '6px 10px', color: 'var(--text-2)', fontWeight: 500, fontSize: 11, borderBottom: '0.5px solid var(--border)' }}>Email</th>
+                  <th style={{ textAlign: 'left', padding: '6px 10px', color: 'var(--text-2)', fontWeight: 500, fontSize: 11, borderBottom: '0.5px solid var(--border)' }}>Method</th>
+                  <th style={{ textAlign: 'left', padding: '6px 10px', color: 'var(--text-2)', fontWeight: 500, fontSize: 11, borderBottom: '0.5px solid var(--border)' }}>Joined</th>
+                  <th style={{ textAlign: 'left', padding: '6px 10px', color: 'var(--text-2)', fontWeight: 500, fontSize: 11, borderBottom: '0.5px solid var(--border)' }}>Last login</th>
+                  <th style={{ textAlign: 'right', padding: '6px 10px', color: 'var(--text-2)', fontWeight: 500, fontSize: 11, borderBottom: '0.5px solid var(--border)' }}></th>
+                </tr>
+              </thead>
+              <tbody>
+                {users.map((u, i) => {
+                  const border = i === users.length - 1 ? 'none' : '0.5px solid var(--border-sub)'
+                  return (
+                  <tr key={u.id}>
+                    <td style={{ padding: '8px 10px', color: 'var(--text)', borderBottom: border }}>{u.display_name || '—'}</td>
+                    <td style={{ padding: '8px 10px', color: 'var(--text)', borderBottom: border }}>{u.email}</td>
+                    <td style={{ padding: '8px 10px', borderBottom: border }}>
+                      <span style={{ display: 'inline-flex', gap: 4 }}>
+                        {u.has_password && <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 6, background: 'var(--surface-2)', color: 'var(--text-2)' }}>Local</span>}
+                        {u.has_oidc && <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 6, background: 'var(--blue-bg)', color: 'var(--blue)' }}>SSO</span>}
+                      </span>
+                    </td>
+                    <td style={{ padding: '8px 10px', color: 'var(--text-2)', borderBottom: border }}>{formatDate(u.created_at, dateFormat)}</td>
+                    <td style={{ padding: '8px 10px', color: 'var(--text-2)', borderBottom: border }}>
+                      {u.last_login_at ? formatDateTime(u.last_login_at, dateFormat) : 'Never'}
+                    </td>
+                    <td style={{ padding: '8px 10px', borderBottom: border, textAlign: 'right', whiteSpace: 'nowrap' }}>
+                      <button
+                        onClick={() => openEdit(u)}
+                        title="Edit user"
+                        style={{ display: 'inline-flex', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-3)', padding: 4, lineHeight: 0 }}
+                      >
+                        <Pencil size={14} />
+                      </button>
+                      <button
+                        onClick={() => openPermissions(u)}
+                        title="Permissions"
+                        style={{ display: 'inline-flex', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-3)', padding: 4, lineHeight: 0 }}
+                      >
+                        <Shield size={14} />
+                      </button>
+                      <button
+                        onClick={() => { setDeletingUser(u); setDeleteError(null) }}
+                        title={u.id === currentUser?.id ? "You can't delete your own account here" : 'Delete user'}
+                        disabled={u.id === currentUser?.id}
+                        style={{
+                          display: 'inline-flex', background: 'none', border: 'none', padding: 4, lineHeight: 0,
+                          cursor: u.id === currentUser?.id ? 'not-allowed' : 'pointer',
+                          color: u.id === currentUser?.id ? 'var(--text-4)' : 'var(--text-3)',
+                        }}
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </td>
+                  </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
+
+      <section style={{ paddingBottom: 20, borderBottom: '0.5px solid var(--border-sub)' }}>
+        <p style={{ fontWeight: 500, fontSize: 14, margin: '0 0 4px', color: 'var(--text)', display: 'flex', alignItems: 'center', gap: 6 }}><Lock size={14} color="var(--text-2)" />Access</p>
+        <p style={{ fontSize: 12, color: 'var(--text-2)', margin: '0 0 14px' }}>
+          Each account only sees the tanks it created. Shared, instance-wide areas like the species catalog and AI assistant are controlled per-user below.
+        </p>
+        <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: 'var(--text-label)' }}>
+          <input
+            type="checkbox"
+            checked={authSettings?.allow_registration ?? false}
+            disabled={savingRegistration}
+            onChange={e => toggleRegistration(e.target.checked)}
+          />
+          Allow new accounts to be created from the login screen
+        </label>
+      </section>
+
+      {!loadingOidc && (
+        <section>
+          <p style={{ fontWeight: 500, fontSize: 14, margin: '0 0 4px', color: 'var(--text)', display: 'flex', alignItems: 'center', gap: 6 }}>
+            <KeyRound size={14} color="var(--text-2)" />Single Sign-On (OIDC)
+            <button
+              onClick={() => setShowOidcHelp(true)}
+              title="What does the OIDC provider need to be configured with?"
+              style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 18, height: 18, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-3)', padding: 0, lineHeight: 0 }}
+            >
+              <HelpCircle size={14} />
+            </button>
+          </p>
+          <p style={{ fontSize: 12, color: 'var(--text-2)', margin: '0 0 14px' }}>
+            Let people sign in with an external identity provider (Authentik, Keycloak, Google, etc). Leave the issuer URL blank to turn SSO off — the login screen will only show local email/password.
+          </p>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <div>
+              <FieldLabel>Issuer URL</FieldLabel>
+              <input
+                value={issuerUrl}
+                onChange={e => { setIssuerUrl(e.target.value); setOidcSaved(false) }}
+                placeholder="e.g. https://auth.example.com/application/o/tankbook/"
+                style={{ width: '100%', boxSizing: 'border-box' }}
+              />
+            </div>
+            <div>
+              <FieldLabel>Client ID</FieldLabel>
+              <input
+                value={clientId}
+                onChange={e => { setClientId(e.target.value); setOidcSaved(false) }}
+                style={{ width: '100%', boxSizing: 'border-box' }}
+              />
+            </div>
+            <div>
+              <FieldLabel>Client Secret</FieldLabel>
+              <input
+                type="password"
+                value={clientSecret}
+                onChange={e => { setClientSecret(e.target.value); setOidcSaved(false) }}
+                placeholder={authSettings?.oidc_client_secret_set ? 'Secret saved — enter a new one to replace it' : ''}
+                style={{ width: '100%', boxSizing: 'border-box' }}
+              />
+            </div>
+            <div>
+              <FieldLabel>Provider name — shown on the login page as "Sign in with …"</FieldLabel>
+              <input
+                value={displayName}
+                onChange={e => { setDisplayName(e.target.value); setOidcSaved(false) }}
+                placeholder="e.g. Authentik"
+                style={{ width: '100%', boxSizing: 'border-box' }}
+              />
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 4 }}>
+              <button
+                onClick={saveOidc}
+                disabled={savingOidc}
+                style={{
+                  padding: '7px 16px', borderRadius: 8, fontSize: 13, fontWeight: 500,
+                  cursor: savingOidc ? 'default' : 'pointer',
+                  border: '0.5px solid var(--blue-border)',
+                  background: !savingOidc ? 'var(--blue-bg)' : 'var(--surface-2)',
+                  color: !savingOidc ? 'var(--blue)' : 'var(--text-3)',
+                }}
+              >
+                {savingOidc ? 'Saving…' : 'Save SSO Settings'}
+              </button>
+              {oidcSaved && <span style={{ fontSize: 12, color: 'var(--green)' }}>Saved</span>}
+              {oidcError && <span style={{ fontSize: 12, color: 'var(--red)' }}>{oidcError}</span>}
+            </div>
+          </div>
+        </section>
+      )}
+
+      {showOidcHelp && (
+        <Modal title="OIDC Provider Setup" onClose={() => setShowOidcHelp(false)} width={460}>
+          <p style={{ margin: '0 0 16px', fontSize: 12, color: 'var(--text-2)', lineHeight: 1.5 }}>
+            Register TankBook as a client application on your identity provider (Authentik, Keycloak, Google, etc)
+            with the settings below, then copy the values it gives you into the fields on the left.
+          </p>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+            <div>
+              <p style={{ margin: '0 0 4px', fontSize: 12, fontWeight: 600, color: 'var(--text)' }}>Redirect / Callback URI</p>
+              <p style={{
+                margin: '0 0 4px', fontSize: 12, fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
+                background: 'var(--tag-bg)', padding: '6px 10px', borderRadius: 6, color: 'var(--text)',
+                wordBreak: 'break-all',
+              }}>
+                {(appUrl ? appUrl.replace(/\/$/, '') : window.location.origin)}/api/auth/oidc/callback
+              </p>
+              <p style={{ margin: 0, fontSize: 11, color: 'var(--text-3)' }}>
+                Must be registered exactly, path included. Set the "App URL" in General settings first if this
+                instance sits behind a different address than the one you're viewing it from now.
+              </p>
+            </div>
+
+            <div>
+              <p style={{ margin: '0 0 4px', fontSize: 12, fontWeight: 600, color: 'var(--text)' }}>Client type</p>
+              <p style={{ margin: 0, fontSize: 12, color: 'var(--text-2)' }}>
+                Confidential / server-side client using the Authorization Code grant — TankBook sends a Client Secret
+                when exchanging the code, so a public/SPA-only client won't work.
+              </p>
+            </div>
+
+            <div>
+              <p style={{ margin: '0 0 4px', fontSize: 12, fontWeight: 600, color: 'var(--text)' }}>Scopes</p>
+              <p style={{ margin: 0, fontSize: 12, color: 'var(--text-2)' }}>
+                <code style={{ fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace' }}>openid email profile</code> — make
+                sure the provider is set to actually release the <code style={{ fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace' }}>email</code> claim
+                to this client; sign-in fails without it. The <code style={{ fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace' }}>name</code> claim
+                is optional and only used to pre-fill a display name the first time someone signs in.
+              </p>
+            </div>
+
+            <div>
+              <p style={{ margin: '0 0 4px', fontSize: 12, fontWeight: 600, color: 'var(--text)' }}>Issuer URL</p>
+              <p style={{ margin: 0, fontSize: 12, color: 'var(--text-2)' }}>
+                Enter the base issuer URL your provider advertises — TankBook discovers everything else itself from
+                <code style={{ fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace' }}> {'{issuer}'}/.well-known/openid-configuration</code>,
+                so that endpoint needs to be reachable from this server.
+              </p>
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 20 }}>
+            <button
+              onClick={() => setShowOidcHelp(false)}
+              style={{
+                fontSize: 13, padding: '7px 16px', borderRadius: 8,
+                border: '0.5px solid var(--btn-border)', background: 'transparent', color: 'var(--text)',
+                cursor: 'pointer',
+              }}
+            >
+              Close
+            </button>
+          </div>
+        </Modal>
+      )}
+
+      {editingUser && (
+        <Modal title="Edit User" onClose={() => setEditingUser(null)} width={380}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <div>
+              <FieldLabel>Name</FieldLabel>
+              <input
+                value={editDisplayName}
+                onChange={e => setEditDisplayName(e.target.value)}
+                style={{ width: '100%', boxSizing: 'border-box' }}
+              />
+            </div>
+            <div>
+              <FieldLabel>Email</FieldLabel>
+              <input
+                type="email"
+                value={editEmail}
+                onChange={e => setEditEmail(e.target.value)}
+                style={{ width: '100%', boxSizing: 'border-box' }}
+              />
+            </div>
+            {editError && <p style={{ margin: 0, fontSize: 12, color: 'var(--red)' }}>{editError}</p>}
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 6 }}>
+              <button
+                onClick={() => setEditingUser(null)}
+                style={{
+                  fontSize: 13, padding: '7px 16px', borderRadius: 8,
+                  border: '0.5px solid var(--btn-border)', background: 'transparent', color: 'var(--text)',
+                  cursor: 'pointer',
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={saveEdit}
+                disabled={savingEdit || !editEmail.trim()}
+                style={{
+                  fontSize: 13, padding: '7px 16px', borderRadius: 8, fontWeight: 500,
+                  border: '0.5px solid var(--blue-border)',
+                  background: savingEdit || !editEmail.trim() ? 'var(--surface-2)' : 'var(--blue-bg)',
+                  color: savingEdit || !editEmail.trim() ? 'var(--text-3)' : 'var(--blue)',
+                  cursor: savingEdit || !editEmail.trim() ? 'default' : 'pointer',
+                }}
+              >
+                {savingEdit ? 'Saving…' : 'Save'}
+              </button>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {deletingUser && (
+        <ConfirmDialog
+          title="Delete user?"
+          message={`This permanently deletes the account for ${deletingUser.display_name || deletingUser.email}. This can't be undone.${deleteError ? ` ${deleteError}.` : ''}`}
+          confirmLabel="Delete"
+          danger
+          onConfirm={confirmDelete}
+          onCancel={() => setDeletingUser(null)}
+        />
+      )}
+
+      {permissionsUser && (
+        <Modal title={`Permissions — ${permissionsUser.display_name || permissionsUser.email}`} onClose={() => setPermissionsUser(null)} width={420}>
+          {loadingPermissions || !permissionsDraft ? (
+            <p style={{ margin: 0, fontSize: 13, color: 'var(--text-3)' }}>Loading…</p>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+                <div>
+                  <p style={{ margin: 0, fontSize: 13, color: 'var(--text)', fontWeight: 500 }}>AI</p>
+                  <p style={{ margin: 0, fontSize: 12, color: 'var(--text-2)' }}>Assistant chat, species drafting, and AI settings</p>
+                </div>
+                <select
+                  value={permissionsDraft.ai}
+                  onChange={e => setPermissionsDraft(d => (d ? { ...d, ai: e.target.value as PermissionLevel } : d))}
+                  style={{ flexShrink: 0 }}
+                >
+                  <option value="none">None</option>
+                  <option value="use">Use</option>
+                  <option value="edit">Edit</option>
+                </select>
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+                <div>
+                  <p style={{ margin: 0, fontSize: 13, color: 'var(--text)', fontWeight: 500 }}>Tanks</p>
+                  <p style={{ margin: 0, fontSize: 12, color: 'var(--text-2)' }}>Create new tanks. Defaults to Yes — editing and deleting a tank is governed by its own ownership/sharing, not this</p>
+                </div>
+                <select
+                  value={permissionsDraft.tanks}
+                  onChange={e => setPermissionsDraft(d => (d ? { ...d, tanks: e.target.value as PermissionLevel } : d))}
+                  style={{ flexShrink: 0 }}
+                >
+                  <option value="none">No</option>
+                  <option value="edit">Yes</option>
+                </select>
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+                <div>
+                  <p style={{ margin: 0, fontSize: 13, color: 'var(--text)', fontWeight: 500 }}>General</p>
+                  <p style={{ margin: 0, fontSize: 12, color: 'var(--text-2)' }}>General settings tab and the About section (backup, storage)</p>
+                </div>
+                <select
+                  value={permissionsDraft.general}
+                  onChange={e => setPermissionsDraft(d => (d ? { ...d, general: e.target.value as PermissionLevel } : d))}
+                  style={{ flexShrink: 0 }}
+                >
+                  <option value="none">No</option>
+                  <option value="edit">Yes</option>
+                </select>
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+                <div>
+                  <p style={{ margin: 0, fontSize: 13, color: 'var(--text)', fontWeight: 500 }}>Species</p>
+                  <p style={{ margin: 0, fontSize: 12, color: 'var(--text-2)' }}>The species catalog — Use browses it, Edit can add/correct entries, Delete can also remove them</p>
+                </div>
+                <select
+                  value={permissionsDraft.species}
+                  onChange={e => setPermissionsDraft(d => (d ? { ...d, species: e.target.value as PermissionLevel } : d))}
+                  style={{ flexShrink: 0 }}
+                >
+                  <option value="none">None</option>
+                  <option value="use">Use</option>
+                  <option value="edit">Edit</option>
+                  <option value="delete">Delete</option>
+                </select>
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+                <div>
+                  <p style={{ margin: 0, fontSize: 13, color: 'var(--text)', fontWeight: 500 }}>Manage Users</p>
+                  <p style={{ margin: 0, fontSize: 12, color: 'var(--text-2)' }}>The Users section: accounts, permissions, registration, and SSO</p>
+                </div>
+                <select
+                  value={permissionsDraft.users}
+                  onChange={e => setPermissionsDraft(d => (d ? { ...d, users: e.target.value as PermissionLevel } : d))}
+                  style={{ flexShrink: 0 }}
+                >
+                  <option value="none">No</option>
+                  <option value="edit">Yes</option>
+                </select>
+              </div>
+
+              {permissionsError && <p style={{ margin: 0, fontSize: 12, color: 'var(--red)' }}>{permissionsError}</p>}
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 6 }}>
+                <button
+                  onClick={() => setPermissionsUser(null)}
+                  style={{
+                    fontSize: 13, padding: '7px 16px', borderRadius: 8,
+                    border: '0.5px solid var(--btn-border)', background: 'transparent', color: 'var(--text)',
+                    cursor: 'pointer',
+                  }}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={savePermissions}
+                  disabled={savingPermissions}
+                  style={{
+                    fontSize: 13, padding: '7px 16px', borderRadius: 8, fontWeight: 500,
+                    border: '0.5px solid var(--blue-border)',
+                    background: savingPermissions ? 'var(--surface-2)' : 'var(--blue-bg)',
+                    color: savingPermissions ? 'var(--text-3)' : 'var(--blue)',
+                    cursor: savingPermissions ? 'default' : 'pointer',
+                  }}
+                >
+                  {savingPermissions ? 'Saving…' : 'Save'}
+                </button>
+              </div>
+            </div>
+          )}
+        </Modal>
+      )}
+    </>
+  )
+}
 
 function formatBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`
@@ -13,7 +705,7 @@ function formatBytes(bytes: number): string {
   return `${value.toFixed(1)} ${units[unitIndex]}`
 }
 
-const APP_VERSION = '0.7.2'
+const APP_VERSION = '1.0.0'
 const GITHUB_REPO = 'TankBook/TankBook-App'
 
 function semverNewer(current: string, latest: string): boolean {
@@ -27,25 +719,51 @@ function semverNewer(current: string, latest: string): boolean {
   return false
 }
 
-const FORMAT_OPTIONS: { value: DateFormat; label: string }[] = [
-  { value: 'DD/MM/YYYY', label: 'DD/MM/YYYY (UK / Europe)' },
-  { value: 'MM/DD/YYYY', label: 'MM/DD/YYYY (US)' },
-  { value: 'YYYY-MM-DD', label: 'YYYY-MM-DD (ISO)' },
+const SETTINGS_TABS: { id: string; label: string; icon: LucideIcon }[] = [
+  { id: 'general', label: 'General', icon: SlidersHorizontal },
+  { id: 'ai', label: 'AI', icon: Bot },
+  { id: 'users', label: 'Users', icon: UsersIcon },
+  { id: 'about', label: 'About', icon: Info },
 ]
 
-const UNIT_OPTIONS: { value: UnitSystem; label: string; example: string }[] = [
-  { value: 'mm', label: 'Millimetres (mm)', example: '600 × 400 × 300 mm' },
-  { value: 'cm', label: 'Centimetres (cm)', example: '60 × 40 × 30 cm' },
-  { value: 'm',  label: 'Metres (m)',        example: '0.6 × 0.4 × 0.3 m' },
-  { value: 'imperial', label: 'Imperial (inches)', example: '23.62 × 15.75 × 11.81 in' },
+const DEFAULT_EXPORT_SELECTION: ExportSelection = {
+  tanks: true, tank_fish: true, tank_plants: true, tank_parameters: true,
+  tank_maintenance: true, tank_daily_tasks: true, tank_alerts: true,
+  tank_journal: true, tank_health_cases: true,
+  rooms: true, expenses: true, inventory: true, tap_water: true, settings: true,
+}
+
+const TANK_EXPORT_FIELDS: { key: keyof ExportSelection; label: string }[] = [
+  { key: 'tank_fish', label: 'Fish & Invertebrates' },
+  { key: 'tank_plants', label: 'Plants' },
+  { key: 'tank_parameters', label: 'Water Parameters' },
+  { key: 'tank_maintenance', label: 'Maintenance Tasks' },
+  { key: 'tank_daily_tasks', label: 'Daily Tasks' },
+  { key: 'tank_alerts', label: 'Alerts' },
+  { key: 'tank_journal', label: 'Journal Entries' },
+  { key: 'tank_health_cases', label: 'Health Cases (quarantine / disease)' },
+]
+
+const OTHER_EXPORT_FIELDS: { key: keyof ExportSelection; label: string }[] = [
+  { key: 'rooms', label: 'Rooms & Layout' },
+  { key: 'expenses', label: 'Expenses' },
+  { key: 'inventory', label: 'Inventory' },
+  { key: 'tap_water', label: 'Tap Water Tests' },
+  { key: 'settings', label: 'App Settings' },
 ]
 
 export default function Settings() {
-  const { dateFormat, setDateFormat, unitSystem, setUnitSystem, defaultTank, setDefaultTank, alertRetentionDays, setAlertRetentionDays, appUrl, setAppUrl, feedingAmountPresets, setFeedingAmountPresets, loading } = useSettings()
-  const [tanks, setTanks] = useState<Tank[]>([])
-  const [draftDateFormat, setDraftDateFormat] = useState<DateFormat>(dateFormat)
-  const [draftUnitSystem, setDraftUnitSystem] = useState<UnitSystem>(unitSystem)
-  const [draftDefaultTank, setDraftDefaultTank] = useState(defaultTank ?? '')
+  const { alertRetentionDays, setAlertRetentionDays, appUrl, setAppUrl, feedingAmountPresets, setFeedingAmountPresets, loading } = useSettings()
+  const { user: loggedInUser } = useAuth()
+  const canEditAi = hasPermission(loggedInUser?.permissions.ai, 'edit')
+  const canEditGeneral = hasPermission(loggedInUser?.permissions.general, 'edit')
+  const canManageUsers = hasPermission(loggedInUser?.permissions.users, 'edit')
+  const visibleTabs = SETTINGS_TABS.filter(t =>
+    t.id === 'ai' ? canEditAi :
+    t.id === 'users' ? canManageUsers :
+    t.id === 'general' || t.id === 'about' ? canEditGeneral :
+    true
+  )
   const [draftAlertRetentionDays, setDraftAlertRetentionDays] = useState<number | null>(alertRetentionDays)
   const [draftAppUrl, setDraftAppUrl] = useState(appUrl ?? '')
   const [draftFeedingAmountPresets, setDraftFeedingAmountPresets] = useState<string[]>(feedingAmountPresets)
@@ -53,6 +771,7 @@ export default function Settings() {
   const [settingsSaved, setSettingsSaved] = useState(false)
   const [newPreset, setNewPreset] = useState('')
   const [isMobile, setIsMobile] = useState(() => window.matchMedia('(max-width: 768px)').matches)
+  const [activeTab, setActiveTab] = useState(visibleTabs[0]?.id ?? SETTINGS_TABS[0].id)
 
   useEffect(() => {
     const mq = window.matchMedia('(max-width: 768px)')
@@ -63,9 +782,6 @@ export default function Settings() {
 
   useEffect(() => {
     if (!loading) {
-      setDraftDateFormat(dateFormat)
-      setDraftUnitSystem(unitSystem)
-      setDraftDefaultTank(defaultTank ?? '')
       setDraftAlertRetentionDays(alertRetentionDays)
       setDraftAppUrl(appUrl ?? '')
       setDraftFeedingAmountPresets(feedingAmountPresets)
@@ -79,16 +795,9 @@ export default function Settings() {
     setNewPreset('')
   }
 
-  useEffect(() => {
-    api.tanks.list().then(setTanks)
-  }, [])
-
   const feedingAmountPresetsChanged = JSON.stringify(draftFeedingAmountPresets) !== JSON.stringify(feedingAmountPresets)
 
-  const settingsChanged = draftDateFormat !== dateFormat
-    || draftUnitSystem !== unitSystem
-    || draftDefaultTank !== (defaultTank ?? '')
-    || draftAlertRetentionDays !== alertRetentionDays
+  const settingsChanged = draftAlertRetentionDays !== alertRetentionDays
     || draftAppUrl !== (appUrl ?? '')
     || feedingAmountPresetsChanged
 
@@ -97,9 +806,6 @@ export default function Settings() {
     setSettingsSaved(false)
     try {
       await Promise.all([
-        draftDateFormat !== dateFormat && setDateFormat(draftDateFormat),
-        draftUnitSystem !== unitSystem && setUnitSystem(draftUnitSystem),
-        draftDefaultTank !== (defaultTank ?? '') && setDefaultTank(draftDefaultTank || null),
         draftAlertRetentionDays !== alertRetentionDays && setAlertRetentionDays(draftAlertRetentionDays),
         draftAppUrl !== (appUrl ?? '') && setAppUrl(draftAppUrl || null),
         feedingAmountPresetsChanged && setFeedingAmountPresets(draftFeedingAmountPresets),
@@ -111,9 +817,6 @@ export default function Settings() {
   }
 
   function resetToDefaults() {
-    setDraftDateFormat('DD/MM/YYYY')
-    setDraftUnitSystem('mm')
-    setDraftDefaultTank('')
     setDraftAlertRetentionDays(null)
     setDraftAppUrl('')
     setDraftFeedingAmountPresets(['1 pinch', '1 cube'])
@@ -150,12 +853,18 @@ export default function Settings() {
   }, [])
 
   const [exporting, setExporting] = useState(false)
+  const [showExportModal, setShowExportModal] = useState(false)
+  const [exportSelection, setExportSelection] = useState<ExportSelection>(DEFAULT_EXPORT_SELECTION)
   const [importing, setImporting] = useState(false)
   const [importResult, setImportResult] = useState<{ ok: boolean; tanks_restored: number } | null>(null)
   const [importError, setImportError] = useState<string | null>(null)
   const [importFile, setImportFile] = useState<File | null>(null)
   const [showImportModal, setShowImportModal] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
+
+  function setExportField(key: keyof ExportSelection, value: boolean) {
+    setExportSelection(prev => ({ ...prev, [key]: value }))
+  }
 
   function closeImportModal() {
     setShowImportModal(false)
@@ -168,7 +877,7 @@ export default function Settings() {
   async function handleExport() {
     setExporting(true)
     try {
-      const data = await api.backup.export()
+      const data = await api.backup.export(exportSelection)
       const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
@@ -177,6 +886,7 @@ export default function Settings() {
       a.download = `tankbook-backup-${ts}.json`
       a.click()
       URL.revokeObjectURL(url)
+      setShowExportModal(false)
     } finally {
       setExporting(false)
     }
@@ -203,97 +913,39 @@ export default function Settings() {
 
   if (loading) return <p style={{ color: 'var(--text-2)' }}>Loading settings…</p>
 
-  const exampleDate = new Date()
-
   return (
     <div>
-      <h1 style={{ margin: '0 0 4px', fontSize: 22, fontWeight: 500, color: 'var(--text)' }}>Settings</h1>
+      <h1 style={{ margin: '0 0 4px', fontSize: 22, fontWeight: 500, color: 'var(--text)' }}>Admin</h1>
       <p style={{ margin: '0 0 24px', fontSize: 13, color: 'var(--text-2)' }}>
-        App-wide settings for TankBook. There are no user accounts, so these apply to everyone using this instance.
+        App-wide settings for TankBook. These apply to every account on this instance — though each account's tanks are private to them.
       </p>
 
-      <Card style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 16, padding: 24 }}>
+      <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', gap: 16, alignItems: 'flex-start' }}>
 
-        <section style={{ paddingBottom: 20, borderBottom: '0.5px solid var(--border-sub)' }}>
-          <p style={{ fontWeight: 500, fontSize: 14, margin: '0 0 4px', color: 'var(--text)', display: 'flex', alignItems: 'center', gap: 6 }}><Droplets size={14} color="var(--text-2)" />Default Tank</p>
-          <p style={{ fontSize: 12, color: 'var(--text-2)', margin: '0 0 14px' }}>
-            Pre-selects this tank on pages with a tank dropdown, like the Livestock Journal.
-          </p>
-          <select
-            value={draftDefaultTank}
-            onChange={e => { setDraftDefaultTank(e.target.value); setSettingsSaved(false) }}
-            style={{ width: '100%' }}
-          >
-            <option value="">No default</option>
-            {tanks.map(t => (
-              <option key={t.id} value={t.id}>{t.name}</option>
-            ))}
-          </select>
-        </section>
-
-        <section style={{ paddingBottom: 20, borderBottom: '0.5px solid var(--border-sub)' }}>
-          <p style={{ fontWeight: 500, fontSize: 14, margin: '0 0 4px', color: 'var(--text)', display: 'flex', alignItems: 'center', gap: 6 }}><CalendarDays size={14} color="var(--text-2)" />Date Format</p>
-          <p style={{ fontSize: 12, color: 'var(--text-2)', margin: '0 0 14px' }}>
-            Controls how dates are displayed across tanks, parameters, and the maintenance schedule.
-          </p>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {FORMAT_OPTIONS.map(opt => (
-              <label
-                key={opt.value}
+        <Card style={{ width: isMobile ? '100%' : 200, flexShrink: 0, padding: 8, boxSizing: 'border-box' }}>
+          <div style={{ display: 'flex', flexDirection: isMobile ? 'row' : 'column', gap: 2, overflowX: isMobile ? 'auto' : 'visible' }}>
+            {visibleTabs.map(t => (
+              <button
+                key={t.id}
+                onClick={() => setActiveTab(t.id)}
                 style={{
-                  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                  padding: '10px 12px', borderRadius: 8, cursor: 'pointer',
-                  border: draftDateFormat === opt.value ? '1px solid var(--blue-border)' : '0.5px solid var(--border)',
-                  background: draftDateFormat === opt.value ? 'var(--blue-bg)' : 'transparent',
+                  display: 'flex', alignItems: 'center', gap: 8, width: isMobile ? 'auto' : '100%',
+                  padding: '8px 10px', borderRadius: 8, fontSize: 13, textAlign: 'left', cursor: 'pointer',
+                  border: 'none', whiteSpace: 'nowrap',
+                  background: activeTab === t.id ? 'var(--blue-bg)' : 'transparent',
+                  color: activeTab === t.id ? 'var(--blue)' : 'var(--text)',
+                  fontWeight: activeTab === t.id ? 500 : 400,
                 }}
               >
-                <span style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                  <input
-                    type="radio"
-                    name="dateFormat"
-                    checked={draftDateFormat === opt.value}
-                    onChange={() => { setDraftDateFormat(opt.value); setSettingsSaved(false) }}
-                  />
-                  <span style={{ fontSize: 13, color: 'var(--text)' }}>{opt.label}</span>
-                </span>
-                <span style={{ fontSize: 12, color: 'var(--text-2)', fontFamily: 'monospace' }}>
-                  {formatDate(exampleDate, opt.value)}
-                </span>
-              </label>
+                <t.icon size={14} style={{ flexShrink: 0 }} />
+                {t.label}
+              </button>
             ))}
           </div>
-        </section>
+        </Card>
 
-        <section style={{ paddingBottom: 20, borderBottom: '0.5px solid var(--border-sub)' }}>
-          <p style={{ fontWeight: 500, fontSize: 14, margin: '0 0 4px', color: 'var(--text)', display: 'flex', alignItems: 'center', gap: 6 }}><Ruler size={14} color="var(--text-2)" />Dimension Units</p>
-          <p style={{ fontSize: 12, color: 'var(--text-2)', margin: '0 0 14px' }}>
-            Controls how tank dimensions (width, height, depth) are displayed and entered. Changing this converts existing values automatically.
-          </p>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {UNIT_OPTIONS.map(opt => (
-              <label
-                key={opt.value}
-                style={{
-                  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                  padding: '10px 12px', borderRadius: 8, cursor: 'pointer',
-                  border: draftUnitSystem === opt.value ? '1px solid var(--blue-border)' : '0.5px solid var(--border)',
-                  background: draftUnitSystem === opt.value ? 'var(--blue-bg)' : 'transparent',
-                }}
-              >
-                <span style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                  <input
-                    type="radio"
-                    name="unitSystem"
-                    checked={draftUnitSystem === opt.value}
-                    onChange={() => { setDraftUnitSystem(opt.value); setSettingsSaved(false) }}
-                  />
-                  <span style={{ fontSize: 13, color: 'var(--text)' }}>{opt.label}</span>
-                </span>
-                <span style={{ fontSize: 12, color: 'var(--text-2)', fontFamily: 'monospace' }}>{opt.example}</span>
-              </label>
-            ))}
-          </div>
-        </section>
+        {activeTab === 'general' && canEditGeneral && (
+      <Card style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 16, padding: 24, flex: 1, minWidth: 0, width: '100%', boxSizing: 'border-box' }}>
 
         <section style={{ paddingBottom: 20, borderBottom: '0.5px solid var(--border-sub)' }}>
           <p style={{ fontWeight: 500, fontSize: 14, margin: '0 0 4px', color: 'var(--text)', display: 'flex', alignItems: 'center', gap: 6 }}><Bell size={14} color="var(--text-2)" />Alert Retention</p>
@@ -375,17 +1027,64 @@ export default function Settings() {
           )}
         </section>
 
+        <section style={{ display: 'flex', flexDirection: isMobile ? 'column-reverse' : 'row', alignItems: isMobile ? 'stretch' : 'center', justifyContent: 'space-between', gap: 12 }}>
+          <button
+            onClick={resetToDefaults}
+            style={{
+              padding: '8px 18px', borderRadius: 8, border: '0.5px solid var(--btn-border)',
+              background: 'transparent', color: 'var(--text-2)', fontWeight: 500, cursor: 'pointer',
+              width: isMobile ? '100%' : undefined, boxSizing: 'border-box',
+            }}
+          >
+            Reset to Defaults
+          </button>
+          <div style={{ display: 'flex', flexDirection: isMobile ? 'column-reverse' : 'row', alignItems: isMobile ? 'stretch' : 'center', gap: 12 }}>
+            {settingsSaved && <span style={{ fontSize: 12, color: 'var(--green)', textAlign: isMobile ? 'center' : undefined }}>Settings saved</span>}
+            <button
+              onClick={saveSettings}
+              disabled={!settingsChanged || savingSettings}
+              style={{
+                padding: '8px 18px', borderRadius: 8, border: '0.5px solid var(--blue-border)',
+                background: settingsChanged && !savingSettings ? 'var(--blue-bg)' : 'var(--surface-2)',
+                color: settingsChanged && !savingSettings ? 'var(--blue)' : 'var(--text-3)',
+                fontWeight: 500, cursor: settingsChanged && !savingSettings ? 'pointer' : 'default',
+                width: isMobile ? '100%' : undefined, boxSizing: 'border-box',
+              }}
+            >
+              {savingSettings ? 'Saving…' : 'Save Settings'}
+            </button>
+          </div>
+        </section>
+
+      </Card>
+        )}
+
+        {activeTab === 'users' && canManageUsers && (
+      <Card style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 16, padding: 24, flex: 1, minWidth: 0, width: '100%', boxSizing: 'border-box' }}>
+        <UsersSection />
+      </Card>
+        )}
+
+        {activeTab === 'ai' && canEditAi && (
+      <Card style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 16, padding: 24, flex: 1, minWidth: 0, width: '100%', boxSizing: 'border-box' }}>
+        <AgentSettingsSection />
+      </Card>
+        )}
+
+        {activeTab === 'about' && canEditGeneral && (
+      <Card style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 16, padding: 24, flex: 1, minWidth: 0, width: '100%', boxSizing: 'border-box' }}>
+
         <section style={{ paddingBottom: 20, borderBottom: '0.5px solid var(--border-sub)' }}>
           <p style={{ fontWeight: 500, fontSize: 14, margin: '0 0 4px', color: 'var(--text)', display: 'flex', alignItems: 'center', gap: 6 }}>
             <Download size={14} color="var(--text-2)" />Data Backup
           </p>
           <p style={{ fontSize: 12, color: 'var(--text-2)', margin: '0 0 14px' }}>
-            Export all tank data, parameters, livestock, and journal entries to a JSON file. Restoring replaces all current data with the backup.
+            Choose what to include in a downloadable JSON file. Restoring a backup only replaces the categories that file actually contains.
           </p>
 
           <div style={{ display: 'flex', gap: 8 }}>
             <button
-              onClick={handleExport}
+              onClick={() => setShowExportModal(true)}
               disabled={exporting}
               style={{
                 flex: 1, display: 'flex', flexDirection: isMobile && !exporting ? 'column' : 'row',
@@ -441,12 +1140,104 @@ export default function Settings() {
           </div>
         </section>
 
+        {showExportModal && (
+          <Modal title="Export Backup" onClose={() => setShowExportModal(false)} width={460}>
+            <p style={{ margin: '0 0 14px', fontSize: 12, color: 'var(--text-2)', lineHeight: 1.5 }}>
+              Choose what to include in the downloaded file. It's safe to leave categories out —
+              restoring a backup later only replaces what the file actually contains.
+            </p>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 14, marginBottom: 10 }}>
+              <button
+                type="button"
+                onClick={() => setExportSelection({
+                  tanks: true, tank_fish: true, tank_plants: true, tank_parameters: true,
+                  tank_maintenance: true, tank_daily_tasks: true, tank_alerts: true,
+                  tank_journal: true, tank_health_cases: true,
+                  rooms: true, expenses: true, inventory: true, tap_water: true, settings: true,
+                })}
+                style={{ background: 'none', border: 'none', padding: 0, fontSize: 12, color: 'var(--blue)', cursor: 'pointer' }}
+              >
+                Select all
+              </button>
+              <button
+                type="button"
+                onClick={() => setExportSelection({
+                  tanks: false, tank_fish: false, tank_plants: false, tank_parameters: false,
+                  tank_maintenance: false, tank_daily_tasks: false, tank_alerts: false,
+                  tank_journal: false, tank_health_cases: false,
+                  rooms: false, expenses: false, inventory: false, tap_water: false, settings: false,
+                })}
+                style={{ background: 'none', border: 'none', padding: 0, fontSize: 12, color: 'var(--text-2)', cursor: 'pointer' }}
+              >
+                Select none
+              </button>
+            </div>
+
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, fontWeight: 500, color: 'var(--text)' }}>
+              <input type="checkbox" checked={exportSelection.tanks} onChange={e => setExportField('tanks', e.target.checked)} />
+              Tanks
+            </label>
+
+            <div style={{
+              marginLeft: 22, marginTop: 6, marginBottom: 16, display: 'flex', flexDirection: 'column', gap: 6,
+              opacity: exportSelection.tanks ? 1 : 0.4, pointerEvents: exportSelection.tanks ? 'auto' : 'none',
+            }}>
+              {TANK_EXPORT_FIELDS.map(f => (
+                <label key={f.key} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: 'var(--text-label)' }}>
+                  <input type="checkbox" checked={exportSelection[f.key]} onChange={e => setExportField(f.key, e.target.checked)} />
+                  {f.label}
+                </label>
+              ))}
+            </div>
+
+            <p style={{ fontSize: 10, fontWeight: 600, letterSpacing: '0.09em', color: 'var(--text-3)', textTransform: 'uppercase', margin: '0 0 10px' }}>
+              Other Data
+            </p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              {OTHER_EXPORT_FIELDS.map(f => (
+                <label key={f.key} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: 'var(--text-label)' }}>
+                  <input type="checkbox" checked={exportSelection[f.key]} onChange={e => setExportField(f.key, e.target.checked)} />
+                  {f.label}
+                </label>
+              ))}
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 20 }}>
+              <button
+                onClick={() => setShowExportModal(false)}
+                style={{
+                  fontSize: 13, padding: '7px 16px', borderRadius: 8,
+                  border: '0.5px solid var(--btn-border)', background: 'transparent', color: 'var(--text)',
+                  cursor: 'pointer', boxSizing: 'border-box',
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleExport}
+                disabled={exporting || !Object.values(exportSelection).some(Boolean)}
+                style={{
+                  fontSize: 13, padding: '7px 16px', borderRadius: 8, fontWeight: 500,
+                  border: '0.5px solid var(--blue-border)',
+                  background: exporting || !Object.values(exportSelection).some(Boolean) ? 'var(--surface-2)' : 'var(--blue-bg)',
+                  color: exporting || !Object.values(exportSelection).some(Boolean) ? 'var(--text-3)' : 'var(--blue)',
+                  cursor: exporting || !Object.values(exportSelection).some(Boolean) ? 'not-allowed' : 'pointer',
+                  boxSizing: 'border-box',
+                }}
+              >
+                {exporting ? 'Exporting…' : 'Download Backup'}
+              </button>
+            </div>
+          </Modal>
+        )}
+
         {showImportModal && (
           <Modal title="Restore Backup" onClose={closeImportModal}>
             <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start', background: 'var(--red-bg)', border: '0.5px solid var(--red-border)', borderRadius: 8, padding: '10px 12px', marginBottom: 16 }}>
               <AlertTriangle size={16} color="var(--red)" style={{ flexShrink: 0, marginTop: 1 }} />
               <p style={{ margin: 0, fontSize: 12, color: 'var(--red)', lineHeight: 1.5 }}>
-                Restoring a backup permanently deletes all current tanks, livestock, parameters, and journal entries, replacing them with the contents of the file you choose. This cannot be undone.
+                Restoring a backup permanently replaces every category present in the file you choose — anything it contains is wiped and re-created from the file. This cannot be undone.
               </p>
             </div>
 
@@ -520,7 +1311,7 @@ export default function Settings() {
           </Modal>
         )}
 
-        <section style={{ paddingBottom: 20, borderBottom: '0.5px solid var(--border-sub)' }}>
+        <section>
           <p style={{ fontWeight: 500, fontSize: 14, margin: '0 0 12px', color: 'var(--text)', display: 'flex', alignItems: 'center', gap: 6 }}>
             <Info size={14} color="var(--text-2)" />About
           </p>
@@ -592,36 +1383,10 @@ export default function Settings() {
           </p>
         </section>
 
-        <section style={{ display: 'flex', flexDirection: isMobile ? 'column-reverse' : 'row', alignItems: isMobile ? 'stretch' : 'center', justifyContent: 'space-between', gap: 12 }}>
-          <button
-            onClick={resetToDefaults}
-            style={{
-              padding: '8px 18px', borderRadius: 8, border: '0.5px solid var(--btn-border)',
-              background: 'transparent', color: 'var(--text-2)', fontWeight: 500, cursor: 'pointer',
-              width: isMobile ? '100%' : undefined, boxSizing: 'border-box',
-            }}
-          >
-            Reset to Defaults
-          </button>
-          <div style={{ display: 'flex', flexDirection: isMobile ? 'column-reverse' : 'row', alignItems: isMobile ? 'stretch' : 'center', gap: 12 }}>
-            {settingsSaved && <span style={{ fontSize: 12, color: 'var(--green)', textAlign: isMobile ? 'center' : undefined }}>Settings saved</span>}
-            <button
-              onClick={saveSettings}
-              disabled={!settingsChanged || savingSettings}
-              style={{
-                padding: '8px 18px', borderRadius: 8, border: '0.5px solid var(--blue-border)',
-                background: settingsChanged && !savingSettings ? 'var(--blue-bg)' : 'var(--surface-2)',
-                color: settingsChanged && !savingSettings ? 'var(--blue)' : 'var(--text-3)',
-                fontWeight: 500, cursor: settingsChanged && !savingSettings ? 'pointer' : 'default',
-                width: isMobile ? '100%' : undefined, boxSizing: 'border-box',
-              }}
-            >
-              {savingSettings ? 'Saving…' : 'Save Settings'}
-            </button>
-          </div>
-        </section>
-
       </Card>
+        )}
+
+      </div>
     </div>
   )
 }

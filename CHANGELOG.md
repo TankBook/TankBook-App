@@ -4,6 +4,41 @@ All notable changes to TankBook are documented here.
 
 ---
 
+## [1.0.0] — 2026-09-02
+
+TankBook's first stable release — no longer a single-user tool. See [RELEASE-NOTES-1.0.0.md](RELEASE-NOTES-1.0.0.md) for the full writeup.
+
+### Features
+- Multi-user accounts (local or OIDC SSO) with tiered permissions across five categories: AI assistant, general settings, user management, species catalogue, and tank creation.
+- Per-tank ownership with view/edit collaborator sharing, enforced on both frontend and backend.
+- Household groups — assign a tank, expense, inventory item, room, or tap water reading to a group so every member gets access, without one-to-one sharing.
+- AI assistant: global chat widget backed by Anthropic, OpenAI, or a local Ollama model; can draft starting-point species entries.
+- Configurable dashboard: per-slot stat cards (9 available stats), per-user section visibility, redesigned tank cards with an in-range status ring.
+- Quarantine / Disease case tracking in the Tank Journal.
+- Web Push notifications for due maintenance tasks.
+- Selective backup export/import by category.
+- Round/cylinder tank shape.
+- Expense quantity, with totals as amount × quantity.
+
+### Security
+- Three internal audit passes: tightened default permissions and login brute-force protection; fixed an SSRF opportunity and a path traversal vector; scoped AI conversations and room data to their owning user; closed a DNS-rebinding bypass of the SSRF guard, a species-slug path traversal, missing rate limiting on password changes, and several outdated dependencies with known CVEs (including the OIDC library).
+- Added upload size limits (10MB images, 1MB species YAML) — previously unbounded.
+
+### Fixed
+- `default_tank_id` moved from a shared setting to a per-user preference.
+- Dashboard edit-mode visibility toggles, mobile Users table overflow, tank reorder controls, and AI widget overlap with the navbar/footer.
+- Navbar collapse breakpoint raised from 1280px to 1650px so all 9 links fit without wrapping.
+- Tank Detail's "Weekly Tasks Due Today" alert now appears above the inhabitant counts instead of below them (#12).
+
+### Improvements
+- Maintenance tasks gained a Postpone option.
+- Built-in OIDC setup help; logout moved to a more consistent spot in mobile navigation.
+- Desktop parameter charts now paginate (6 readings per page), matching mobile.
+- Ammonia field's test-strip tab now points at API's dedicated Ammonia Test Strips chart.
+- Species YAML download no longer requires a login.
+
+---
+
 ## [0.7.2] — 2026-08-29
 
 ### Improvements

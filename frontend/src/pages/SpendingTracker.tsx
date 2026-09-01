@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react'
 import { Trash2, Plus, X, Pencil } from 'lucide-react'
-import { api, Expense } from '../api/client'
+import { api, Expense, type Group } from '../api/client'
 import { useTanks } from '../hooks'
 import { useSettings, formatDate } from '../context/SettingsContext'
 import { Card, FieldLabel, SectionTitle, Tag, RichTextarea, renderNotes, Dropdown } from '../components/ui'
@@ -25,6 +25,10 @@ const CAT_COLORS: Record<string, { bg: string; color: string }> = {
 
 function fmt(n: number) {
   return `£${n.toFixed(2)}`
+}
+
+function lineTotal(e: Expense) {
+  return e.amount * (e.quantity || 1)
 }
 
 function localDateStr() {
@@ -164,24 +168,31 @@ export default function SpendingTracker() {
 
   const [formTank, setFormTank] = useState<string>('')
   const [formAmount, setFormAmount] = useState('')
+  const [formQuantity, setFormQuantity] = useState('1')
   const [formCat, setFormCat] = useState(CATEGORIES[0])
   const [formDesc, setFormDesc] = useState('')
   const [formDate, setFormDate] = useState(localDateStr())
   const [formNotes, setFormNotes] = useState('')
+  const [formGroupId, setFormGroupId] = useState('')
+
+  const [groups, setGroups] = useState<Group[]>([])
+  useEffect(() => { api.groups.list().then(setGroups) }, [])
 
   function resetForm() {
-    setFormTank(''); setFormAmount(''); setFormCat(CATEGORIES[0])
-    setFormDesc(''); setFormDate(localDateStr()); setFormNotes('')
+    setFormTank(''); setFormAmount(''); setFormQuantity('1'); setFormCat(CATEGORIES[0])
+    setFormDesc(''); setFormDate(localDateStr()); setFormNotes(''); setFormGroupId('')
   }
 
   function openEdit(e: Expense) {
     setEditingId(e.id)
     setFormTank(e.tank_id ?? '')
     setFormAmount(String(e.amount))
+    setFormQuantity(String(e.quantity ?? 1))
     setFormCat(e.category)
     setFormDesc(e.description ?? '')
     setFormDate(e.purchase_date)
     setFormNotes(e.notes ?? '')
+    setFormGroupId(e.group_id ?? '')
   }
 
   async function submitAdd() {
@@ -189,10 +200,12 @@ export default function SpendingTracker() {
     await api.spending.add({
       tank_id: formTank || null,
       amount: Number(formAmount),
+      quantity: Number(formQuantity) || 1,
       category: formCat,
       description: formDesc || null,
       purchase_date: formDate,
       notes: formNotes || null,
+      group_id: formGroupId || null,
     })
     resetForm(); setShowAdd(false); reload()
   }
@@ -202,10 +215,12 @@ export default function SpendingTracker() {
     await api.spending.update(editingId, {
       tank_id: formTank || null,
       amount: Number(formAmount),
+      quantity: Number(formQuantity) || 1,
       category: formCat,
       description: formDesc || null,
       purchase_date: formDate,
       notes: formNotes || null,
+      group_id: formGroupId || null,
     })
     setEditingId(null); resetForm(); reload()
   }
@@ -216,16 +231,16 @@ export default function SpendingTracker() {
     return true
   }), [expenses, filterTank, filterCat])
 
-  const totalAll = expenses.reduce((s, e) => s + e.amount, 0)
+  const totalAll = expenses.reduce((s, e) => s + lineTotal(e), 0)
   const now = new Date()
   const thisMonthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
-  const totalMonth = expenses.filter(e => monthKey(e.purchase_date) === thisMonthKey).reduce((s, e) => s + e.amount, 0)
+  const totalMonth = expenses.filter(e => monthKey(e.purchase_date) === thisMonthKey).reduce((s, e) => s + lineTotal(e), 0)
   const thisYear = now.getFullYear()
-  const totalYear = expenses.filter(e => e.purchase_date.startsWith(String(thisYear))).reduce((s, e) => s + e.amount, 0)
+  const totalYear = expenses.filter(e => e.purchase_date.startsWith(String(thisYear))).reduce((s, e) => s + lineTotal(e), 0)
 
   const byCategory = CATEGORIES.map(cat => ({
     cat,
-    total: expenses.filter(e => e.category === cat).reduce((s, e) => s + e.amount, 0),
+    total: expenses.filter(e => e.category === cat).reduce((s, e) => s + lineTotal(e), 0),
   })).filter(r => r.total > 0).sort((a, b) => b.total - a.total)
 
   const groupedByMonth = useMemo(() => {
@@ -254,29 +269,40 @@ export default function SpendingTracker() {
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 12 }}>
           <div>
-            <FieldLabel>Amount (£)</FieldLabel>
+            <FieldLabel>Amount (£ per item)</FieldLabel>
             <input type="number" min="0" step="0.01" placeholder="0.00" value={formAmount} onChange={e => setFormAmount(e.target.value)} style={{ width: '100%', boxSizing: 'border-box' }} />
           </div>
+          <div>
+            <FieldLabel>Quantity</FieldLabel>
+            <input type="number" min="1" step="1" placeholder="1" value={formQuantity} onChange={e => setFormQuantity(e.target.value)} style={{ width: '100%', boxSizing: 'border-box' }} />
+          </div>
+        </div>
+
+        {Number(formAmount) > 0 && Number(formQuantity) > 1 && !isNaN(Number(formAmount)) && (
+          <p style={{ margin: '-6px 0 12px', fontSize: 12, color: 'var(--text-2)' }}>
+            Total: <strong style={{ color: 'var(--text)' }}>{fmt(Number(formAmount) * Number(formQuantity))}</strong>
+          </p>
+        )}
+
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 12 }}>
           <div>
             <FieldLabel>Date</FieldLabel>
             <DateInput key={editingId ?? 'new'} value={formDate} onChange={setFormDate} dateFormat={dateFormat} />
           </div>
-        </div>
-
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 12 }}>
           <div>
             <FieldLabel>Category</FieldLabel>
             <select value={formCat} onChange={e => setFormCat(e.target.value)} style={{ width: '100%', boxSizing: 'border-box' }}>
               {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
             </select>
           </div>
-          <div>
-            <FieldLabel>Tank (Optional)</FieldLabel>
-            <select value={formTank} onChange={e => setFormTank(e.target.value)} style={{ width: '100%', boxSizing: 'border-box' }}>
-              <option value="">General / No Tank</option>
-              {tanks?.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
-            </select>
-          </div>
+        </div>
+
+        <div style={{ marginBottom: 12 }}>
+          <FieldLabel>Tank (Optional)</FieldLabel>
+          <select value={formTank} onChange={e => setFormTank(e.target.value)} style={{ width: '100%', boxSizing: 'border-box' }}>
+            <option value="">General / No Tank</option>
+            {tanks?.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+          </select>
         </div>
 
         <div style={{ marginBottom: 12 }}>
@@ -284,10 +310,20 @@ export default function SpendingTracker() {
           <input value={formDesc} onChange={e => setFormDesc(e.target.value)} placeholder="e.g. Fluval 307 canister filter" style={{ width: '100%', boxSizing: 'border-box' }} />
         </div>
 
-        <div style={{ marginBottom: 16 }}>
+        <div style={{ marginBottom: 12 }}>
           <FieldLabel>Notes (Optional)</FieldLabel>
           <RichTextarea value={formNotes} onChange={setFormNotes} rows={2} placeholder="Notes…" />
         </div>
+
+        {groups.length > 0 && (
+          <div style={{ marginBottom: 16 }}>
+            <FieldLabel>Group</FieldLabel>
+            <select value={formGroupId} onChange={e => setFormGroupId(e.target.value)} style={{ width: '100%', boxSizing: 'border-box' }}>
+              <option value="">Personal</option>
+              {groups.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
+            </select>
+          </div>
+        )}
 
         <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
           <button onClick={() => { isEdit ? setEditingId(null) : setShowAdd(false); resetForm() }} style={{ padding: '7px 16px', borderRadius: 8, fontSize: 13, cursor: 'pointer', border: '0.5px solid var(--btn-border)', background: 'transparent', color: 'var(--text)' }}>Cancel</button>
@@ -361,7 +397,7 @@ export default function SpendingTracker() {
             <div key={mk} style={{ marginBottom: 24 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 8 }}>
                 <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>{monthLabel(mk)}</p>
-                <span style={{ fontSize: 12, color: 'var(--text-2)' }}>{fmt(items.reduce((s, e) => s + e.amount, 0))}</span>
+                <span style={{ fontSize: 12, color: 'var(--text-2)' }}>{fmt(items.reduce((s, e) => s + lineTotal(e), 0))}</span>
               </div>
               <Card>
                 {items.map((e, i) => {
@@ -377,11 +413,15 @@ export default function SpendingTracker() {
                             {e.description || e.category}
                             {tankName && <span style={{ fontWeight: 400, color: 'var(--text-3)', marginLeft: 4 }}>({tankName})</span>}
                           </span>
-                          <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)', flexShrink: 0 }}>{fmt(e.amount)}</span>
+                          <span style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', flexShrink: 0 }}>
+                            <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)' }}>{fmt(lineTotal(e))}</span>
+                            {e.quantity > 1 && <span style={{ fontSize: 10, color: 'var(--text-3)' }}>{fmt(e.amount)} × {e.quantity}</span>}
+                          </span>
                         </div>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 5, gap: 8 }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
                             <Tag bg={cc.bg} color={cc.color}>{e.category}</Tag>
+                            {e.quantity > 1 && <Tag bg="var(--tag-bg)" color="var(--text-2)">×{e.quantity}</Tag>}
                             <span style={{ fontSize: 11, color: 'var(--text-3)', flexShrink: 0 }}>{formatDate(e.purchase_date, dateFormat)}</span>
                           </div>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0 }}>
@@ -404,8 +444,9 @@ export default function SpendingTracker() {
                           {e.description || e.category}
                           {tankName && <span style={{ fontWeight: 400, color: 'var(--text-3)', marginLeft: 4 }}>({tankName})</span>}
                         </span>
-                        <div style={{ marginTop: 3 }}>
+                        <div style={{ marginTop: 3, display: 'flex', alignItems: 'center', gap: 6 }}>
                           <Tag bg={cc.bg} color={cc.color}>{e.category}</Tag>
+                          {e.quantity > 1 && <Tag bg="var(--tag-bg)" color="var(--text-2)">×{e.quantity}</Tag>}
                         </div>
                         <span style={{ display: 'block', fontSize: 11, color: 'var(--text-3)', marginTop: 3 }}>
                           {formatDate(e.purchase_date, dateFormat)}
@@ -418,7 +459,10 @@ export default function SpendingTracker() {
                       }
                       {/* Amount + actions */}
                       <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
-                        <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)' }}>{fmt(e.amount)}</span>
+                        <span style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
+                          <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)' }}>{fmt(lineTotal(e))}</span>
+                          {e.quantity > 1 && <span style={{ fontSize: 10, color: 'var(--text-3)' }}>{fmt(e.amount)} × {e.quantity}</span>}
+                        </span>
                         <button onClick={() => openEdit(e)} style={{ lineHeight: 0, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-3)' }}><Pencil size={13} /></button>
                         <button onClick={() => setConfirmDeleteId(e.id)} style={{ lineHeight: 0, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--red)' }}><Trash2 size={13} /></button>
                       </div>
@@ -468,7 +512,7 @@ export default function SpendingTracker() {
             <div onMouseDown={e => e.stopPropagation()} style={{ background: 'var(--surface)', border: '0.5px solid var(--red-border)', borderRadius: 14, padding: '1.5rem', width: 360, maxWidth: '100%', boxShadow: '0 12px 40px rgba(0,0,0,0.22)' }}>
               <p style={{ margin: '0 0 6px', fontSize: 15, fontWeight: 600, color: 'var(--red)' }}>Delete expense?</p>
               <p style={{ margin: '0 0 20px', fontSize: 13, color: 'var(--text-2)' }}>
-                {target ? `"${target.description || target.category}" — ${fmt(target.amount)}` : 'This expense'} will be permanently removed.
+                {target ? `"${target.description || target.category}" — ${fmt(lineTotal(target))}` : 'This expense'} will be permanently removed.
               </p>
               <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
                 <button

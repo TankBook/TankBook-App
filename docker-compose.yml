@@ -22,6 +22,7 @@ services:
         condition: service_healthy
     environment:
       DATABASE_URL: postgresql://${DB_USER:-tankbook}:${DB_PASSWORD:-changeme}@db/tankbook
+      SECRET_KEY: ${SECRET_KEY:-}
     volumes:
       - species_data:/app/species-data
       - tankbook-images:/app/images

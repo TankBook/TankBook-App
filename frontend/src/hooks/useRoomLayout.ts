@@ -73,10 +73,10 @@ export function useRoomLayoutState() {
     setRooms(prev => updater(prev))
   }
 
-  async function addRoom(name: string, width?: number, length?: number): Promise<string | null> {
+  async function addRoom(name: string, width?: number, length?: number, groupId?: string | null): Promise<string | null> {
     const trimmed = name.trim()
     if (!trimmed) return null
-    const created = await api.rooms.create({ name: trimmed, width_m: width, length_m: length })
+    const created = await api.rooms.create({ name: trimmed, width_m: width, length_m: length, group_id: groupId ?? null })
     updateRooms(prev => [...prev, fromApiRoom(created)])
     return created.id
   }
