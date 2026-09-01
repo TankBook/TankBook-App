@@ -25,6 +25,7 @@ export interface Tank {
   setup_date: string | null
   created_at: string
   owner_id: string
+  group_id: string | null
   my_access: 'owner' | 'edit' | 'view'
 }
 
@@ -33,6 +34,20 @@ export interface TankShare {
   email: string
   display_name: string | null
   level: 'view' | 'edit'
+}
+
+export interface GroupMember {
+  user_id: string
+  email: string
+  display_name: string | null
+  role: 'owner' | 'member'
+}
+
+export interface Group {
+  id: string
+  name: string
+  my_role: 'owner' | 'member'
+  members: GroupMember[]
 }
 
 export function canEditTank(tank: Pick<Tank, 'my_access'>): boolean {
@@ -54,6 +69,8 @@ export interface Expense {
   purchase_date: string
   notes: string | null
   created_at: string
+  owner_id: string
+  group_id: string | null
 }
 
 export interface InventoryItem {
@@ -65,6 +82,8 @@ export interface InventoryItem {
   unit_label: string | null
   notes: string | null
   created_at: string
+  owner_id: string
+  group_id: string | null
 }
 
 export interface TankFish {
@@ -122,6 +141,8 @@ export interface TapWaterTest {
   tds_ppm: number | null
   recorded_at: string
   notes: string | null
+  owner_id: string
+  group_id: string | null
 }
 
 export interface MaintenanceTask {
@@ -213,6 +234,8 @@ export interface Room {
   name: string
   width_m: number
   length_m: number
+  owner_id: string
+  group_id: string | null
   tank_positions: RoomTankPosition[]
 }
 
@@ -458,7 +481,7 @@ export const api = {
   },
   tapWater: {
     list: (limit = 50) => get<TapWaterTest[]>(`/tap-water/?limit=${limit}`),
-    log: (body: Omit<TapWaterTest, 'id' | 'recorded_at'>) => post<TapWaterTest>('/tap-water/', body),
+    log: (body: Omit<TapWaterTest, 'id' | 'recorded_at' | 'owner_id'>) => post<TapWaterTest>('/tap-water/', body),
   },
   alerts: {
     list: (tankId: string, unacknowledgedOnly = false) =>
@@ -587,17 +610,17 @@ export const api = {
   },
   spending: {
     list: (tankId?: string) => get<Expense[]>(`/expenses${tankId ? `?tank_id=${tankId}` : ''}`),
-    add: (body: Pick<Expense, 'tank_id' | 'amount' | 'quantity' | 'category' | 'description' | 'purchase_date' | 'notes'>) =>
+    add: (body: Pick<Expense, 'tank_id' | 'amount' | 'quantity' | 'category' | 'description' | 'purchase_date' | 'notes' | 'group_id'>) =>
       post<Expense>('/expenses', body),
-    update: (id: string, body: Partial<Pick<Expense, 'tank_id' | 'amount' | 'quantity' | 'category' | 'description' | 'purchase_date' | 'notes'>>) =>
+    update: (id: string, body: Partial<Pick<Expense, 'tank_id' | 'amount' | 'quantity' | 'category' | 'description' | 'purchase_date' | 'notes' | 'group_id'>>) =>
       patch<Expense>(`/expenses/${id}`, body),
     remove: (id: string) => del(`/expenses/${id}`),
   },
   inventory: {
     list: () => get<InventoryItem[]>('/inventory/'),
-    create: (body: Pick<InventoryItem, 'name' | 'category' | 'quantity' | 'low_stock_threshold' | 'unit_label' | 'notes'>) =>
+    create: (body: Pick<InventoryItem, 'name' | 'category' | 'quantity' | 'low_stock_threshold' | 'unit_label' | 'notes' | 'group_id'>) =>
       post<InventoryItem>('/inventory/', body),
-    update: (id: string, body: Partial<Pick<InventoryItem, 'name' | 'category' | 'low_stock_threshold' | 'unit_label' | 'notes'>>) =>
+    update: (id: string, body: Partial<Pick<InventoryItem, 'name' | 'category' | 'low_stock_threshold' | 'unit_label' | 'notes' | 'group_id'>>) =>
       patch<InventoryItem>(`/inventory/${id}`, body),
     remove: (id: string) => del(`/inventory/${id}`),
     adjust: (id: string, delta: number) => patch<InventoryItem>(`/inventory/${id}/adjust`, { delta }),
@@ -606,14 +629,22 @@ export const api = {
   },
   rooms: {
     list: () => get<Room[]>('/rooms/'),
-    create: (body: { name: string; width_m?: number; length_m?: number }) =>
+    create: (body: { name: string; width_m?: number; length_m?: number; group_id?: string | null }) =>
       post<Room>('/rooms/', body),
-    update: (id: string, body: Partial<{ name: string; width_m: number; length_m: number }>) =>
+    update: (id: string, body: Partial<{ name: string; width_m: number; length_m: number; group_id: string | null }>) =>
       patch<Room>(`/rooms/${id}`, body),
     remove: (id: string) => del(`/rooms/${id}`),
     setTankPosition: (tankId: string, body: { room_id: string; x: number; y: number }) =>
       put<RoomTankPosition>(`/rooms/tank-positions/${tankId}`, body),
     unassignTank: (tankId: string) => del(`/rooms/tank-positions/${tankId}`),
+  },
+  groups: {
+    list: () => get<Group[]>('/groups/'),
+    create: (name: string) => post<Group>('/groups/', { name }),
+    rename: (id: string, name: string) => patch<Group>(`/groups/${id}`, { name }),
+    remove: (id: string) => del(`/groups/${id}`),
+    addMember: (id: string, email: string) => post<Group>(`/groups/${id}/members`, { email }),
+    removeMember: (id: string, userId: string) => del(`/groups/${id}/members/${userId}`),
   },
   agent: {
     getSettings: () => get<AgentSettings>('/agent/settings'),

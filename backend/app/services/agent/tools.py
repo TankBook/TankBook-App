@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 
 from app.models.models import Tank, TankShare, TankFish, TankPlant, WaterParameter, Alert, JournalEntry, MaintenanceTask, TapWaterTest
 from app.services.species import species_service, check_compatibility as _check_compatibility
+from app.services.groups import user_group_ids
 
 
 def _iso(dt: datetime | None) -> str | None:
@@ -12,7 +13,9 @@ def _iso(dt: datetime | None) -> str | None:
 def _accessible_tank_ids(db: Session, user_id: str) -> list[str]:
     owned = [t.id for t in db.query(Tank.id).filter_by(owner_id=user_id).all()]
     shared = [r[0] for r in db.query(TankShare.tank_id).filter_by(user_id=user_id).all()]
-    return list({*owned, *shared})
+    group_ids = user_group_ids(db, user_id)
+    grouped = [t.id for t in db.query(Tank.id).filter(Tank.group_id.in_(group_ids)).all()] if group_ids else []
+    return list({*owned, *shared, *grouped})
 
 
 def _can_access_tank(db: Session, user_id: str, tank_id: str) -> bool:
@@ -20,6 +23,8 @@ def _can_access_tank(db: Session, user_id: str, tank_id: str) -> bool:
     if not tank:
         return False
     if tank.owner_id == user_id:
+        return True
+    if tank.group_id is not None and tank.group_id in user_group_ids(db, user_id):
         return True
     return db.query(TankShare).filter_by(tank_id=tank_id, user_id=user_id).first() is not None
 
@@ -147,7 +152,12 @@ def check_compatibility(db: Session, user_id: str, tank_id: str, slug: str) -> d
 
 def get_tap_water_tests(db: Session, user_id: str, limit: int = 10) -> dict:
     limit = max(1, min(limit, 50))
-    rows = db.query(TapWaterTest).order_by(TapWaterTest.recorded_at.desc()).limit(limit).all()
+    group_ids = user_group_ids(db, user_id)
+    rows = (
+        db.query(TapWaterTest)
+        .filter((TapWaterTest.owner_id == user_id) | (TapWaterTest.group_id.in_(group_ids) if group_ids else False))
+        .order_by(TapWaterTest.recorded_at.desc()).limit(limit).all()
+    )
     return {"tests": [
         {
             "recorded_at": _iso(r.recorded_at), "ph": r.ph, "gh_dgh": r.gh_dgh, "kh_dkh": r.kh_dkh,

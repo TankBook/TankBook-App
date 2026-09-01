@@ -27,6 +27,7 @@ class TankCreate(BaseModel):
     light_watts: int | None = None
     light_technology: str | None = None
     setup_date: datetime | None = None
+    group_id: str | None = None
 
 
 class TankOut(TankCreate):
@@ -47,6 +48,34 @@ class TankShareOut(BaseModel):
 class TankShareCreate(BaseModel):
     email: str
     level: Literal["view", "edit"]
+
+
+# --- Groups ---
+
+class GroupMemberOut(BaseModel):
+    user_id: str
+    email: str
+    display_name: str | None = None
+    role: Literal["owner", "member"]
+
+
+class GroupOut(BaseModel):
+    id: str
+    name: str
+    my_role: Literal["owner", "member"]
+    members: list[GroupMemberOut] = []
+
+
+class GroupCreate(BaseModel):
+    name: str
+
+
+class GroupUpdate(BaseModel):
+    name: str
+
+
+class GroupMemberAdd(BaseModel):
+    email: str
 
 
 # --- Fish ---
@@ -143,11 +172,13 @@ class TapWaterTestCreate(BaseModel):
     nitrate_ppm: float | None = None
     tds_ppm: float | None = None
     notes: str | None = None
+    group_id: str | None = None
 
 
 class TapWaterTestOut(TapWaterTestCreate):
     id: str
     recorded_at: datetime
+    owner_id: str
     model_config = {"from_attributes": True}
 
 
@@ -430,12 +461,14 @@ class RoomCreate(BaseModel):
     name: str
     width_m: float = 3.0
     length_m: float = 2.4
+    group_id: str | None = None
 
 
 class RoomUpdate(BaseModel):
     name: str | None = None
     width_m: float | None = None
     length_m: float | None = None
+    group_id: str | None = None
 
 
 class RoomTankPositionOut(BaseModel):
@@ -450,6 +483,8 @@ class RoomOut(BaseModel):
     name: str
     width_m: float
     length_m: float
+    owner_id: str
+    group_id: str | None = None
     tank_positions: list[RoomTankPositionOut] = []
     model_config = {"from_attributes": True}
 
@@ -471,6 +506,7 @@ class ExpenseCreate(BaseModel):
     description: str | None = None
     purchase_date: str
     notes: str | None = None
+    group_id: str | None = None
 
 
 class ExpenseUpdate(BaseModel):
@@ -482,11 +518,13 @@ class ExpenseUpdate(BaseModel):
     description: str | None = None
     purchase_date: str | None = None
     notes: str | None = None
+    group_id: str | None = None
 
 
 class ExpenseOut(ExpenseCreate):
     id: str
     created_at: datetime
+    owner_id: str
     model_config = {"from_attributes": True}
 
 
@@ -499,6 +537,7 @@ class InventoryItemCreate(BaseModel):
     low_stock_threshold: int = 1
     unit_label: str | None = None
     notes: str | None = None
+    group_id: str | None = None
 
 
 class InventoryItemUpdate(BaseModel):
@@ -507,11 +546,13 @@ class InventoryItemUpdate(BaseModel):
     low_stock_threshold: int | None = None
     unit_label: str | None = None
     notes: str | None = None
+    group_id: str | None = None
 
 
 class InventoryItemOut(InventoryItemCreate):
     id: str
     created_at: datetime
+    owner_id: str
     model_config = {"from_attributes": True}
 
 

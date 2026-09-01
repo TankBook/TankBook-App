@@ -79,11 +79,17 @@ function QuickAdd() {
   const [invThreshold, setInvThreshold] = useState('1')
   const [invUnit, setInvUnit] = useState('')
 
+  const [groups, setGroups] = useState<{ id: string; name: string }[]>([])
+  const [qaGroupId, setQaGroupId] = useState('')
+
   useEffect(() => {
-    if (open) api.tanks.list().then(t => {
-      setTanks(t)
-      if (t.length) setParamTank(t[0].id)
-    })
+    if (open) {
+      api.tanks.list().then(t => {
+        setTanks(t)
+        if (t.length) setParamTank(t[0].id)
+      })
+      api.groups.list().then(setGroups)
+    }
   }, [open])
 
   function resetForms() {
@@ -92,6 +98,7 @@ function QuickAdd() {
     setPh(''); setTemp(''); setAmmonia(''); setNitrite(''); setNitrate('')
     setExpTank(''); setExpAmount(''); setExpCat(QA_CATEGORIES[0]); setExpDesc(''); setExpDate(todayIso())
     setInvName(''); setInvCat(QA_INV_CATEGORIES[0]); setInvQty('1'); setInvThreshold('1'); setInvUnit('')
+    setQaGroupId('')
   }
 
   function close() { setOpen(false); resetForms() }
@@ -100,7 +107,7 @@ function QuickAdd() {
     if (!qaName || !qaVolume) return
     setSaving(true)
     try {
-      await api.tanks.create({ name: qaName, volume_litres: Number(qaVolume), water_type: qaWaterType, shape: 'rectangle', co2_injection: false, co2_source: null, co2_method: null, has_heater: false, heater_watts: null, has_lighting: false, light_intensity: null, light_watts: null, light_technology: null, setup_date: null, substrate: null, lighting: null, has_filter: false, filter_flow_lph: null, width_mm: null, height_mm: null, depth_mm: null })
+      await api.tanks.create({ name: qaName, volume_litres: Number(qaVolume), water_type: qaWaterType, shape: 'rectangle', co2_injection: false, co2_source: null, co2_method: null, has_heater: false, heater_watts: null, has_lighting: false, light_intensity: null, light_watts: null, light_technology: null, setup_date: null, substrate: null, lighting: null, has_filter: false, filter_flow_lph: null, width_mm: null, height_mm: null, depth_mm: null, group_id: qaGroupId || null })
       close()
     } finally { setSaving(false) }
   }
@@ -118,7 +125,7 @@ function QuickAdd() {
     if (!invName) return
     setSaving(true)
     try {
-      await api.inventory.create({ name: invName, category: invCat, quantity: Number(invQty) || 0, low_stock_threshold: Number(invThreshold) || 1, unit_label: invUnit || null, notes: null })
+      await api.inventory.create({ name: invName, category: invCat, quantity: Number(invQty) || 0, low_stock_threshold: Number(invThreshold) || 1, unit_label: invUnit || null, notes: null, group_id: qaGroupId || null })
       close()
     } finally { setSaving(false) }
   }
@@ -127,7 +134,7 @@ function QuickAdd() {
     if (!expAmount || isNaN(Number(expAmount))) return
     setSaving(true)
     try {
-      await api.spending.add({ tank_id: expTank || null, amount: Number(expAmount), quantity: 1, category: expCat, description: expDesc || null, purchase_date: expDate, notes: null })
+      await api.spending.add({ tank_id: expTank || null, amount: Number(expAmount), quantity: 1, category: expCat, description: expDesc || null, purchase_date: expDate, notes: null, group_id: qaGroupId || null })
       close()
     } finally { setSaving(false) }
   }
@@ -204,6 +211,15 @@ function QuickAdd() {
             </select>
           </div>
         </div>
+        {groups.length > 0 && (
+          <div style={{ marginBottom: 12 }}>
+            {lbl('Group')}
+            <select value={qaGroupId} onChange={e => setQaGroupId(e.target.value)} style={{ width: '100%' }}>
+              <option value="">Personal</option>
+              {groups.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
+            </select>
+          </div>
+        )}
         {saveRow(saveTank, !qaName || !qaVolume)}
       </>
     )
@@ -270,6 +286,15 @@ function QuickAdd() {
             <input type="date" value={expDate} onChange={e => setExpDate(e.target.value)} style={inputStyle} />
           </div>
         </div>
+        {groups.length > 0 && (
+          <div style={{ marginBottom: 4 }}>
+            {lbl('Group')}
+            <select value={qaGroupId} onChange={e => setQaGroupId(e.target.value)} style={{ width: '100%' }}>
+              <option value="">Personal</option>
+              {groups.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
+            </select>
+          </div>
+        )}
         {saveRow(saveExpense, !expAmount || isNaN(Number(expAmount)))}
       </>
     )
@@ -304,6 +329,15 @@ function QuickAdd() {
             <input type="number" min="0" value={invThreshold} onChange={e => setInvThreshold(e.target.value)} style={inputStyle} />
           </div>
         </div>
+        {groups.length > 0 && (
+          <div style={{ marginBottom: 4 }}>
+            {lbl('Group')}
+            <select value={qaGroupId} onChange={e => setQaGroupId(e.target.value)} style={{ width: '100%' }}>
+              <option value="">Personal</option>
+              {groups.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
+            </select>
+          </div>
+        )}
         {saveRow(saveInventory, !invName)}
       </>
     )

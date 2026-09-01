@@ -10,7 +10,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from starlette.middleware.sessions import SessionMiddleware
 
-from app.routers import tanks, fish, plants, parameters, alerts, species, maintenance, settings, daily_tasks, journal, backup, images, spending, inventory, rooms, tap_water, agent, auth, push, health_cases
+from app.routers import tanks, fish, plants, parameters, alerts, species, maintenance, settings, daily_tasks, journal, backup, images, spending, inventory, rooms, tap_water, agent, auth, push, health_cases, groups
 from app.services.species import species_service, check_compatibility
 from app.services.auth import get_current_user
 from app.services.push import notification_loop
@@ -67,6 +67,7 @@ app.include_router(rooms.router, prefix="/api/rooms", tags=["rooms"], dependenci
 app.include_router(tap_water.router, prefix="/api/tap-water", tags=["tap_water"], dependencies=authenticated)
 app.include_router(agent.router, prefix="/api/agent", tags=["agent"], dependencies=authenticated)
 app.include_router(push.router, prefix="/api/push", tags=["push"], dependencies=authenticated)
+app.include_router(groups.router, prefix="/api/groups", tags=["groups"], dependencies=authenticated)
 
 
 @app.get("/api/tanks/{tank_id}/compatibility")
@@ -84,17 +85,23 @@ def dashboard_stats(db=Depends(get_db), _user=Depends(get_current_user)):
     from app.models.models import Tank, TankShare, TankFish, TankPlant, WaterParameter, MaintenanceTask, Alert
     from sqlalchemy import func
     from datetime import datetime, timedelta
+    from app.services.groups import user_group_ids
 
+    group_ids = user_group_ids(db, _user.id)
     owned = db.query(Tank).filter_by(owner_id=_user.id).all()
     shared_ids = [r[0] for r in db.query(TankShare.tank_id).filter_by(user_id=_user.id).all()]
     shared = db.query(Tank).filter(Tank.id.in_(shared_ids)).all() if shared_ids else []
-    tanks = owned + shared
+    grouped = db.query(Tank).filter(Tank.group_id.in_(group_ids)).all() if group_ids else []
+    tanks = list({t.id: t for t in owned + shared + grouped}.values())
     tanks.sort(key=lambda t: (t.sort_order, t.created_at))
     tank_ids = [t.id for t in tanks]
     my_access_by_tank = {t.id: "owner" for t in owned}
+    for t in grouped:
+        my_access_by_tank.setdefault(t.id, "edit")
     if shared:
         shares_by_tank = {s.tank_id: s.level for s in db.query(TankShare).filter_by(user_id=_user.id).all()}
-        my_access_by_tank.update({t.id: shares_by_tank.get(t.id, "view") for t in shared})
+        for t in shared:
+            my_access_by_tank.setdefault(t.id, shares_by_tank.get(t.id, "view"))
 
     today_start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
     today_end = today_start + timedelta(days=1)

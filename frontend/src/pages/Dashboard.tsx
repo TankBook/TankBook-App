@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Layers, Fish, Leaf, Bug, Waves, Bell, Clock, CalendarClock, Plus, AlertTriangle, Timer, Thermometer, FlaskConical, GripVertical, Filter, Droplets, X, ChevronUp, ChevronDown, Eye, EyeOff, Pencil, type LucideIcon } from 'lucide-react'
 import { useTanks } from '../hooks'
-import { api, hasPermission, type TapWaterTest, type DashboardSectionLayout } from '../api/client'
+import { api, hasPermission, type TapWaterTest, type DashboardSectionLayout, type Group } from '../api/client'
 import { useSettings, formatDate, toMM, dimInputProps } from '../context/SettingsContext'
 import { useAuth } from '../context/AuthContext'
 import { Card, FieldLabel, StatCard, Tag } from '../components/ui'
@@ -397,6 +397,10 @@ export default function Dashboard() {
   const [width, setWidth] = useState('')
   const [height, setHeight] = useState('')
   const [depth, setDepth] = useState('')
+  const [groupId, setGroupId] = useState('')
+
+  const [groups, setGroups] = useState<Group[]>([])
+  useEffect(() => { api.groups.list().then(setGroups) }, [])
 
   const [tapWaterTests, setTapWaterTests] = useState<TapWaterTest[]>([])
   const [showTapWaterModal, setShowTapWaterModal] = useState(false)
@@ -407,6 +411,7 @@ export default function Dashboard() {
   const [twNitrate, setTwNitrate] = useState('')
   const [twTds, setTwTds] = useState('')
   const [twNotes, setTwNotes] = useState('')
+  const [twGroupId, setTwGroupId] = useState('')
 
   async function loadStats() {
     const r = await fetch('/api/dashboard')
@@ -428,8 +433,9 @@ export default function Dashboard() {
       nitrate_ppm: twNitrate ? Number(twNitrate) : null,
       tds_ppm: twTds ? Number(twTds) : null,
       notes: twNotes || null,
+      group_id: twGroupId || null,
     })
-    setTwPh(''); setTwGh(''); setTwKh(''); setTwChlorine(''); setTwNitrate(''); setTwTds(''); setTwNotes('')
+    setTwPh(''); setTwGh(''); setTwKh(''); setTwChlorine(''); setTwNitrate(''); setTwTds(''); setTwNotes(''); setTwGroupId('')
     setShowTapWaterModal(false)
     loadTapWaterTests()
   }
@@ -470,10 +476,11 @@ export default function Dashboard() {
       light_watts: null,
       light_technology: null,
       setup_date: null,
+      group_id: groupId || null,
     })
     setName(''); setVolume(''); setWaterType('freshwater'); setCo2(false)
     setSubstrate(''); setLighting(''); setFilterFlow('')
-    setShape('rectangle'); setWidth(''); setHeight(''); setDepth('')
+    setShape('rectangle'); setWidth(''); setHeight(''); setDepth(''); setGroupId('')
     setShowForm(false)
     reload(); loadStats()
   }
@@ -838,6 +845,15 @@ export default function Dashboard() {
                 <FieldLabel>Notes</FieldLabel>
                 <input value={twNotes} onChange={e => setTwNotes(e.target.value)} placeholder="Optional notes…" style={{ width: '100%', boxSizing: 'border-box' }} />
               </div>
+              {groups.length > 0 && (
+                <div>
+                  <FieldLabel>Group</FieldLabel>
+                  <select value={twGroupId} onChange={e => setTwGroupId(e.target.value)} style={{ width: '100%', boxSizing: 'border-box' }}>
+                    <option value="">Personal</option>
+                    {groups.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
+                  </select>
+                </div>
+              )}
             </div>
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, padding: '12px 20px', borderTop: '0.5px solid var(--border)' }}>
               <button onClick={() => setShowTapWaterModal(false)} style={{ fontSize: 13, padding: '7px 16px', borderRadius: 8, border: '0.5px solid var(--border)', background: 'transparent', cursor: 'pointer', color: 'var(--text-2)' }}>
@@ -922,6 +938,15 @@ export default function Dashboard() {
                   <option value="brackish">Brackish</option>
                 </select>
               </div>
+              {groups.length > 0 && (
+                <div>
+                  <FieldLabel>Group</FieldLabel>
+                  <select value={groupId} onChange={e => setGroupId(e.target.value)} style={{ width: '100%', boxSizing: 'border-box' }}>
+                    <option value="">Personal</option>
+                    {groups.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
+                  </select>
+                </div>
+              )}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
                 <div>
                   <FieldLabel>Substrate</FieldLabel>

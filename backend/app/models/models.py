@@ -11,6 +11,33 @@ def new_uuid() -> str:
     return str(uuid.uuid4())
 
 
+class Group(Base):
+    """A household — anything assigned to it (a tank, expense, inventory item, room, tap
+    water test) is visible/editable by every member, on top of that resource's own owner_id."""
+    __tablename__ = "groups"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=new_uuid)
+    name: Mapped[str] = mapped_column(String, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    memberships: Mapped[list["GroupMembership"]] = relationship(back_populates="group", cascade="all, delete-orphan")
+
+
+class GroupMembership(Base):
+    __tablename__ = "group_memberships"
+    __table_args__ = (UniqueConstraint("group_id", "user_id", name="uq_group_membership_group_user"),)
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=new_uuid)
+    group_id: Mapped[str] = mapped_column(String, ForeignKey("groups.id", ondelete="CASCADE"), nullable=False)
+    user_id: Mapped[str] = mapped_column(String, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    role: Mapped[str] = mapped_column(String, nullable=False)  # "owner" | "member" — governs group
+    # management (rename/delete/invite/remove) only; resource access is uniform for every member.
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    group: Mapped["Group"] = relationship(back_populates="memberships")
+    user: Mapped["User"] = relationship()
+
+
 class Tank(Base):
     __tablename__ = "tanks"
 
@@ -39,6 +66,7 @@ class Tank(Base):
     setup_date: Mapped[datetime | None] = mapped_column(DateTime)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     owner_id: Mapped[str] = mapped_column(String, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    group_id: Mapped[str | None] = mapped_column(String, ForeignKey("groups.id", ondelete="SET NULL"), nullable=True)
 
     owner: Mapped["User"] = relationship(foreign_keys=[owner_id])
     fish: Mapped[list["TankFish"]] = relationship(back_populates="tank", cascade="all, delete-orphan")
@@ -135,6 +163,8 @@ class TapWaterTest(Base):
     tds_ppm: Mapped[float | None] = mapped_column(Float)
     recorded_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     notes: Mapped[str | None] = mapped_column(Text)
+    owner_id: Mapped[str] = mapped_column(String, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    group_id: Mapped[str | None] = mapped_column(String, ForeignKey("groups.id", ondelete="SET NULL"), nullable=True)
 
 
 class MaintenanceTask(Base):
@@ -306,6 +336,8 @@ class Expense(Base):
     purchase_date: Mapped[str] = mapped_column(String, nullable=False)
     notes: Mapped[str | None] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    owner_id: Mapped[str] = mapped_column(String, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    group_id: Mapped[str | None] = mapped_column(String, ForeignKey("groups.id", ondelete="SET NULL"), nullable=True)
 
 
 class Room(Base):
@@ -316,6 +348,8 @@ class Room(Base):
     width_m: Mapped[float] = mapped_column(Float, default=3.0)
     length_m: Mapped[float] = mapped_column(Float, default=2.4)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    owner_id: Mapped[str] = mapped_column(String, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    group_id: Mapped[str | None] = mapped_column(String, ForeignKey("groups.id", ondelete="SET NULL"), nullable=True)
 
     tank_positions: Mapped[list["RoomTankPosition"]] = relationship(back_populates="room", cascade="all, delete-orphan")
 
@@ -344,6 +378,8 @@ class InventoryItem(Base):
     unit_label: Mapped[str | None] = mapped_column(String, nullable=True)
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    owner_id: Mapped[str] = mapped_column(String, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    group_id: Mapped[str | None] = mapped_column(String, ForeignKey("groups.id", ondelete="SET NULL"), nullable=True)
 
 
 DASHBOARD_SECTION_IDS = ["stats", "tanks", "tasks", "tap_water"]

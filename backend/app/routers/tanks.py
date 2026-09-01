@@ -8,29 +8,39 @@ from app.schemas.schemas import TankCreate, TankOut, TankShareCreate, TankShareO
 from app.services.auth import get_current_user
 from app.services.ownership import require_owned_tank, require_tank_view, require_tank_edit
 from app.services.permissions import require_permission
+from app.services.groups import user_group_ids
 
 router = APIRouter()
 
 require_tanks_create = Depends(require_permission("tanks", "edit"))
 
 
-def _attach_access(tank: Tank, viewer_id: str, db: Session) -> Tank:
+def _attach_access(tank: Tank, viewer_id: str, db: Session, group_ids: set[str] | None = None) -> Tank:
     if tank.owner_id == viewer_id:
         tank.my_access = "owner"
+    elif tank.group_id is not None and tank.group_id in (group_ids if group_ids is not None else user_group_ids(db, viewer_id)):
+        tank.my_access = "edit"  # group membership is uniform full access
     else:
         share = db.query(TankShare).filter_by(tank_id=tank.id, user_id=viewer_id).first()
         tank.my_access = share.level if share else "view"
     return tank
 
 
+def _validate_group_id(db: Session, user: User, group_id: str | None) -> None:
+    if group_id is not None and group_id not in user_group_ids(db, user.id):
+        raise HTTPException(404, "Group not found")
+
+
 @router.get("/", response_model=list[TankOut])
 def list_tanks(db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    group_ids = user_group_ids(db, user.id)
     owned = db.query(Tank).filter_by(owner_id=user.id).all()
     shared_ids = [r[0] for r in db.query(TankShare.tank_id).filter_by(user_id=user.id).all()]
     shared = db.query(Tank).filter(Tank.id.in_(shared_ids)).all() if shared_ids else []
-    tanks = owned + shared
-    tanks.sort(key=lambda t: (t.sort_order, t.created_at))
-    return [_attach_access(t, user.id, db) for t in tanks]
+    grouped = db.query(Tank).filter(Tank.group_id.in_(group_ids)).all() if group_ids else []
+    tanks = {t.id: t for t in owned + shared + grouped}.values()
+    tanks = sorted(tanks, key=lambda t: (t.sort_order, t.created_at))
+    return [_attach_access(t, user.id, db, group_ids) for t in tanks]
 
 
 @router.patch("/reorder")
@@ -45,6 +55,7 @@ def reorder_tanks(order: list[dict], db: Session = Depends(get_db), user: User =
 
 @router.post("/", response_model=TankOut, status_code=201)
 def create_tank(body: TankCreate, db: Session = Depends(get_db), user: User = Depends(get_current_user), _perm: User = require_tanks_create):
+    _validate_group_id(db, user, body.group_id)
     count = db.query(func.count(Tank.id)).filter_by(owner_id=user.id).scalar() or 0
     tank = Tank(**body.model_dump(), sort_order=count, owner_id=user.id)
     db.add(tank)
@@ -61,7 +72,10 @@ def get_tank(tank_id: str, db: Session = Depends(get_db), user: User = Depends(g
 
 @router.patch("/{tank_id}", response_model=TankOut)
 def update_tank(body: TankCreate, db: Session = Depends(get_db), user: User = Depends(get_current_user), tank: Tank = Depends(require_tank_edit)):
-    for k, v in body.model_dump(exclude_unset=True).items():
+    data = body.model_dump(exclude_unset=True)
+    if "group_id" in data:
+        _validate_group_id(db, user, data["group_id"])
+    for k, v in data.items():
         setattr(tank, k, v)
     db.commit()
     db.refresh(tank)

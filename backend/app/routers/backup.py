@@ -7,7 +7,7 @@ from app.database import get_db
 from app.models.models import (
     Tank, TankFish, TankPlant, WaterParameter, MaintenanceTask,
     Alert, DailyTask, JournalEntry, HealthCase, AppSettings, Expense, InventoryItem,
-    Room, RoomTankPosition, TapWaterTest, User,
+    Room, RoomTankPosition, TapWaterTest, User, Group,
 )
 from app.services.permissions import require_permission
 
@@ -68,7 +68,7 @@ def export_backup(body: ExportSelection = ExportSelection(), db: Session = Depen
         for tank in db.query(Tank).all():
             entry = {
                 "id": tank.id, "name": tank.name, "volume_litres": tank.volume_litres,
-                "owner_id": tank.owner_id,
+                "owner_id": tank.owner_id, "group_id": tank.group_id,
                 "water_type": tank.water_type, "sort_order": tank.sort_order,
                 "substrate": tank.substrate, "lighting": tank.lighting,
                 "has_filter": tank.has_filter, "filter_flow_lph": tank.filter_flow_lph,
@@ -146,7 +146,8 @@ def export_backup(body: ExportSelection = ExportSelection(), db: Session = Depen
             {"id": e.id, "tank_id": e.tank_id, "inventory_item_id": e.inventory_item_id,
              "amount": e.amount, "quantity": e.quantity, "category": e.category,
              "description": e.description, "purchase_date": e.purchase_date,
-             "notes": e.notes, "created_at": _dt(e.created_at)}
+             "notes": e.notes, "created_at": _dt(e.created_at),
+             "owner_id": e.owner_id, "group_id": e.group_id}
             for e in db.query(Expense).all()
         ]
 
@@ -154,13 +155,15 @@ def export_backup(body: ExportSelection = ExportSelection(), db: Session = Depen
         result["inventory_items"] = [
             {"id": i.id, "name": i.name, "category": i.category, "quantity": i.quantity,
              "low_stock_threshold": i.low_stock_threshold, "unit_label": i.unit_label,
-             "notes": i.notes, "created_at": _dt(i.created_at)}
+             "notes": i.notes, "created_at": _dt(i.created_at),
+             "owner_id": i.owner_id, "group_id": i.group_id}
             for i in db.query(InventoryItem).all()
         ]
 
     if body.rooms:
         result["rooms"] = [
             {"id": r.id, "name": r.name, "width_m": r.width_m, "length_m": r.length_m,
+             "owner_id": r.owner_id, "group_id": r.group_id,
              "tank_positions": [{"tank_id": p.tank_id, "x": p.x, "y": p.y} for p in r.tank_positions]}
             for r in db.query(Room).all()
         ]
@@ -169,7 +172,8 @@ def export_backup(body: ExportSelection = ExportSelection(), db: Session = Depen
         result["tap_water_tests"] = [
             {"id": t.id, "ph": t.ph, "gh_dgh": t.gh_dgh, "kh_dkh": t.kh_dkh,
              "chlorine_ppm": t.chlorine_ppm, "nitrate_ppm": t.nitrate_ppm, "tds_ppm": t.tds_ppm,
-             "recorded_at": _dt(t.recorded_at), "notes": t.notes}
+             "recorded_at": _dt(t.recorded_at), "notes": t.notes,
+             "owner_id": t.owner_id, "group_id": t.group_id}
             for t in db.query(TapWaterTest).all()
         ]
 
@@ -231,16 +235,23 @@ def import_backup(payload: dict, db: Session = Depends(get_db), user: User = req
         db.commit()
 
     valid_user_ids = {u.id for u in db.query(User.id).all()}
+    valid_group_ids = {g.id for g in db.query(Group.id).all()}
+
+    def _owner_id(raw: str | None) -> str:
+        # Backup predates ownership, or was made on a different instance —
+        # fall back to whoever is running this restore.
+        return raw if raw in valid_user_ids else user.id
+
+    def _group_id(raw: str | None) -> str | None:
+        # Group doesn't exist on this instance (different instance's backup, or the
+        # group's since been deleted) — restore as personally-owned instead of failing.
+        return raw if raw in valid_group_ids else None
 
     tanks_restored = 0
     for t in (payload.get("tanks", []) if restore_tanks else []):
-        owner_id = t.get("owner_id")
-        if owner_id not in valid_user_ids:
-            # Backup predates ownership, or was made on a different instance —
-            # fall back to whoever is running this restore.
-            owner_id = user.id
         tank = Tank(
-            id=t["id"], name=t["name"], volume_litres=t["volume_litres"], owner_id=owner_id,
+            id=t["id"], name=t["name"], volume_litres=t["volume_litres"], owner_id=_owner_id(t.get("owner_id")),
+            group_id=_group_id(t.get("group_id")),
             water_type=t.get("water_type", "freshwater"), sort_order=t.get("sort_order", 0),
             substrate=t.get("substrate"), lighting=t.get("lighting"),
             has_filter=t.get("has_filter", False), filter_flow_lph=t.get("filter_flow_lph"),
@@ -347,6 +358,7 @@ def import_backup(payload: dict, db: Session = Depends(get_db), user: User = req
                 quantity=i.get("quantity", 0), low_stock_threshold=i.get("low_stock_threshold", 1),
                 unit_label=i.get("unit_label"), notes=i.get("notes"),
                 created_at=_parse_dt(i.get("created_at")) or datetime.utcnow(),
+                owner_id=_owner_id(i.get("owner_id")), group_id=_group_id(i.get("group_id")),
             ))
         db.flush()
 
@@ -357,6 +369,7 @@ def import_backup(payload: dict, db: Session = Depends(get_db), user: User = req
                 amount=e["amount"], quantity=e.get("quantity", 1), category=e["category"], description=e.get("description"),
                 purchase_date=e["purchase_date"], notes=e.get("notes"),
                 created_at=_parse_dt(e.get("created_at")) or datetime.utcnow(),
+                owner_id=_owner_id(e.get("owner_id")), group_id=_group_id(e.get("group_id")),
             ))
 
     if restore_rooms:
@@ -365,6 +378,7 @@ def import_backup(payload: dict, db: Session = Depends(get_db), user: User = req
             room = Room(
                 id=r["id"], name=r["name"],
                 width_m=r.get("width_m", 3.0), length_m=r.get("length_m", 2.4),
+                owner_id=_owner_id(r.get("owner_id")), group_id=_group_id(r.get("group_id")),
             )
             db.add(room)
             for p in r.get("tank_positions", []):
@@ -376,6 +390,7 @@ def import_backup(payload: dict, db: Session = Depends(get_db), user: User = req
                 id=t["id"], ph=t.get("ph"), gh_dgh=t.get("gh_dgh"), kh_dkh=t.get("kh_dkh"),
                 chlorine_ppm=t.get("chlorine_ppm"), nitrate_ppm=t.get("nitrate_ppm"), tds_ppm=t.get("tds_ppm"),
                 recorded_at=_parse_dt(t.get("recorded_at")) or datetime.utcnow(), notes=t.get("notes"),
+                owner_id=_owner_id(t.get("owner_id")), group_id=_group_id(t.get("group_id")),
             ))
 
     db.commit()

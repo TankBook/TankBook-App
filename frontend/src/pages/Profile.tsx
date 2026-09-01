@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react'
-import { CalendarDays, Ruler, Droplets, UserCircle, Lock, Bell } from 'lucide-react'
-import { Card, FieldLabel } from '../components/ui'
+import { CalendarDays, Ruler, Droplets, UserCircle, Lock, Bell, Users, Plus, X, Trash2, Pencil, LogOut } from 'lucide-react'
+import { Card, FieldLabel, Modal } from '../components/ui'
 import { useSettings, formatDate, DateFormat, UnitSystem } from '../context/SettingsContext'
 import { useAuth } from '../context/AuthContext'
 import { useTanks } from '../hooks'
-import { api } from '../api/client'
+import { api, type Group } from '../api/client'
 
 const PUSH_SUPPORTED =
   typeof window !== 'undefined' && window.isSecureContext && 'serviceWorker' in navigator && 'PushManager' in window
@@ -47,6 +47,108 @@ export default function Profile() {
   const [notifBusy, setNotifBusy] = useState(false)
   const [notifError, setNotifError] = useState<string | null>(null)
   const [deviceSubscribed, setDeviceSubscribed] = useState<boolean | null>(null)
+
+  const [groups, setGroups] = useState<Group[]>([])
+  const [loadingGroups, setLoadingGroups] = useState(true)
+  const [newGroupName, setNewGroupName] = useState('')
+  const [creatingGroup, setCreatingGroup] = useState(false)
+  const [managingGroup, setManagingGroup] = useState<Group | null>(null)
+  const [groupNameDraft, setGroupNameDraft] = useState('')
+  const [memberEmail, setMemberEmail] = useState('')
+  const [groupError, setGroupError] = useState<string | null>(null)
+  const [groupBusy, setGroupBusy] = useState(false)
+
+  function loadGroups() {
+    setLoadingGroups(true)
+    api.groups.list().then(setGroups).finally(() => setLoadingGroups(false))
+  }
+  useEffect(loadGroups, [])
+
+  async function createGroup() {
+    const name = newGroupName.trim()
+    if (!name) return
+    setCreatingGroup(true)
+    try {
+      await api.groups.create(name)
+      setNewGroupName('')
+      loadGroups()
+    } catch (e: any) {
+      setGroupError(e.message ?? 'Could not create group')
+    } finally {
+      setCreatingGroup(false)
+    }
+  }
+
+  function openManage(group: Group) {
+    setManagingGroup(group)
+    setGroupNameDraft(group.name)
+    setMemberEmail('')
+    setGroupError(null)
+  }
+
+  async function saveGroupName() {
+    if (!managingGroup || !groupNameDraft.trim() || groupNameDraft === managingGroup.name) return
+    setGroupBusy(true)
+    setGroupError(null)
+    try {
+      const updated = await api.groups.rename(managingGroup.id, groupNameDraft.trim())
+      setManagingGroup(updated)
+      loadGroups()
+    } catch (e: any) {
+      setGroupError(e.message ?? 'Could not rename group')
+    } finally {
+      setGroupBusy(false)
+    }
+  }
+
+  async function addMember() {
+    if (!managingGroup || !memberEmail.trim()) return
+    setGroupBusy(true)
+    setGroupError(null)
+    try {
+      const updated = await api.groups.addMember(managingGroup.id, memberEmail.trim())
+      setManagingGroup(updated)
+      setMemberEmail('')
+      loadGroups()
+    } catch (e: any) {
+      setGroupError(e.message ?? 'Could not add member')
+    } finally {
+      setGroupBusy(false)
+    }
+  }
+
+  async function removeMember(userId: string) {
+    if (!managingGroup) return
+    setGroupBusy(true)
+    setGroupError(null)
+    try {
+      await api.groups.removeMember(managingGroup.id, userId)
+      if (userId === user?.id) {
+        setManagingGroup(null)
+      } else {
+        setManagingGroup({ ...managingGroup, members: managingGroup.members.filter(m => m.user_id !== userId) })
+      }
+      loadGroups()
+    } catch (e: any) {
+      setGroupError(e.message ?? 'Could not remove member')
+    } finally {
+      setGroupBusy(false)
+    }
+  }
+
+  async function deleteGroup() {
+    if (!managingGroup) return
+    setGroupBusy(true)
+    setGroupError(null)
+    try {
+      await api.groups.remove(managingGroup.id)
+      setManagingGroup(null)
+      loadGroups()
+    } catch (e: any) {
+      setGroupError(e.message ?? 'Could not delete group')
+      setGroupBusy(false)
+    }
+  }
 
   useEffect(() => {
     if (!PUSH_SUPPORTED) { setDeviceSubscribed(false); return }
@@ -275,6 +377,73 @@ export default function Profile() {
           </div>
         </section>
 
+        <section style={{ paddingBottom: 20, borderBottom: '0.5px solid var(--border-sub)' }}>
+          <p style={{ fontWeight: 500, fontSize: 14, margin: '0 0 4px', color: 'var(--text)', display: 'flex', alignItems: 'center', gap: 6 }}><Users size={14} color="var(--text-2)" />Groups</p>
+          <p style={{ fontSize: 12, color: 'var(--text-2)', margin: '0 0 14px' }}>
+            A group is a household — a tank, expense, inventory item, room, or tap water reading assigned to a group is shared with every member. You can belong to more than one.
+          </p>
+
+          {loadingGroups ? (
+            <p style={{ margin: 0, fontSize: 13, color: 'var(--text-3)' }}>Loading…</p>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 12 }}>
+              {groups.length === 0 && (
+                <p style={{ margin: 0, fontSize: 13, color: 'var(--text-3)' }}>You're not in any groups yet.</p>
+              )}
+              {groups.map(g => (
+                <div
+                  key={g.id}
+                  style={{
+                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                    padding: '10px 12px', borderRadius: 8, border: '0.5px solid var(--border)',
+                  }}
+                >
+                  <span style={{ fontSize: 13, color: 'var(--text)', display: 'flex', alignItems: 'center', gap: 8 }}>
+                    {g.name}
+                    <span style={{ fontSize: 11, color: 'var(--text-3)' }}>
+                      {g.my_role === 'owner' ? 'Owner' : 'Member'} · {g.members.length} {g.members.length === 1 ? 'member' : 'members'}
+                    </span>
+                  </span>
+                  <button
+                    onClick={() => openManage(g)}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: 6, padding: '5px 12px', borderRadius: 8,
+                      fontSize: 12, fontWeight: 500, cursor: 'pointer',
+                      border: '0.5px solid var(--btn-border)', background: 'transparent', color: 'var(--text)',
+                    }}
+                  >
+                    {g.my_role === 'owner' ? <Pencil size={12} /> : <LogOut size={12} />}
+                    {g.my_role === 'owner' ? 'Manage' : 'View'}
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <div style={{ display: 'flex', gap: 8 }}>
+            <input
+              value={newGroupName}
+              onChange={e => setNewGroupName(e.target.value)}
+              placeholder="e.g. Our House"
+              onKeyDown={e => e.key === 'Enter' && createGroup()}
+              style={{ flex: 1, boxSizing: 'border-box' }}
+            />
+            <button
+              onClick={createGroup}
+              disabled={!newGroupName.trim() || creatingGroup}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 6, padding: '7px 14px', borderRadius: 8, fontSize: 13, fontWeight: 500,
+                cursor: newGroupName.trim() ? 'pointer' : 'default',
+                border: '0.5px solid var(--blue-border)',
+                background: newGroupName.trim() ? 'var(--blue-bg)' : 'var(--surface-2)',
+                color: newGroupName.trim() ? 'var(--blue)' : 'var(--text-3)',
+              }}
+            >
+              <Plus size={13} />New Group
+            </button>
+          </div>
+        </section>
+
         <section>
           <p style={{ fontWeight: 500, fontSize: 14, margin: '0 0 4px', color: 'var(--text)', display: 'flex', alignItems: 'center', gap: 6 }}><Bell size={14} color="var(--text-2)" />Notifications</p>
           <p style={{ fontSize: 12, color: 'var(--text-2)', margin: '0 0 14px' }}>
@@ -318,6 +487,122 @@ export default function Profile() {
         </section>
 
       </Card>
+
+      {managingGroup && (
+        <Modal title={managingGroup.name} onClose={() => setManagingGroup(null)} width={440}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+            {managingGroup.my_role === 'owner' && (
+              <div>
+                <FieldLabel>Group name</FieldLabel>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <input
+                    value={groupNameDraft}
+                    onChange={e => setGroupNameDraft(e.target.value)}
+                    style={{ flex: 1, boxSizing: 'border-box' }}
+                  />
+                  <button
+                    onClick={saveGroupName}
+                    disabled={groupBusy || !groupNameDraft.trim() || groupNameDraft === managingGroup.name}
+                    style={{
+                      padding: '7px 14px', borderRadius: 8, fontSize: 13, fontWeight: 500,
+                      border: '0.5px solid var(--blue-border)', background: 'var(--blue-bg)', color: 'var(--blue)',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    Save
+                  </button>
+                </div>
+              </div>
+            )}
+
+            <div>
+              <FieldLabel>Members</FieldLabel>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {managingGroup.members.map(m => (
+                  <div
+                    key={m.user_id}
+                    style={{
+                      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                      padding: '8px 10px', borderRadius: 8, background: 'var(--surface-2)',
+                    }}
+                  >
+                    <span style={{ fontSize: 13, color: 'var(--text)' }}>
+                      {m.display_name || m.email}
+                      <span style={{ marginLeft: 6, fontSize: 11, color: 'var(--text-3)' }}>
+                        {m.role === 'owner' ? 'Owner' : 'Member'}
+                      </span>
+                    </span>
+                    {(managingGroup.my_role === 'owner' && m.role !== 'owner') || m.user_id === user?.id ? (
+                      <button
+                        onClick={() => removeMember(m.user_id)}
+                        disabled={groupBusy}
+                        title={m.user_id === user?.id ? 'Leave group' : 'Remove member'}
+                        style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-3)', display: 'flex' }}
+                      >
+                        {m.user_id === user?.id ? <LogOut size={14} /> : <Trash2 size={14} />}
+                      </button>
+                    ) : null}
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {managingGroup.my_role === 'owner' && (
+              <div>
+                <FieldLabel>Add member by email</FieldLabel>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <input
+                    value={memberEmail}
+                    onChange={e => setMemberEmail(e.target.value)}
+                    placeholder="someone@example.com"
+                    onKeyDown={e => e.key === 'Enter' && addMember()}
+                    style={{ flex: 1, boxSizing: 'border-box' }}
+                  />
+                  <button
+                    onClick={addMember}
+                    disabled={groupBusy || !memberEmail.trim()}
+                    style={{
+                      padding: '7px 14px', borderRadius: 8, fontSize: 13, fontWeight: 500,
+                      border: '0.5px solid var(--blue-border)', background: 'var(--blue-bg)', color: 'var(--blue)',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    Add
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {groupError && <p style={{ margin: 0, fontSize: 12, color: 'var(--red)' }}>{groupError}</p>}
+
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 4 }}>
+              {managingGroup.my_role === 'owner' ? (
+                <button
+                  onClick={deleteGroup}
+                  disabled={groupBusy}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 6, padding: '7px 14px', borderRadius: 8,
+                    fontSize: 13, fontWeight: 500, cursor: 'pointer',
+                    border: '0.5px solid var(--red-border)', background: 'var(--red-bg)', color: 'var(--red)',
+                  }}
+                >
+                  <X size={13} />Delete Group
+                </button>
+              ) : <span />}
+              <button
+                onClick={() => setManagingGroup(null)}
+                style={{
+                  padding: '7px 16px', borderRadius: 8, fontSize: 13,
+                  border: '0.5px solid var(--btn-border)', background: 'transparent', color: 'var(--text)',
+                  cursor: 'pointer',
+                }}
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </Modal>
+      )}
     </div>
   )
 }

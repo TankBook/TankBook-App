@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Plus, Pencil, Trash2, Minus, PackagePlus, AlertTriangle } from 'lucide-react'
-import { api, InventoryItem } from '../api/client'
+import { api, InventoryItem, type Group } from '../api/client'
 import { useInventory } from '../hooks'
 import { Card, FieldLabel, SectionTitle, Tag, Modal, ConfirmDialog, Dropdown } from '../components/ui'
 
@@ -35,6 +35,9 @@ export default function Inventory() {
     return () => mq.removeEventListener('change', handler)
   }, [])
 
+  const [groups, setGroups] = useState<Group[]>([])
+  useEffect(() => { api.groups.list().then(setGroups) }, [])
+
   const [editing, setEditing] = useState<InventoryItem | 'new' | null>(null)
   const [formName, setFormName] = useState('')
   const [formCat, setFormCat] = useState<InventoryItem['category']>('Food')
@@ -42,6 +45,7 @@ export default function Inventory() {
   const [formThreshold, setFormThreshold] = useState('1')
   const [formUnit, setFormUnit] = useState('')
   const [formNotes, setFormNotes] = useState('')
+  const [formGroupId, setFormGroupId] = useState('')
 
   const [restocking, setRestocking] = useState<InventoryItem | null>(null)
   const [restockQty, setRestockQty] = useState('1')
@@ -52,13 +56,13 @@ export default function Inventory() {
   const [deleteTarget, setDeleteTarget] = useState<InventoryItem | null>(null)
 
   function openAdd() {
-    setFormName(''); setFormCat('Food'); setFormQty('1'); setFormThreshold('1'); setFormUnit(''); setFormNotes('')
+    setFormName(''); setFormCat('Food'); setFormQty('1'); setFormThreshold('1'); setFormUnit(''); setFormNotes(''); setFormGroupId('')
     setEditing('new')
   }
 
   function openEdit(item: InventoryItem) {
     setFormName(item.name); setFormCat(item.category); setFormThreshold(String(item.low_stock_threshold))
-    setFormUnit(item.unit_label ?? ''); setFormNotes(item.notes ?? '')
+    setFormUnit(item.unit_label ?? ''); setFormNotes(item.notes ?? ''); setFormGroupId(item.group_id ?? '')
     setEditing(item)
   }
 
@@ -68,11 +72,13 @@ export default function Inventory() {
       await api.inventory.create({
         name: formName, category: formCat, quantity: Number(formQty) || 0,
         low_stock_threshold: Number(formThreshold) || 1, unit_label: formUnit || null, notes: formNotes || null,
+        group_id: formGroupId || null,
       })
     } else if (editing) {
       await api.inventory.update(editing.id, {
         name: formName, category: formCat,
         low_stock_threshold: Number(formThreshold) || 1, unit_label: formUnit || null, notes: formNotes || null,
+        group_id: formGroupId || null,
       })
     }
     setEditing(null)
@@ -298,6 +304,15 @@ export default function Inventory() {
             <FieldLabel>Notes (Optional)</FieldLabel>
             <input value={formNotes} onChange={e => setFormNotes(e.target.value)} placeholder="e.g. for fry tank only" style={{ width: '100%', boxSizing: 'border-box' }} />
           </div>
+          {groups.length > 0 && (
+            <div style={{ marginBottom: 16 }}>
+              <FieldLabel>Group</FieldLabel>
+              <select value={formGroupId} onChange={e => setFormGroupId(e.target.value)} style={{ width: '100%', boxSizing: 'border-box' }}>
+                <option value="">Personal</option>
+                {groups.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
+              </select>
+            </div>
+          )}
           <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
             <button onClick={() => setEditing(null)} style={{ padding: '7px 16px', borderRadius: 8, fontSize: 13, cursor: 'pointer', border: '0.5px solid var(--btn-border)', background: 'transparent', color: 'var(--text)' }}>Cancel</button>
             <button

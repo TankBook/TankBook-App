@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react'
 import { Trash2, Plus, X, Pencil } from 'lucide-react'
-import { api, Expense } from '../api/client'
+import { api, Expense, type Group } from '../api/client'
 import { useTanks } from '../hooks'
 import { useSettings, formatDate } from '../context/SettingsContext'
 import { Card, FieldLabel, SectionTitle, Tag, RichTextarea, renderNotes, Dropdown } from '../components/ui'
@@ -173,10 +173,14 @@ export default function SpendingTracker() {
   const [formDesc, setFormDesc] = useState('')
   const [formDate, setFormDate] = useState(localDateStr())
   const [formNotes, setFormNotes] = useState('')
+  const [formGroupId, setFormGroupId] = useState('')
+
+  const [groups, setGroups] = useState<Group[]>([])
+  useEffect(() => { api.groups.list().then(setGroups) }, [])
 
   function resetForm() {
     setFormTank(''); setFormAmount(''); setFormQuantity('1'); setFormCat(CATEGORIES[0])
-    setFormDesc(''); setFormDate(localDateStr()); setFormNotes('')
+    setFormDesc(''); setFormDate(localDateStr()); setFormNotes(''); setFormGroupId('')
   }
 
   function openEdit(e: Expense) {
@@ -188,6 +192,7 @@ export default function SpendingTracker() {
     setFormDesc(e.description ?? '')
     setFormDate(e.purchase_date)
     setFormNotes(e.notes ?? '')
+    setFormGroupId(e.group_id ?? '')
   }
 
   async function submitAdd() {
@@ -200,6 +205,7 @@ export default function SpendingTracker() {
       description: formDesc || null,
       purchase_date: formDate,
       notes: formNotes || null,
+      group_id: formGroupId || null,
     })
     resetForm(); setShowAdd(false); reload()
   }
@@ -214,6 +220,7 @@ export default function SpendingTracker() {
       description: formDesc || null,
       purchase_date: formDate,
       notes: formNotes || null,
+      group_id: formGroupId || null,
     })
     setEditingId(null); resetForm(); reload()
   }
@@ -303,10 +310,20 @@ export default function SpendingTracker() {
           <input value={formDesc} onChange={e => setFormDesc(e.target.value)} placeholder="e.g. Fluval 307 canister filter" style={{ width: '100%', boxSizing: 'border-box' }} />
         </div>
 
-        <div style={{ marginBottom: 16 }}>
+        <div style={{ marginBottom: 12 }}>
           <FieldLabel>Notes (Optional)</FieldLabel>
           <RichTextarea value={formNotes} onChange={setFormNotes} rows={2} placeholder="Notes…" />
         </div>
+
+        {groups.length > 0 && (
+          <div style={{ marginBottom: 16 }}>
+            <FieldLabel>Group</FieldLabel>
+            <select value={formGroupId} onChange={e => setFormGroupId(e.target.value)} style={{ width: '100%', boxSizing: 'border-box' }}>
+              <option value="">Personal</option>
+              {groups.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
+            </select>
+          </div>
+        )}
 
         <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
           <button onClick={() => { isEdit ? setEditingId(null) : setShowAdd(false); resetForm() }} style={{ padding: '7px 16px', borderRadius: 8, fontSize: 13, cursor: 'pointer', border: '0.5px solid var(--btn-border)', background: 'transparent', color: 'var(--text)' }}>Cancel</button>
