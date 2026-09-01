@@ -404,6 +404,7 @@ export default function SpendingTracker() {
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 5, gap: 8 }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
                             <Tag bg={cc.bg} color={cc.color}>{e.category}</Tag>
+                            {e.quantity > 1 && <Tag bg="var(--tag-bg)" color="var(--text-2)">×{e.quantity}</Tag>}
                             <span style={{ fontSize: 11, color: 'var(--text-3)', flexShrink: 0 }}>{formatDate(e.purchase_date, dateFormat)}</span>
                           </div>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0 }}>
@@ -426,8 +427,9 @@ export default function SpendingTracker() {
                           {e.description || e.category}
                           {tankName && <span style={{ fontWeight: 400, color: 'var(--text-3)', marginLeft: 4 }}>({tankName})</span>}
                         </span>
-                        <div style={{ marginTop: 3 }}>
+                        <div style={{ marginTop: 3, display: 'flex', alignItems: 'center', gap: 6 }}>
                           <Tag bg={cc.bg} color={cc.color}>{e.category}</Tag>
+                          {e.quantity > 1 && <Tag bg="var(--tag-bg)" color="var(--text-2)">×{e.quantity}</Tag>}
                         </div>
                         <span style={{ display: 'block', fontSize: 11, color: 'var(--text-3)', marginTop: 3 }}>
                           {formatDate(e.purchase_date, dateFormat)}
