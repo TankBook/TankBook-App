@@ -24,6 +24,23 @@ export interface Tank {
   light_technology: string | null
   setup_date: string | null
   created_at: string
+  owner_id: string
+  my_access: 'owner' | 'edit' | 'view'
+}
+
+export interface TankShare {
+  user_id: string
+  email: string
+  display_name: string | null
+  level: 'view' | 'edit'
+}
+
+export function canEditTank(tank: Pick<Tank, 'my_access'>): boolean {
+  return tank.my_access === 'owner' || tank.my_access === 'edit'
+}
+
+export function isTankOwner(tank: Pick<Tank, 'my_access'>): boolean {
+  return tank.my_access === 'owner'
 }
 
 export interface Expense {
@@ -348,7 +365,10 @@ async function post<T>(path: string, body: unknown): Promise<T> {
     body: JSON.stringify(body),
   })
   if (res.status === 401) handleUnauthorized(path)
-  if (!res.ok) throw new Error(`POST ${path} failed: ${res.status}`)
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}))
+    throw new Error((err as any).detail ?? `POST ${path} failed: ${res.status}`)
+  }
   return res.json()
 }
 
@@ -406,9 +426,13 @@ export const api = {
   tanks: {
     list: () => get<Tank[]>('/tanks/'),
     get: (id: string) => get<Tank>(`/tanks/${id}`),
-    create: (body: Omit<Tank, 'id' | 'created_at'>) => post<Tank>('/tanks/', body),
+    create: (body: Omit<Tank, 'id' | 'created_at' | 'owner_id' | 'my_access'>) => post<Tank>('/tanks/', body),
+    update: (id: string, body: Partial<Omit<Tank, 'id' | 'created_at' | 'owner_id' | 'my_access'>>) => patch<Tank>(`/tanks/${id}`, body),
     delete: (id: string) => del(`/tanks/${id}`),
     reorder: (order: { id: string; sort_order: number }[]) => patch<{ ok: boolean }>('/tanks/reorder', order),
+    listShares: (id: string) => get<TankShare[]>(`/tanks/${id}/shares`),
+    addShare: (id: string, body: { email: string; level: 'view' | 'edit' }) => post<TankShare>(`/tanks/${id}/shares`, body),
+    removeShare: (id: string, userId: string) => del(`/tanks/${id}/shares/${userId}`),
   },
   fish: {
     list: (tankId: string) => get<TankFish[]>(`/fish/${tankId}/fish`),

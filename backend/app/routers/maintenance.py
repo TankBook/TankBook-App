@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.schemas.schemas import MaintenanceTaskCreate, MaintenanceTaskOut, MaintenanceTaskSkip, MaintenanceTaskPostpone, MaintenanceTaskCompletionUpdate
 from app.models.models import MaintenanceTask, Tank
-from app.services.ownership import require_owned_tank
+from app.services.ownership import require_tank_view, require_tank_edit
 
 router = APIRouter()
 
@@ -24,13 +24,13 @@ def next_occurrence(from_date: datetime, day_of_week: int, every_weeks: int) -> 
 
 
 @router.get("/{tank_id}/maintenance", response_model=list[MaintenanceTaskOut])
-def list_tasks(tank_id: str, db: Session = Depends(get_db), _tank: Tank = Depends(require_owned_tank)):
+def list_tasks(tank_id: str, db: Session = Depends(get_db), _tank: Tank = Depends(require_tank_view)):
     return (db.query(MaintenanceTask).filter_by(tank_id=tank_id)
             .order_by(MaintenanceTask.due_at.asc()).all())
 
 
 @router.post("/{tank_id}/maintenance", response_model=MaintenanceTaskOut, status_code=201)
-def create_task(tank_id: str, body: MaintenanceTaskCreate, db: Session = Depends(get_db), _tank: Tank = Depends(require_owned_tank)):
+def create_task(tank_id: str, body: MaintenanceTaskCreate, db: Session = Depends(get_db), _tank: Tank = Depends(require_tank_edit)):
     data = body.model_dump()
     task = MaintenanceTask(tank_id=tank_id, **data)
     db.add(task); db.commit(); db.refresh(task)
@@ -38,7 +38,7 @@ def create_task(tank_id: str, body: MaintenanceTaskCreate, db: Session = Depends
 
 
 @router.patch("/{tank_id}/maintenance/{task_id}/complete", response_model=MaintenanceTaskOut)
-def complete_task(tank_id: str, task_id: str, db: Session = Depends(get_db), _tank: Tank = Depends(require_owned_tank)):
+def complete_task(tank_id: str, task_id: str, db: Session = Depends(get_db), _tank: Tank = Depends(require_tank_edit)):
     task = db.query(MaintenanceTask).filter_by(id=task_id, tank_id=tank_id).first()
     if not task:
         raise HTTPException(404, "Task not found")
@@ -69,7 +69,7 @@ def complete_task(tank_id: str, task_id: str, db: Session = Depends(get_db), _ta
 
 
 @router.patch("/{tank_id}/maintenance/{task_id}/completed-date", response_model=MaintenanceTaskOut)
-def update_completed_date(tank_id: str, task_id: str, body: MaintenanceTaskCompletionUpdate, db: Session = Depends(get_db), _tank: Tank = Depends(require_owned_tank)):
+def update_completed_date(tank_id: str, task_id: str, body: MaintenanceTaskCompletionUpdate, db: Session = Depends(get_db), _tank: Tank = Depends(require_tank_edit)):
     task = db.query(MaintenanceTask).filter_by(id=task_id, tank_id=tank_id).first()
     if not task:
         raise HTTPException(404, "Task not found")
@@ -81,7 +81,7 @@ def update_completed_date(tank_id: str, task_id: str, body: MaintenanceTaskCompl
 
 
 @router.patch("/{tank_id}/maintenance/{task_id}/skip", response_model=MaintenanceTaskOut)
-def skip_task(tank_id: str, task_id: str, body: MaintenanceTaskSkip, db: Session = Depends(get_db), _tank: Tank = Depends(require_owned_tank)):
+def skip_task(tank_id: str, task_id: str, body: MaintenanceTaskSkip, db: Session = Depends(get_db), _tank: Tank = Depends(require_tank_edit)):
     task = db.query(MaintenanceTask).filter_by(id=task_id, tank_id=tank_id).first()
     if not task:
         raise HTTPException(404, "Task not found")
@@ -99,7 +99,7 @@ def skip_task(tank_id: str, task_id: str, body: MaintenanceTaskSkip, db: Session
 
 
 @router.patch("/{tank_id}/maintenance/{task_id}/postpone", response_model=MaintenanceTaskOut)
-def postpone_task(tank_id: str, task_id: str, body: MaintenanceTaskPostpone, db: Session = Depends(get_db), _tank: Tank = Depends(require_owned_tank)):
+def postpone_task(tank_id: str, task_id: str, body: MaintenanceTaskPostpone, db: Session = Depends(get_db), _tank: Tank = Depends(require_tank_edit)):
     task = db.query(MaintenanceTask).filter_by(id=task_id, tank_id=tank_id).first()
     if not task:
         raise HTTPException(404, "Task not found")
@@ -114,7 +114,7 @@ def postpone_task(tank_id: str, task_id: str, body: MaintenanceTaskPostpone, db:
 
 
 @router.delete("/{tank_id}/maintenance/{task_id}", status_code=204)
-def delete_task(tank_id: str, task_id: str, db: Session = Depends(get_db), _tank: Tank = Depends(require_owned_tank)):
+def delete_task(tank_id: str, task_id: str, db: Session = Depends(get_db), _tank: Tank = Depends(require_tank_edit)):
     task = db.query(MaintenanceTask).filter_by(id=task_id, tank_id=tank_id).first()
     if not task:
         raise HTTPException(404, "Task not found")

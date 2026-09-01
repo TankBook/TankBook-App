@@ -23,6 +23,7 @@ interface DashboardStats {
   tanks: Array<{
     id: string; name: string; volume_litres: number; water_type: string; co2_injection: boolean; has_heater: boolean; filter_flow_lph: number | null
     substrate: string | null
+    my_access: 'owner' | 'edit' | 'view'
     fish_count: number; fish_species: number
     invertebrate_count: number; invertebrate_species: number
     amphibian_count: number; amphibian_species: number
@@ -179,7 +180,7 @@ type DragProps = {
 function TankOverviewCard({ tank, drag, isMobile, editMode }: { tank: DashboardStats['tanks'][0]; drag: DragProps; isMobile: boolean; editMode: boolean }) {
   const navigate = useNavigate()
   const hasAlerts = tank.unack_alerts > 0 || tank.overdue_tasks > 0
-  const draggableNow = editMode && !isMobile
+  const draggableNow = editMode && !isMobile && tank.my_access === 'owner'
 
   return (
     <div
@@ -229,8 +230,13 @@ function TankOverviewCard({ tank, drag, isMobile, editMode }: { tank: DashboardS
           </div>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+          {tank.my_access !== 'owner' && (
+            <span title={tank.my_access === 'edit' ? 'Shared with you — you can edit' : 'Shared with you — view only'} style={{ fontSize: 10, fontWeight: 500, color: 'var(--text-2)', background: 'var(--tag-bg)', border: '0.5px solid var(--border)', borderRadius: 5, padding: '1px 6px' }}>
+              Shared
+            </span>
+          )}
           <WaterTypeBadge type={tank.water_type} />
-          {editMode && (isMobile ? (
+          {editMode && tank.my_access === 'owner' && (isMobile ? (
             <div style={{ display: 'flex', flexDirection: 'column', flexShrink: 0 }}>
               <button
                 type="button"

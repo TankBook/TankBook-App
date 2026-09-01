@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends, UploadFile, File, HTTPException, Query
 from fastapi.responses import FileResponse
 from app.models.models import Tank
 from app.services.permissions import require_permission
-from app.services.ownership import require_owned_tank
+from app.services.ownership import require_tank_view, require_tank_edit
 from app.services.url_safety import assert_public_url, UnsafeUrlError
 
 router = APIRouter()
@@ -132,7 +132,7 @@ def _safe_filename(filename: str) -> str:
 
 
 @router.post("/tanks/{tank_id}")
-async def upload_tank_image(tank_id: str, file: UploadFile = File(...), _tank: Tank = Depends(require_owned_tank)):
+async def upload_tank_image(tank_id: str, file: UploadFile = File(...), _tank: Tank = Depends(require_tank_edit)):
     if file.content_type not in ALLOWED_TYPES:
         raise HTTPException(400, f"Unsupported type: {file.content_type}. Use JPEG, PNG, WebP, or GIF.")
     ext = EXT_MAP[file.content_type]
@@ -145,7 +145,7 @@ async def upload_tank_image(tank_id: str, file: UploadFile = File(...), _tank: T
 
 
 @router.get("/tanks/{tank_id}")
-def list_tank_images(tank_id: str, _tank: Tank = Depends(require_owned_tank)):
+def list_tank_images(tank_id: str, _tank: Tank = Depends(require_tank_view)):
     tank_dir = _tank_dir(tank_id)
     if not tank_dir.exists():
         return []
@@ -157,7 +157,7 @@ def list_tank_images(tank_id: str, _tank: Tank = Depends(require_owned_tank)):
 
 
 @router.get("/tanks/{tank_id}/{filename}")
-def get_tank_image(tank_id: str, filename: str, _tank: Tank = Depends(require_owned_tank)):
+def get_tank_image(tank_id: str, filename: str, _tank: Tank = Depends(require_tank_view)):
     filename = _safe_filename(filename)
     path = _tank_dir(tank_id) / filename
     if not path.exists():
@@ -166,7 +166,7 @@ def get_tank_image(tank_id: str, filename: str, _tank: Tank = Depends(require_ow
 
 
 @router.delete("/tanks/{tank_id}/{filename}")
-def delete_tank_image(tank_id: str, filename: str, _tank: Tank = Depends(require_owned_tank)):
+def delete_tank_image(tank_id: str, filename: str, _tank: Tank = Depends(require_tank_edit)):
     filename = _safe_filename(filename)
     path = _tank_dir(tank_id) / filename
     if not path.exists():

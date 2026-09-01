@@ -32,7 +32,21 @@ class TankCreate(BaseModel):
 class TankOut(TankCreate):
     id: str
     created_at: datetime
+    owner_id: str
+    my_access: Literal["owner", "edit", "view"]
     model_config = {"from_attributes": True}
+
+
+class TankShareOut(BaseModel):
+    user_id: str
+    email: str
+    display_name: str | None = None
+    level: Literal["view", "edit"]
+
+
+class TankShareCreate(BaseModel):
+    email: str
+    level: Literal["view", "edit"]
 
 
 # --- Fish ---

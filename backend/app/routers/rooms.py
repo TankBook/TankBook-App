@@ -1,10 +1,10 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from app.database import get_db
-from app.models.models import Room, RoomTankPosition, Tank, User
+from app.models.models import Room, RoomTankPosition, Tank, TankShare, User
 from app.schemas.schemas import RoomCreate, RoomUpdate, RoomOut, RoomTankPositionOut, RoomTankPositionUpsert
 from app.services.auth import get_current_user
-from app.services.ownership import require_owned_tank
+from app.services.ownership import require_tank_view, require_tank_edit
 
 router = APIRouter()
 
@@ -12,11 +12,13 @@ router = APIRouter()
 @router.get("/", response_model=list[RoomOut])
 def list_rooms(db: Session = Depends(get_db), user: User = Depends(get_current_user)):
     owned_tank_ids = {t.id for t in db.query(Tank.id).filter_by(owner_id=user.id).all()}
+    shared_tank_ids = {r.tank_id for r in db.query(TankShare.tank_id).filter_by(user_id=user.id).all()}
+    accessible_tank_ids = owned_tank_ids | shared_tank_ids
     rooms = db.query(Room).order_by(Room.created_at).all()
     return [
         RoomOut(
             id=room.id, name=room.name, width_m=room.width_m, length_m=room.length_m,
-            tank_positions=[p for p in room.tank_positions if p.tank_id in owned_tank_ids],
+            tank_positions=[p for p in room.tank_positions if p.tank_id in accessible_tank_ids],
         )
         for room in rooms
     ]
@@ -50,7 +52,7 @@ def delete_room(room_id: str, db: Session = Depends(get_db)):
 
 
 @router.put("/tank-positions/{tank_id}", response_model=RoomTankPositionOut)
-def set_tank_position(tank_id: str, body: RoomTankPositionUpsert, db: Session = Depends(get_db), _tank: Tank = Depends(require_owned_tank)):
+def set_tank_position(tank_id: str, body: RoomTankPositionUpsert, db: Session = Depends(get_db), _tank: Tank = Depends(require_tank_edit)):
     if not db.query(Room).filter_by(id=body.room_id).first():
         raise HTTPException(404, "Room not found")
     row = db.query(RoomTankPosition).filter_by(tank_id=tank_id).first()
@@ -66,7 +68,7 @@ def set_tank_position(tank_id: str, body: RoomTankPositionUpsert, db: Session = 
 
 
 @router.delete("/tank-positions/{tank_id}", status_code=204)
-def unassign_tank(tank_id: str, db: Session = Depends(get_db), _tank: Tank = Depends(require_owned_tank)):
+def unassign_tank(tank_id: str, db: Session = Depends(get_db), _tank: Tank = Depends(require_tank_edit)):
     row = db.query(RoomTankPosition).filter_by(tank_id=tank_id).first()
     if row:
         db.delete(row); db.commit()

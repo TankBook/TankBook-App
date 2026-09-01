@@ -1,12 +1,12 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
 import { useParams, Link, useNavigate, useSearchParams } from 'react-router-dom'
-import { Fish, Leaf, Droplets, CalendarCheck, Bell, Pencil, Trash2, Plus, ChevronLeft, ChevronDown, ListChecks, Camera, X, Utensils, BookOpen, FlaskConical, Thermometer, Lightbulb, Filter, Home, Clock, Calendar, ChevronLeft as Prev, ChevronRight as Next, Save, Target, Info, type LucideIcon } from 'lucide-react'
+import { Fish, Leaf, Droplets, CalendarCheck, Bell, Pencil, Trash2, Plus, ChevronLeft, ChevronDown, ListChecks, Camera, X, Utensils, BookOpen, FlaskConical, Thermometer, Lightbulb, Filter, Home, Clock, Calendar, ChevronLeft as Prev, ChevronRight as Next, Save, Target, Info, Users, type LucideIcon } from 'lucide-react'
 import {
   LineChart, Line, XAxis, YAxis, Tooltip, ReferenceLine,
   ResponsiveContainer,
 } from 'recharts'
 import { useTank, useFish, usePlants, useParameters, useAlerts } from '../hooks'
-import { api, type Tank } from '../api/client'
+import { api, canEditTank, isTankOwner, type Tank, type TankShare } from '../api/client'
 import { useSettings, formatDate, formatDateTime, fromMM, toMM, fmtDim, dimInputProps } from '../context/SettingsContext'
 import { Card, FieldLabel, Tag, SectionTitle, tabStyle } from '../components/ui'
 import { type Species, SpeciesDetailModal } from '../components/SpeciesDetail'
@@ -454,10 +454,12 @@ function SpeciesAutocomplete({ type, value, onChange }: {
 }
 
 // --- Edit tank panel ---
-function EditTankPanel({ tank, onSave }: { tank: any; onSave: () => void }) {
+function EditTankPanel({ tank, onSave }: { tank: Tank; onSave: () => void }) {
   const { unitSystem } = useSettings()
   const dp = dimInputProps(unitSystem)
   const navigate = useNavigate()
+  const canEdit = canEditTank(tank)
+  const isOwner = isTankOwner(tank)
 
   const [name, setName] = useState(tank.name)
   const [volume, setVolume] = useState(String(tank.volume_litres))
@@ -483,6 +485,42 @@ function EditTankPanel({ tank, onSave }: { tank: any; onSave: () => void }) {
   const [deleting, setDeleting] = useState(false)
   const [isMobile, setIsMobile] = useState(() => window.matchMedia('(max-width: 768px)').matches)
 
+  const [showShareModal, setShowShareModal] = useState(false)
+  const [shares, setShares] = useState<TankShare[]>([])
+  const [loadingShares, setLoadingShares] = useState(false)
+  const [shareEmail, setShareEmail] = useState('')
+  const [shareLevel, setShareLevel] = useState<'view' | 'edit'>('view')
+  const [addingShare, setAddingShare] = useState(false)
+  const [shareError, setShareError] = useState<string | null>(null)
+
+  function openShareModal() {
+    setShowShareModal(true)
+    setShareError(null)
+    setLoadingShares(true)
+    api.tanks.listShares(tank.id).then(setShares).catch(() => {}).finally(() => setLoadingShares(false))
+  }
+
+  async function addShare() {
+    if (!shareEmail.trim()) return
+    setAddingShare(true)
+    setShareError(null)
+    try {
+      const share = await api.tanks.addShare(tank.id, { email: shareEmail.trim(), level: shareLevel })
+      setShares(prev => [...prev.filter(s => s.user_id !== share.user_id), share])
+      setShareEmail('')
+      setShareLevel('view')
+    } catch (e: any) {
+      setShareError(e.message ?? 'Could not share this tank')
+    } finally {
+      setAddingShare(false)
+    }
+  }
+
+  async function removeShare(userId: string) {
+    await api.tanks.removeShare(tank.id, userId)
+    setShares(prev => prev.filter(s => s.user_id !== userId))
+  }
+
   useEffect(() => {
     const mq = window.matchMedia('(max-width: 768px)')
     const handler = (e: MediaQueryListEvent) => setIsMobile(e.matches)
@@ -491,30 +529,26 @@ function EditTankPanel({ tank, onSave }: { tank: any; onSave: () => void }) {
   }, [])
 
   async function save() {
-    await fetch(`/api/tanks/${tank.id}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        name, volume_litres: Number(volume),
-        water_type: waterType,
-        shape,
-        substrate: substrate || null,
-        has_filter: hasFilter,
-        filter_flow_lph: hasFilter && filterFlow ? Number(filterFlow) : null,
-        width_mm: width ? toMM(Number(width), unitSystem) : null,
-        height_mm: height ? toMM(Number(height), unitSystem) : null,
-        depth_mm: shape === 'cylinder' ? null : (depth ? toMM(Number(depth), unitSystem) : null),
-        co2_injection: co2,
-        co2_source: co2 && co2Source ? co2Source : null,
-        co2_method: co2 && co2Method ? co2Method : null,
-        has_heater: hasHeater,
-        heater_watts: hasHeater && heaterWatts ? Number(heaterWatts) : null,
-        has_lighting: hasLighting,
-        light_intensity: hasLighting && lightIntensity ? lightIntensity : null,
-        light_watts: hasLighting && lightWatts ? Number(lightWatts) : null,
-        light_technology: hasLighting && lightTechnology ? lightTechnology : null,
-        setup_date: tank.setup_date,
-      }),
+    await api.tanks.update(tank.id, {
+      name, volume_litres: Number(volume),
+      water_type: waterType,
+      shape,
+      substrate: substrate || null,
+      has_filter: hasFilter,
+      filter_flow_lph: hasFilter && filterFlow ? Number(filterFlow) : null,
+      width_mm: width ? toMM(Number(width), unitSystem) : null,
+      height_mm: height ? toMM(Number(height), unitSystem) : null,
+      depth_mm: shape === 'cylinder' ? null : (depth ? toMM(Number(depth), unitSystem) : null),
+      co2_injection: co2,
+      co2_source: co2 && co2Source ? co2Source : null,
+      co2_method: co2 && co2Method ? co2Method : null,
+      has_heater: hasHeater,
+      heater_watts: hasHeater && heaterWatts ? Number(heaterWatts) : null,
+      has_lighting: hasLighting,
+      light_intensity: hasLighting && lightIntensity ? lightIntensity : null,
+      light_watts: hasLighting && lightWatts ? Number(lightWatts) : null,
+      light_technology: hasLighting && lightTechnology ? lightTechnology : null,
+      setup_date: tank.setup_date,
     })
     onSave()
     setSaved(true)
@@ -686,16 +720,30 @@ function EditTankPanel({ tank, onSave }: { tank: any; onSave: () => void }) {
       <div style={{ marginTop: 28, paddingTop: 20, borderTop: '0.5px solid var(--border)' }}>
         {!showDeleteConfirm ? (
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>
-            <button
-              onClick={() => setShowDeleteConfirm(true)}
-              style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '7px 16px', borderRadius: 8, border: '0.5px solid var(--red-border)', background: 'transparent', color: 'var(--red)', fontSize: 13, cursor: 'pointer', width: isMobile ? '100%' : undefined, boxSizing: 'border-box' }}
-            >
-              <Trash2 size={14} /> Delete Tank
-            </button>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, width: isMobile ? '100%' : undefined }}>
-              <button onClick={save} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '7px 16px', borderRadius: 8, border: '0.5px solid var(--blue-border)', background: 'var(--blue-bg)', color: 'var(--blue)', fontSize: 13, fontWeight: 500, cursor: 'pointer', width: isMobile ? '100%' : undefined, boxSizing: 'border-box' }}><Save size={14} /> Save changes</button>
-              {saved && <span style={{ fontSize: 12, color: 'var(--green)' }}>Saved ✓</span>}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, width: isMobile ? '100%' : undefined, flexWrap: 'wrap' }}>
+              {isOwner && (
+                <button
+                  onClick={() => setShowDeleteConfirm(true)}
+                  style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '7px 16px', borderRadius: 8, border: '0.5px solid var(--red-border)', background: 'transparent', color: 'var(--red)', fontSize: 13, cursor: 'pointer', width: isMobile ? '100%' : undefined, boxSizing: 'border-box' }}
+                >
+                  <Trash2 size={14} /> Delete Tank
+                </button>
+              )}
+              {isOwner && (
+                <button
+                  onClick={openShareModal}
+                  style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '7px 16px', borderRadius: 8, border: '0.5px solid var(--btn-border)', background: 'transparent', color: 'var(--text)', fontSize: 13, cursor: 'pointer', width: isMobile ? '100%' : undefined, boxSizing: 'border-box' }}
+                >
+                  <Users size={14} /> Tank Permissions
+                </button>
+              )}
             </div>
+            {canEdit && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, width: isMobile ? '100%' : undefined }}>
+                <button onClick={save} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '7px 16px', borderRadius: 8, border: '0.5px solid var(--blue-border)', background: 'var(--blue-bg)', color: 'var(--blue)', fontSize: 13, fontWeight: 500, cursor: 'pointer', width: isMobile ? '100%' : undefined, boxSizing: 'border-box' }}><Save size={14} /> Save changes</button>
+                {saved && <span style={{ fontSize: 12, color: 'var(--green)' }}>Saved ✓</span>}
+              </div>
+            )}
           </div>
         ) : (
           <div style={{ background: 'var(--red-bg)', border: '0.5px solid var(--red-border)', borderRadius: 10, padding: '14px 16px' }}>
@@ -714,7 +762,7 @@ function EditTankPanel({ tank, onSave }: { tank: any; onSave: () => void }) {
                 disabled={deleting}
                 onClick={async () => {
                   setDeleting(true)
-                  await fetch(`/api/tanks/${tank.id}`, { method: 'DELETE' })
+                  await api.tanks.delete(tank.id)
                   navigate('/')
                 }}
                 style={{ padding: '6px 16px', borderRadius: 8, border: '0.5px solid var(--red-border)', background: 'var(--red-bg)', color: 'var(--red)', fontSize: 13, fontWeight: 600, cursor: deleting ? 'not-allowed' : 'pointer', opacity: deleting ? 0.6 : 1 }}
@@ -725,6 +773,95 @@ function EditTankPanel({ tank, onSave }: { tank: any; onSave: () => void }) {
           </div>
         )}
       </div>
+
+      {showShareModal && (
+        <div
+          onMouseDown={() => setShowShareModal(false)}
+          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', zIndex: 300, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}
+        >
+          <div
+            onMouseDown={e => e.stopPropagation()}
+            style={{ background: 'var(--surface)', border: '0.5px solid var(--border)', borderRadius: 14, padding: '1.5rem', width: 420, maxWidth: '100%', boxShadow: '0 12px 40px rgba(0,0,0,0.22)' }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+              <p style={{ margin: 0, fontWeight: 600, fontSize: 15, color: 'var(--text)' }}>Tank Permissions</p>
+              <button onClick={() => setShowShareModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-2)', lineHeight: 0 }}><X size={18} /></button>
+            </div>
+
+            {loadingShares ? (
+              <p style={{ margin: 0, fontSize: 13, color: 'var(--text-3)' }}>Loading…</p>
+            ) : (
+              <>
+                {shares.length === 0 ? (
+                  <p style={{ margin: '0 0 16px', fontSize: 13, color: 'var(--text-2)' }}>Nobody else has access to this tank yet.</p>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 16 }}>
+                    {shares.map(s => (
+                      <div key={s.user_id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, padding: '8px 10px', borderRadius: 8, border: '0.5px solid var(--border-sub)' }}>
+                        <div style={{ minWidth: 0 }}>
+                          <p style={{ margin: 0, fontSize: 13, color: 'var(--text)', fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{s.display_name || s.email}</p>
+                          {s.display_name && <p style={{ margin: 0, fontSize: 11, color: 'var(--text-3)' }}>{s.email}</p>}
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+                          <select
+                            value={s.level}
+                            onChange={async e => {
+                              const level = e.target.value as 'view' | 'edit'
+                              const updated = await api.tanks.addShare(tank.id, { email: s.email, level })
+                              setShares(prev => prev.map(x => x.user_id === updated.user_id ? updated : x))
+                            }}
+                            style={{ fontSize: 12, padding: '3px 6px' }}
+                          >
+                            <option value="view">View only</option>
+                            <option value="edit">Can edit</option>
+                          </select>
+                          <button
+                            onClick={() => removeShare(s.user_id)}
+                            title="Remove access"
+                            style={{ display: 'flex', alignItems: 'center', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--red)', padding: 2, lineHeight: 0 }}
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end' }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <FieldLabel>Add by email</FieldLabel>
+                    <input
+                      type="email"
+                      value={shareEmail}
+                      onChange={e => setShareEmail(e.target.value)}
+                      placeholder="someone@example.com"
+                      style={{ width: '100%', boxSizing: 'border-box' }}
+                    />
+                  </div>
+                  <select value={shareLevel} onChange={e => setShareLevel(e.target.value as 'view' | 'edit')} style={{ flexShrink: 0 }}>
+                    <option value="view">View only</option>
+                    <option value="edit">Can edit</option>
+                  </select>
+                  <button
+                    onClick={addShare}
+                    disabled={!shareEmail.trim() || addingShare}
+                    style={{
+                      flexShrink: 0, padding: '7px 14px', borderRadius: 8, fontSize: 13, fontWeight: 500,
+                      border: '0.5px solid var(--blue-border)', background: 'var(--blue-bg)', color: 'var(--blue)',
+                      cursor: shareEmail.trim() && !addingShare ? 'pointer' : 'not-allowed',
+                      opacity: shareEmail.trim() && !addingShare ? 1 : 0.5,
+                    }}
+                  >
+                    {addingShare ? 'Adding…' : 'Add'}
+                  </button>
+                </div>
+                {shareError && <p style={{ margin: '8px 0 0', fontSize: 12, color: 'var(--red)' }}>{shareError}</p>}
+              </>
+            )}
+          </div>
+        </div>
+      )}
     </Card>
   )
 }
@@ -1116,6 +1253,10 @@ export default function TankDetail() {
   const fromRoomId = searchParams.get('fromRoom')
   const fromRoomName = searchParams.get('fromRoomName')
   const { data: tank, reload: reloadTank } = useTank(id!)
+
+  useEffect(() => {
+    if (tank && !canEditTank(tank) && tab === 'edit') setTab('home')
+  }, [tank, tab])
   const fish = useFish(id!)
   const plants = usePlants(id!)
   const params = useParameters(id!, 100)
@@ -1527,6 +1668,9 @@ ${taskRows ? `<h2>Pending Maintenance</h2>
 
   if (!tank) return <p style={{ color: 'var(--text-2)' }}>Loading…</p>
 
+  const canEdit = canEditTank(tank)
+  const isOwner = isTankOwner(tank)
+
   const unackAlerts = alerts.data?.filter(a => !a.acknowledged) ?? []
   const allChartData = [...(params.data ?? [])].reverse()
   const mobileChartMaxOffset = Math.max(0, allChartData.length - 3)
@@ -1633,7 +1777,7 @@ ${taskRows ? `<h2>Pending Maintenance</h2>
                 background: 'var(--surface)', border: '0.5px solid var(--border)', borderRadius: 10,
                 boxShadow: '0 8px 24px rgba(0,0,0,0.16)', overflow: 'hidden',
               }}>
-                {(['home', 'inhabitants', 'plants', 'parameters', 'daily', 'weekly', 'alerts', 'gallery', 'edit'] as Tab[]).map(t => {
+                {(['home', 'inhabitants', 'plants', 'parameters', 'daily', 'weekly', 'alerts', 'gallery', 'edit'] as Tab[]).filter(t => t !== 'edit' || canEdit).map(t => {
                   const Icon = TAB_ICONS[t]
                   const label = TAB_LABELS[t]
                   const badge =
@@ -1672,7 +1816,7 @@ ${taskRows ? `<h2>Pending Maintenance</h2>
         </div>
       ) : (
         <div style={{ display: 'flex', gap: isCompactTabs ? 2 : 4, width: 'fit-content', margin: '0 auto 20px' }}>
-          {(['home', 'inhabitants', 'plants', 'parameters', 'daily', 'weekly', 'alerts', 'gallery', 'edit'] as Tab[]).map(t => {
+          {(['home', 'inhabitants', 'plants', 'parameters', 'daily', 'weekly', 'alerts', 'gallery', 'edit'] as Tab[]).filter(t => t !== 'edit' || canEdit).map(t => {
             const Icon = TAB_ICONS[t]
             const label = TAB_LABELS[t]
             return (
@@ -1748,12 +1892,14 @@ ${taskRows ? `<h2>Pending Maintenance</h2>
                         <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--text)' }}>{t.task_type}</span>
                         {t.description && <span style={{ fontSize: 12, color: 'var(--text-2)', marginLeft: 6 }}>{t.description}</span>}
                       </div>
-                      <button
-                        onClick={() => completeTask(t.id)}
-                        style={{ flexShrink: 0, fontSize: 11, padding: '3px 10px', borderRadius: 6, border: '0.5px solid var(--green-border)', background: 'var(--green-bg)', color: 'var(--green)', cursor: 'pointer' }}
-                      >
-                        Done
-                      </button>
+                      {canEdit && (
+                        <button
+                          onClick={() => completeTask(t.id)}
+                          style={{ flexShrink: 0, fontSize: 11, padding: '3px 10px', borderRadius: 6, border: '0.5px solid var(--green-border)', background: 'var(--green-bg)', color: 'var(--green)', cursor: 'pointer' }}
+                        >
+                          Done
+                        </button>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -1872,12 +2018,12 @@ ${taskRows ? `<h2>Pending Maintenance</h2>
                                   <Info size={13} />
                                 </button>
                               )}
-                              {entries.map(f => (
+                              {canEdit && entries.map(f => (
                                 <button key={f.id} onClick={() => startEditFish(f)} title="Edit" style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-2)', background: 'none', border: '0.5px solid var(--btn-border)', borderRadius: 6, padding: '6px 8px', cursor: 'pointer' }}>
                                   <Pencil size={13} />
                                 </button>
                               ))}
-                              {entries.map(f => (
+                              {canEdit && entries.map(f => (
                                 <button key={`remove-${f.id}`} aria-label={`Remove ${f.quantity} ${f.common_name ?? f.species_slug}`} title="Remove" onClick={async () => { await api.fish.remove(id!, f.id); fish.reload() }} style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--red)', background: 'none', border: '0.5px solid var(--red-border)', borderRadius: 6, padding: '6px 8px', cursor: 'pointer' }}>
                                   <Trash2 size={13} />
                                 </button>
@@ -1903,12 +2049,12 @@ ${taskRows ? `<h2>Pending Maintenance</h2>
                                     <Info size={12} />
                                   </button>
                                 )}
-                                {entries.map(f => (
+                                {canEdit && entries.map(f => (
                                   <button key={f.id} onClick={() => startEditFish(f)} title="Edit" style={{ display: 'flex', alignItems: 'center', color: 'var(--text-2)', background: 'none', border: '0.5px solid var(--btn-border)', borderRadius: 6, padding: '3px', cursor: 'pointer' }}>
                                     <Pencil size={12} />
                                   </button>
                                 ))}
-                                {entries.map(f => (
+                                {canEdit && entries.map(f => (
                                   <button key={`remove-${f.id}`} aria-label={`Remove ${f.quantity} ${f.common_name ?? f.species_slug}`} title="Remove" onClick={async () => { await api.fish.remove(id!, f.id); fish.reload() }} style={{ display: 'flex', alignItems: 'center', color: 'var(--red)', background: 'none', border: 'none', cursor: 'pointer' }}>
                                     <Trash2 size={12} />
                                   </button>
@@ -1925,14 +2071,16 @@ ${taskRows ? `<h2>Pending Maintenance</h2>
               )
             })
           })()}
-          <div style={{ marginTop: 14 }}>
-            <button
-              onClick={() => setShowAddFish(true)}
-              style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6, fontSize: 13, padding: '7px 16px', borderRadius: 8, fontWeight: 500, cursor: 'pointer', border: '0.5px solid var(--blue-border)', background: 'var(--blue-bg)', color: 'var(--blue)', width: isMobile ? '100%' : undefined, boxSizing: 'border-box' }}
-            >
-              <Plus size={13} />Add Inhabitant
-            </button>
-          </div>
+          {canEdit && (
+            <div style={{ marginTop: 14 }}>
+              <button
+                onClick={() => setShowAddFish(true)}
+                style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6, fontSize: 13, padding: '7px 16px', borderRadius: 8, fontWeight: 500, cursor: 'pointer', border: '0.5px solid var(--blue-border)', background: 'var(--blue-bg)', color: 'var(--blue)', width: isMobile ? '100%' : undefined, boxSizing: 'border-box' }}
+              >
+                <Plus size={13} />Add Inhabitant
+              </button>
+            </div>
+          )}
         </Card>
       )}
 
@@ -1972,25 +2120,29 @@ ${taskRows ? `<h2>Pending Maintenance</h2>
                           <Info size={13} />
                         </button>
                       )}
-                      <button
-                        onClick={() => {
-                          setEditingPlantId(p.id)
-                          setEditPlantQty(String(p.quantity))
-                          setEditPlantStatus(p.plant_status)
-                          setEditPlantNotes(p.notes ?? '')
-                        }}
-                        title="Edit"
-                        style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-2)', background: 'none', border: '0.5px solid var(--btn-border)', borderRadius: 6, padding: '6px 8px', cursor: 'pointer' }}
-                      >
-                        <Pencil size={13} />
-                      </button>
-                      <button
-                        onClick={async () => { await api.plants.remove(id!, p.id); plants.reload() }}
-                        title="Remove"
-                        style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--red)', background: 'none', border: '0.5px solid var(--red-border)', borderRadius: 6, padding: '6px 8px', cursor: 'pointer' }}
-                      >
-                        <Trash2 size={13} />
-                      </button>
+                      {canEdit && (
+                        <button
+                          onClick={() => {
+                            setEditingPlantId(p.id)
+                            setEditPlantQty(String(p.quantity))
+                            setEditPlantStatus(p.plant_status)
+                            setEditPlantNotes(p.notes ?? '')
+                          }}
+                          title="Edit"
+                          style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-2)', background: 'none', border: '0.5px solid var(--btn-border)', borderRadius: 6, padding: '6px 8px', cursor: 'pointer' }}
+                        >
+                          <Pencil size={13} />
+                        </button>
+                      )}
+                      {canEdit && (
+                        <button
+                          onClick={async () => { await api.plants.remove(id!, p.id); plants.reload() }}
+                          title="Remove"
+                          style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--red)', background: 'none', border: '0.5px solid var(--red-border)', borderRadius: 6, padding: '6px 8px', cursor: 'pointer' }}
+                        >
+                          <Trash2 size={13} />
+                        </button>
+                      )}
                     </div>
                   </div>
                 ) : (
@@ -2018,39 +2170,45 @@ ${taskRows ? `<h2>Pending Maintenance</h2>
                           <Info size={12} />
                         </button>
                       )}
-                      <button
-                        onClick={() => {
-                          setEditingPlantId(p.id)
-                          setEditPlantQty(String(p.quantity))
-                          setEditPlantStatus(p.plant_status)
-                          setEditPlantNotes(p.notes ?? '')
-                        }}
-                        title="Edit"
-                        style={{ display: 'flex', alignItems: 'center', color: 'var(--text-2)', background: 'none', border: '0.5px solid var(--btn-border)', borderRadius: 6, padding: '3px', cursor: 'pointer' }}
-                      >
-                        <Pencil size={12} />
-                      </button>
-                      <button
-                        onClick={async () => { await api.plants.remove(id!, p.id); plants.reload() }}
-                        title="Remove"
-                        style={{ display: 'flex', alignItems: 'center', color: 'var(--red)', background: 'none', border: 'none', cursor: 'pointer' }}
-                      >
-                        <Trash2 size={12} />
-                      </button>
+                      {canEdit && (
+                        <button
+                          onClick={() => {
+                            setEditingPlantId(p.id)
+                            setEditPlantQty(String(p.quantity))
+                            setEditPlantStatus(p.plant_status)
+                            setEditPlantNotes(p.notes ?? '')
+                          }}
+                          title="Edit"
+                          style={{ display: 'flex', alignItems: 'center', color: 'var(--text-2)', background: 'none', border: '0.5px solid var(--btn-border)', borderRadius: 6, padding: '3px', cursor: 'pointer' }}
+                        >
+                          <Pencil size={12} />
+                        </button>
+                      )}
+                      {canEdit && (
+                        <button
+                          onClick={async () => { await api.plants.remove(id!, p.id); plants.reload() }}
+                          title="Remove"
+                          style={{ display: 'flex', alignItems: 'center', color: 'var(--red)', background: 'none', border: 'none', cursor: 'pointer' }}
+                        >
+                          <Trash2 size={12} />
+                        </button>
+                      )}
                     </div>
                   </div>
                 )}
               </div>
             )
           })}
-          <div style={{ marginTop: 16 }}>
-            <button
-              onClick={() => setShowAddPlant(true)}
-              style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6, fontSize: 13, padding: '7px 16px', borderRadius: 8, fontWeight: 500, cursor: 'pointer', border: '0.5px solid var(--green-border)', background: 'var(--green-bg)', color: 'var(--green)', width: isMobile ? '100%' : undefined, boxSizing: 'border-box' }}
-            >
-              <Plus size={13} />Add Plant
-            </button>
-          </div>
+          {canEdit && (
+            <div style={{ marginTop: 16 }}>
+              <button
+                onClick={() => setShowAddPlant(true)}
+                style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6, fontSize: 13, padding: '7px 16px', borderRadius: 8, fontWeight: 500, cursor: 'pointer', border: '0.5px solid var(--green-border)', background: 'var(--green-bg)', color: 'var(--green)', width: isMobile ? '100%' : undefined, boxSizing: 'border-box' }}
+              >
+                <Plus size={13} />Add Plant
+              </button>
+            </div>
+          )}
         </Card>
       )}
 
@@ -2089,12 +2247,12 @@ ${taskRows ? `<h2>Pending Maintenance</h2>
               ))}
             </div>
             <button
-              disabled={!hasParamInput}
+              disabled={!hasParamInput || !canEdit}
               style={{
                 marginTop: 12, padding: '7px 18px', borderRadius: 8, fontSize: 13, fontWeight: 500,
-                cursor: hasParamInput ? 'pointer' : 'not-allowed',
+                cursor: hasParamInput && canEdit ? 'pointer' : 'not-allowed',
                 border: '0.5px solid var(--blue-border)', background: 'var(--blue-bg)', color: 'var(--blue)',
-                opacity: hasParamInput ? 1 : 0.45,
+                opacity: hasParamInput && canEdit ? 1 : 0.45,
                 transition: 'background 0.15s, color 0.15s',
                 width: isMobile ? '100%' : undefined, boxSizing: 'border-box',
               }}
@@ -2211,6 +2369,7 @@ ${taskRows ? `<h2>Pending Maintenance</h2>
       {/* SCHEDULE TAB */}
       {tab === 'weekly' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          {canEdit && (
           <Card>
             <SectionTitle>Add Weekly Task</SectionTitle>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
@@ -2288,6 +2447,7 @@ ${taskRows ? `<h2>Pending Maintenance</h2>
               <Plus size={13} />Add Weekly Task
             </button>
           </Card>
+          )}
 
           {pendingTasks.length > 0 && (
             <Card>
@@ -2318,6 +2478,7 @@ ${taskRows ? `<h2>Pending Maintenance</h2>
                         <p style={{ margin: 0, fontSize: 11, color: overdue ? 'var(--red)' : dueToday ? 'var(--amber)' : 'var(--text-3)' }}>
                           Due {formatDate(t.due_at, dateFormat)}
                         </p>
+                        {canEdit && (
                         <div style={{ display: 'flex', gap: 6 }}>
                           <button onClick={() => completeTask(t.id)} style={{ flex: 1, fontSize: 12, padding: '5px 8px', borderRadius: 6, border: '0.5px solid var(--green-border)', background: 'var(--green-bg)', color: 'var(--green)', cursor: 'pointer' }}>Done</button>
                           <button
@@ -2330,6 +2491,7 @@ ${taskRows ? `<h2>Pending Maintenance</h2>
                           >Postpone</button>
                           <button onClick={() => deleteTask(t.id)} style={{ flex: 1, fontSize: 12, padding: '5px 8px', borderRadius: 6, border: '0.5px solid var(--btn-border)', background: 'transparent', color: 'var(--text-2)', cursor: 'pointer' }}>Remove</button>
                         </div>
+                        )}
                       </div>
                     ) : (
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -2349,6 +2511,7 @@ ${taskRows ? `<h2>Pending Maintenance</h2>
                             Due {formatDate(t.due_at, dateFormat)}
                           </p>
                         </div>
+                        {canEdit && (
                         <div style={{ display: 'flex', gap: 8 }}>
                           <button onClick={() => completeTask(t.id)} style={{ fontSize: 11, padding: '3px 10px', borderRadius: 6, border: '0.5px solid var(--green-border)', background: 'var(--green-bg)', color: 'var(--green)', cursor: 'pointer' }}>Done</button>
                           <button
@@ -2361,6 +2524,7 @@ ${taskRows ? `<h2>Pending Maintenance</h2>
                           >Postpone</button>
                           <button onClick={() => deleteTask(t.id)} style={{ fontSize: 11, padding: '3px 10px', borderRadius: 6, border: '0.5px solid var(--btn-border)', background: 'transparent', color: 'var(--text-2)', cursor: 'pointer' }}>Remove</button>
                         </div>
+                        )}
                       </div>
                     )}
                     {skipping && (
@@ -2441,10 +2605,12 @@ ${taskRows ? `<h2>Pending Maintenance</h2>
                       <p style={{ margin: '2px 0 0', fontSize: 11, color: 'var(--text-3)' }}>Completed {formatDate(t.completed_at, dateFormat)}</p>
                     )}
                   </div>
+                  {canEdit && (
                   <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
                     {editingCompletedTaskId !== t.id && <button onClick={() => startEditCompletedDate(t)} style={{ fontSize: 11, color: 'var(--text-2)', background: 'none', border: 'none', cursor: 'pointer' }}>Edit date</button>}
                     <button onClick={() => deleteTask(t.id)} style={{ fontSize: 11, color: 'var(--text-2)', background: 'none', border: 'none', cursor: 'pointer' }}>Remove</button>
                   </div>
+                  )}
                 </div>
               ))}
             </Card>
@@ -2477,6 +2643,7 @@ ${taskRows ? `<h2>Pending Maintenance</h2>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
 
             {/* Add task form */}
+            {canEdit && (
             <Card>
               <SectionTitle>Add Daily Task</SectionTitle>
               <DailyTaskFormFields
@@ -2504,6 +2671,7 @@ ${taskRows ? `<h2>Pending Maintenance</h2>
                 <Plus size={13} />Add Daily Task
               </button>
             </Card>
+            )}
 
             {/* Today's tasks */}
             <Card>
@@ -2548,6 +2716,7 @@ ${taskRows ? `<h2>Pending Maintenance</h2>
                         </div>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
                           <span style={{ fontSize: 11, color: 'var(--text-3)' }}>{dayLabels}</span>
+                          {canEdit && (
                           <div style={{ display: 'flex', gap: 10, flexShrink: 0 }}>
                             <button onClick={() => startEditDailyTask(task)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-3)', lineHeight: 0, padding: 2 }}>
                               <Pencil size={14} />
@@ -2556,6 +2725,7 @@ ${taskRows ? `<h2>Pending Maintenance</h2>
                               <X size={15} />
                             </button>
                           </div>
+                          )}
                         </div>
                       </div>
                     ) : (
@@ -2566,12 +2736,14 @@ ${taskRows ? `<h2>Pending Maintenance</h2>
                         </span>
                         <span style={{ fontSize: 13, color: 'var(--text)', flex: 1 }}>{task.name}</span>
                         <span style={{ fontSize: 11, color: 'var(--text-3)', flexShrink: 0 }}>{dayLabels}</span>
+                        {canEdit && (<>
                         <button onClick={() => startEditDailyTask(task)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-3)', lineHeight: 0, padding: 2, flexShrink: 0 }}>
                           <Pencil size={12} />
                         </button>
                         <button onClick={() => removeDailyTask(task.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-3)', lineHeight: 0, padding: 2, flexShrink: 0 }}>
                           <X size={13} />
                         </button>
+                        </>)}
                       </div>
                     )}
                   </div>
@@ -2603,6 +2775,7 @@ ${taskRows ? `<h2>Pending Maintenance</h2>
                             </div>
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
                               <span style={{ fontSize: 11, color: 'var(--text-3)' }}>{dayLabels}</span>
+                              {canEdit && (
                               <div style={{ display: 'flex', gap: 10, flexShrink: 0 }}>
                                 <button onClick={() => startEditDailyTask(task)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-3)', lineHeight: 0, padding: 2 }}>
                                   <Pencil size={14} />
@@ -2611,6 +2784,7 @@ ${taskRows ? `<h2>Pending Maintenance</h2>
                                   <X size={15} />
                                 </button>
                               </div>
+                              )}
                             </div>
                           </div>
                         ) : (
@@ -2621,12 +2795,14 @@ ${taskRows ? `<h2>Pending Maintenance</h2>
                             </span>
                             <span style={{ fontSize: 13, color: 'var(--text)', flex: 1 }}>{task.name}</span>
                             <span style={{ fontSize: 11, color: 'var(--text-3)', flexShrink: 0 }}>{dayLabels}</span>
+                            {canEdit && (<>
                             <button onClick={() => startEditDailyTask(task)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-3)', lineHeight: 0, padding: 2, flexShrink: 0 }}>
                               <Pencil size={12} />
                             </button>
                             <button onClick={() => removeDailyTask(task.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-3)', lineHeight: 0, padding: 2, flexShrink: 0 }}>
                               <X size={13} />
                             </button>
+                            </>)}
                           </div>
                         )}
                       </div>
@@ -2642,6 +2818,7 @@ ${taskRows ? `<h2>Pending Maintenance</h2>
       {/* GALLERY TAB */}
       {tab === 'gallery' && (
         <div>
+          {canEdit && (
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16, flexWrap: 'wrap' }}>
             <input
               ref={galleryInputRef}
@@ -2685,6 +2862,7 @@ ${taskRows ? `<h2>Pending Maintenance</h2>
             </button>
             <span style={{ fontSize: 12, color: 'var(--text-3)' }}>JPEG, PNG, WebP or GIF · multiple files supported</span>
           </div>
+          )}
 
           {galleryImages.length === 0 ? (
             <p style={{ fontSize: 13, color: 'var(--text-2)' }}>No photos yet. Upload some to start the gallery.</p>
@@ -2701,6 +2879,7 @@ ${taskRows ? `<h2>Pending Maintenance</h2>
                     onClick={() => setLightboxIdx(idx)}
                     style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
                   />
+                  {canEdit && (
                   <button
                     onClick={e => { e.stopPropagation(); handleDeleteGalleryImage(img.filename) }}
                     style={{
@@ -2709,6 +2888,7 @@ ${taskRows ? `<h2>Pending Maintenance</h2>
                       color: '#fff', cursor: 'pointer', padding: '2px 5px', lineHeight: 1, fontSize: 14,
                     }}
                   >×</button>
+                  )}
                 </div>
               ))}
             </div>
@@ -3064,6 +3244,7 @@ ${taskRows ? `<h2>Pending Maintenance</h2>
                 <span style={{ fontSize: 13, color: 'var(--text)' }}>{a.message}</span>
                 <p style={{ margin: '2px 0 0', fontSize: 11, color: 'var(--text-3)' }}>{formatDateTime(a.triggered_at, dateFormat)}</p>
               </div>
+              {canEdit && (
               <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
                 {!a.acknowledged && (
                   <button onClick={async () => { await api.alerts.acknowledge(id!, a.id); alerts.reload() }} style={{ fontSize: 11, background: 'none', border: '0.5px solid var(--btn-border)', borderRadius: 6, padding: '2px 8px', cursor: 'pointer', color: 'var(--text-2)' }}>
@@ -3074,6 +3255,7 @@ ${taskRows ? `<h2>Pending Maintenance</h2>
                   <Trash2 size={13} />
                 </button>
               </div>
+              )}
             </div>
           ))}
         </Card>

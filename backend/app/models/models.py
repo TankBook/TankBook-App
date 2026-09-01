@@ -50,6 +50,22 @@ class Tank(Base):
     journal_entries: Mapped[list["JournalEntry"]] = relationship(back_populates="tank", cascade="all, delete-orphan")
     health_cases: Mapped[list["HealthCase"]] = relationship(back_populates="tank", cascade="all, delete-orphan")
     room_position: Mapped["RoomTankPosition | None"] = relationship(back_populates="tank", cascade="all, delete-orphan")
+    shares: Mapped[list["TankShare"]] = relationship(back_populates="tank", cascade="all, delete-orphan")
+
+
+class TankShare(Base):
+    """Grants another user 'view' or 'edit' access to a tank they don't own."""
+    __tablename__ = "tank_shares"
+    __table_args__ = (UniqueConstraint("tank_id", "user_id", name="uq_tank_share_tank_user"),)
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=new_uuid)
+    tank_id: Mapped[str] = mapped_column(String, ForeignKey("tanks.id", ondelete="CASCADE"), nullable=False)
+    user_id: Mapped[str] = mapped_column(String, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    level: Mapped[str] = mapped_column(String, nullable=False)  # "view" | "edit"
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    tank: Mapped["Tank"] = relationship(back_populates="shares")
+    user: Mapped["User"] = relationship()
 
 
 class TankFish(Base):

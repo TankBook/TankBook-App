@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models.models import Alert, AppSettings, Tank
 from app.schemas.schemas import AlertOut
-from app.services.ownership import require_owned_tank
+from app.services.ownership import require_tank_view, require_tank_edit
 
 router = APIRouter()
 
@@ -19,7 +19,7 @@ def _purge_old_alerts(db: Session):
 
 
 @router.get("/{tank_id}/alerts", response_model=list[AlertOut])
-def list_alerts(tank_id: str, unacknowledged_only: bool = False, db: Session = Depends(get_db), _tank: Tank = Depends(require_owned_tank)):
+def list_alerts(tank_id: str, unacknowledged_only: bool = False, db: Session = Depends(get_db), _tank: Tank = Depends(require_tank_view)):
     _purge_old_alerts(db)
     q = db.query(Alert).filter_by(tank_id=tank_id)
     if unacknowledged_only:
@@ -28,7 +28,7 @@ def list_alerts(tank_id: str, unacknowledged_only: bool = False, db: Session = D
 
 
 @router.patch("/{tank_id}/alerts/{alert_id}/acknowledge", response_model=AlertOut)
-def acknowledge_alert(tank_id: str, alert_id: str, db: Session = Depends(get_db), _tank: Tank = Depends(require_owned_tank)):
+def acknowledge_alert(tank_id: str, alert_id: str, db: Session = Depends(get_db), _tank: Tank = Depends(require_tank_edit)):
     alert = db.query(Alert).filter_by(id=alert_id, tank_id=tank_id).first()
     if not alert:
         raise HTTPException(404, "Alert not found")
@@ -38,7 +38,7 @@ def acknowledge_alert(tank_id: str, alert_id: str, db: Session = Depends(get_db)
 
 
 @router.delete("/{tank_id}/alerts/{alert_id}", status_code=204)
-def delete_alert(tank_id: str, alert_id: str, db: Session = Depends(get_db), _tank: Tank = Depends(require_owned_tank)):
+def delete_alert(tank_id: str, alert_id: str, db: Session = Depends(get_db), _tank: Tank = Depends(require_tank_edit)):
     alert = db.query(Alert).filter_by(id=alert_id, tank_id=tank_id).first()
     if not alert:
         raise HTTPException(404, "Alert not found")

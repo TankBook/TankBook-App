@@ -1,7 +1,7 @@
 from datetime import datetime
 from sqlalchemy.orm import Session
 
-from app.models.models import Tank, TankFish, TankPlant, WaterParameter, Alert, JournalEntry, MaintenanceTask, TapWaterTest
+from app.models.models import Tank, TankShare, TankFish, TankPlant, WaterParameter, Alert, JournalEntry, MaintenanceTask, TapWaterTest
 from app.services.species import species_service, check_compatibility as _check_compatibility
 
 
@@ -9,12 +9,23 @@ def _iso(dt: datetime | None) -> str | None:
     return dt.isoformat() if dt else None
 
 
-def _owns_tank(db: Session, owner_id: str, tank_id: str) -> bool:
-    return db.query(Tank.id).filter_by(id=tank_id, owner_id=owner_id).first() is not None
+def _accessible_tank_ids(db: Session, user_id: str) -> list[str]:
+    owned = [t.id for t in db.query(Tank.id).filter_by(owner_id=user_id).all()]
+    shared = [r[0] for r in db.query(TankShare.tank_id).filter_by(user_id=user_id).all()]
+    return list({*owned, *shared})
 
 
-def list_tanks(db: Session, owner_id: str) -> dict:
-    tanks = db.query(Tank).filter_by(owner_id=owner_id).order_by(Tank.sort_order, Tank.created_at).all()
+def _can_access_tank(db: Session, user_id: str, tank_id: str) -> bool:
+    tank = db.query(Tank).filter_by(id=tank_id).first()
+    if not tank:
+        return False
+    if tank.owner_id == user_id:
+        return True
+    return db.query(TankShare).filter_by(tank_id=tank_id, user_id=user_id).first() is not None
+
+
+def list_tanks(db: Session, user_id: str) -> dict:
+    tanks = db.query(Tank).filter(Tank.id.in_(_accessible_tank_ids(db, user_id))).order_by(Tank.sort_order, Tank.created_at).all()
     return {"tanks": [
         {
             "id": t.id, "name": t.name, "volume_litres": t.volume_litres, "water_type": t.water_type,
@@ -25,10 +36,10 @@ def list_tanks(db: Session, owner_id: str) -> dict:
     ]}
 
 
-def get_tank(db: Session, owner_id: str, tank_id: str) -> dict:
-    tank = db.query(Tank).filter_by(id=tank_id, owner_id=owner_id).first()
-    if not tank:
+def get_tank(db: Session, user_id: str, tank_id: str) -> dict:
+    if not _can_access_tank(db, user_id, tank_id):
         return {"error": f"No tank with id {tank_id}"}
+    tank = db.query(Tank).filter_by(id=tank_id).first()
     fish = db.query(TankFish).filter_by(tank_id=tank_id).all()
     plants = db.query(TankPlant).filter_by(tank_id=tank_id).all()
     return {
@@ -52,8 +63,8 @@ def get_tank(db: Session, owner_id: str, tank_id: str) -> dict:
     }
 
 
-def get_water_parameters(db: Session, owner_id: str, tank_id: str, limit: int = 30) -> dict:
-    if not _owns_tank(db, owner_id, tank_id):
+def get_water_parameters(db: Session, user_id: str, tank_id: str, limit: int = 30) -> dict:
+    if not _can_access_tank(db, user_id, tank_id):
         return {"error": f"No tank with id {tank_id}"}
     limit = max(1, min(limit, 100))
     rows = (db.query(WaterParameter).filter_by(tank_id=tank_id)
@@ -69,15 +80,14 @@ def get_water_parameters(db: Session, owner_id: str, tank_id: str, limit: int = 
     ]}
 
 
-def get_alerts(db: Session, owner_id: str, tank_id: str | None = None, unacknowledged_only: bool = True) -> dict:
+def get_alerts(db: Session, user_id: str, tank_id: str | None = None, unacknowledged_only: bool = True) -> dict:
     q = db.query(Alert)
     if tank_id:
-        if not _owns_tank(db, owner_id, tank_id):
+        if not _can_access_tank(db, user_id, tank_id):
             return {"error": f"No tank with id {tank_id}"}
         q = q.filter_by(tank_id=tank_id)
     else:
-        owned_tank_ids = [t.id for t in db.query(Tank.id).filter_by(owner_id=owner_id).all()]
-        q = q.filter(Alert.tank_id.in_(owned_tank_ids))
+        q = q.filter(Alert.tank_id.in_(_accessible_tank_ids(db, user_id)))
     if unacknowledged_only:
         q = q.filter_by(acknowledged=False)
     rows = q.order_by(Alert.triggered_at.desc()).limit(50).all()
@@ -90,8 +100,8 @@ def get_alerts(db: Session, owner_id: str, tank_id: str | None = None, unacknowl
     ]}
 
 
-def get_journal_entries(db: Session, owner_id: str, tank_id: str, limit: int = 20) -> dict:
-    if not _owns_tank(db, owner_id, tank_id):
+def get_journal_entries(db: Session, user_id: str, tank_id: str, limit: int = 20) -> dict:
+    if not _can_access_tank(db, user_id, tank_id):
         return {"error": f"No tank with id {tank_id}"}
     limit = max(1, min(limit, 100))
     rows = (db.query(JournalEntry).filter_by(tank_id=tank_id)
@@ -102,15 +112,14 @@ def get_journal_entries(db: Session, owner_id: str, tank_id: str, limit: int = 2
     ]}
 
 
-def get_maintenance_tasks(db: Session, owner_id: str, tank_id: str | None = None, include_completed: bool = False) -> dict:
+def get_maintenance_tasks(db: Session, user_id: str, tank_id: str | None = None, include_completed: bool = False) -> dict:
     q = db.query(MaintenanceTask)
     if tank_id:
-        if not _owns_tank(db, owner_id, tank_id):
+        if not _can_access_tank(db, user_id, tank_id):
             return {"error": f"No tank with id {tank_id}"}
         q = q.filter_by(tank_id=tank_id)
     else:
-        owned_tank_ids = [t.id for t in db.query(Tank.id).filter_by(owner_id=owner_id).all()]
-        q = q.filter(MaintenanceTask.tank_id.in_(owned_tank_ids))
+        q = q.filter(MaintenanceTask.tank_id.in_(_accessible_tank_ids(db, user_id)))
     if not include_completed:
         q = q.filter(MaintenanceTask.status != "done")
     rows = q.order_by(MaintenanceTask.due_at.asc()).limit(50).all()
@@ -123,20 +132,20 @@ def get_maintenance_tasks(db: Session, owner_id: str, tank_id: str | None = None
     ]}
 
 
-def get_species(db: Session, owner_id: str, slug: str) -> dict:
+def get_species(db: Session, user_id: str, slug: str) -> dict:
     species = species_service.get(slug)
     if not species:
         return {"error": f"No species found for slug {slug}"}
     return species
 
 
-def check_compatibility(db: Session, owner_id: str, tank_id: str, slug: str) -> dict:
-    if not _owns_tank(db, owner_id, tank_id):
+def check_compatibility(db: Session, user_id: str, tank_id: str, slug: str) -> dict:
+    if not _can_access_tank(db, user_id, tank_id):
         return {"error": f"No tank with id {tank_id}"}
     return _check_compatibility(db, tank_id, slug)
 
 
-def get_tap_water_tests(db: Session, owner_id: str, limit: int = 10) -> dict:
+def get_tap_water_tests(db: Session, user_id: str, limit: int = 10) -> dict:
     limit = max(1, min(limit, 50))
     rows = db.query(TapWaterTest).order_by(TapWaterTest.recorded_at.desc()).limit(limit).all()
     return {"tests": [
@@ -259,11 +268,11 @@ TOOL_SCHEMAS = [
 ]
 
 
-def execute_tool(db: Session, name: str, arguments: dict, owner_id: str) -> dict:
+def execute_tool(db: Session, name: str, arguments: dict, user_id: str) -> dict:
     func = TOOL_FUNCTIONS.get(name)
     if not func:
         return {"error": f"Unknown tool: {name}"}
     try:
-        return func(db, owner_id, **arguments)
+        return func(db, user_id, **arguments)
     except TypeError as e:
         return {"error": f"Invalid arguments for {name}: {e}"}

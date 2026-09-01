@@ -4,17 +4,17 @@ from app.database import get_db
 from app.models.models import WaterParameter, Tank
 from app.schemas.schemas import WaterParameterCreate, WaterParameterOut
 from app.services import alerts as alert_service
-from app.services.ownership import require_owned_tank
+from app.services.ownership import require_tank_view, require_tank_edit
 
 router = APIRouter()
 
 @router.get("/{tank_id}/parameters", response_model=list[WaterParameterOut])
-def list_parameters(tank_id: str, limit: int = 50, db: Session = Depends(get_db), _tank: Tank = Depends(require_owned_tank)):
+def list_parameters(tank_id: str, limit: int = 50, db: Session = Depends(get_db), _tank: Tank = Depends(require_tank_view)):
     return (db.query(WaterParameter).filter_by(tank_id=tank_id)
             .order_by(WaterParameter.recorded_at.desc()).limit(limit).all())
 
 @router.post("/{tank_id}/parameters", response_model=WaterParameterOut, status_code=201)
-def log_parameters(tank_id: str, body: WaterParameterCreate, db: Session = Depends(get_db), _tank: Tank = Depends(require_owned_tank)):
+def log_parameters(tank_id: str, body: WaterParameterCreate, db: Session = Depends(get_db), _tank: Tank = Depends(require_tank_edit)):
     log = WaterParameter(tank_id=tank_id, **body.model_dump())
     db.add(log); db.flush()
     alert_service.check_and_create_alerts(db, tank_id, log)

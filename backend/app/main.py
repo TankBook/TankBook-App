@@ -14,7 +14,7 @@ from app.routers import tanks, fish, plants, parameters, alerts, species, mainte
 from app.services.species import species_service, check_compatibility
 from app.services.auth import get_current_user
 from app.services.push import notification_loop
-from app.services.ownership import require_owned_tank
+from app.services.ownership import require_tank_view
 from app.database import get_db
 
 
@@ -70,7 +70,7 @@ app.include_router(push.router, prefix="/api/push", tags=["push"], dependencies=
 
 
 @app.get("/api/tanks/{tank_id}/compatibility")
-def get_compatibility(tank_id: str, slug: str, db=Depends(get_db), _tank=Depends(require_owned_tank)):
+def get_compatibility(tank_id: str, slug: str, db=Depends(get_db), _tank=Depends(require_tank_view)):
     return check_compatibility(db, tank_id, slug)
 
 
@@ -81,12 +81,20 @@ def health():
 
 @app.get("/api/dashboard")
 def dashboard_stats(db=Depends(get_db), _user=Depends(get_current_user)):
-    from app.models.models import Tank, TankFish, TankPlant, WaterParameter, MaintenanceTask, Alert
+    from app.models.models import Tank, TankShare, TankFish, TankPlant, WaterParameter, MaintenanceTask, Alert
     from sqlalchemy import func
     from datetime import datetime, timedelta
 
-    tanks = db.query(Tank).filter_by(owner_id=_user.id).order_by(Tank.sort_order, Tank.created_at).all()
+    owned = db.query(Tank).filter_by(owner_id=_user.id).all()
+    shared_ids = [r[0] for r in db.query(TankShare.tank_id).filter_by(user_id=_user.id).all()]
+    shared = db.query(Tank).filter(Tank.id.in_(shared_ids)).all() if shared_ids else []
+    tanks = owned + shared
+    tanks.sort(key=lambda t: (t.sort_order, t.created_at))
     tank_ids = [t.id for t in tanks]
+    my_access_by_tank = {t.id: "owner" for t in owned}
+    if shared:
+        shares_by_tank = {s.tank_id: s.level for s in db.query(TankShare).filter_by(user_id=_user.id).all()}
+        my_access_by_tank.update({t.id: shares_by_tank.get(t.id, "view") for t in shared})
 
     today_start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
     today_end = today_start + timedelta(days=1)
@@ -136,6 +144,7 @@ def dashboard_stats(db=Depends(get_db), _user=Depends(get_current_user)):
         tank_summaries.append({
             "id": tank.id,
             "name": tank.name,
+            "my_access": my_access_by_tank[tank.id],
             "volume_litres": tank.volume_litres,
             "water_type": tank.water_type,
             "co2_injection": tank.co2_injection,

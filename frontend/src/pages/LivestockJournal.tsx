@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { NotebookPen, Trash2, Plus, Pencil, ChevronDown, Layers, Stethoscope } from 'lucide-react'
 import { Tag, Card, FieldLabel, Modal, RichTextarea, renderNotes } from '../components/ui'
-import { api, JournalEntry, HealthCase, Tank, TankFish } from '../api/client'
+import { api, canEditTank, JournalEntry, HealthCase, Tank, TankFish } from '../api/client'
 import { useSettings, formatDate } from '../context/SettingsContext'
 
 const EVENT_TYPES = [
@@ -365,7 +365,9 @@ export default function LivestockJournal() {
   }
 
   const visible = filterType === 'all' ? entries : entries.filter(e => e.event_type === filterType)
-  const tankName = tanks.find(t => t.id === selectedTank)?.name ?? ''
+  const selectedTankObj = tanks.find(t => t.id === selectedTank)
+  const canEdit = selectedTankObj ? canEditTank(selectedTankObj) : false
+  const tankName = selectedTankObj?.name ?? ''
   const activeCases = cases.filter(c => c.status === 'active')
   const resolvedCases = cases.filter(c => c.status === 'resolved')
   const modalCase = form.case_id ? cases.find(c => c.id === form.case_id) : null
@@ -426,6 +428,7 @@ export default function LivestockJournal() {
               <div style={{ fontSize: 13, color: 'var(--text)', margin: 0, lineHeight: 1.5 }} dangerouslySetInnerHTML={{ __html: renderNotes(entry.notes) }} />
             </div>
             <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
+              {canEdit && (
               <button
                 onClick={() => startEdit(entry)}
                 title="Edit entry"
@@ -433,6 +436,8 @@ export default function LivestockJournal() {
               >
                 <Pencil size={13} />
               </button>
+              )}
+              {canEdit && (
               <button
                 onClick={() => handleDelete(entry)}
                 title="Delete entry"
@@ -440,6 +445,7 @@ export default function LivestockJournal() {
               >
                 <Trash2 size={13} />
               </button>
+              )}
             </div>
           </div>
         )}
@@ -476,6 +482,7 @@ export default function LivestockJournal() {
 
         {expanded && (
           <div style={{ marginTop: 12, paddingTop: 12, borderTop: '0.5px solid var(--border-sub)' }}>
+            {canEdit && (
             <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
               <button
                 onClick={() => openAddUpdate(c)}
@@ -509,6 +516,7 @@ export default function LivestockJournal() {
                 <Trash2 size={13} />
               </button>
             </div>
+            )}
             {caseEntries.length === 0 ? (
               <p style={{ fontSize: 12, color: 'var(--text-3)', margin: 0 }}>No updates logged yet.</p>
             ) : (
@@ -526,7 +534,7 @@ export default function LivestockJournal() {
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
         <h1 style={{ margin: 0, fontSize: 22, fontWeight: 500, color: 'var(--text)' }}>Tank Journal</h1>
-        {selectedTank && (
+        {selectedTank && canEdit && (
           <button
             onClick={openModal}
             style={{
@@ -598,6 +606,7 @@ export default function LivestockJournal() {
             <p style={{ fontWeight: 500, fontSize: 15, margin: 0, color: 'var(--text)', display: 'flex', alignItems: 'center', gap: 6 }}>
               <Stethoscope size={15} />Quarantine / Disease
             </p>
+            {canEdit && (
             <button
               onClick={openCaseModal}
               style={{
@@ -609,6 +618,7 @@ export default function LivestockJournal() {
             >
               <Plus size={12} />New Case
             </button>
+            )}
           </div>
 
           {cases.length === 0 ? (

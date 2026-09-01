@@ -4,7 +4,7 @@ from app.database import get_db
 from app.models.models import TankPlant, Tank
 from app.schemas.schemas import TankPlantCreate, TankPlantUpdate, TankPlantOut
 from app.services.species import species_service
-from app.services.ownership import require_owned_tank
+from app.services.ownership import require_tank_view, require_tank_edit
 
 router = APIRouter()
 
@@ -27,12 +27,12 @@ def _enrich(row: TankPlant) -> dict:
 
 
 @router.get("/{tank_id}/plants", response_model=list[TankPlantOut])
-def list_plants(tank_id: str, db: Session = Depends(get_db), _tank: Tank = Depends(require_owned_tank)):
+def list_plants(tank_id: str, db: Session = Depends(get_db), _tank: Tank = Depends(require_tank_view)):
     return [_enrich(row) for row in db.query(TankPlant).filter_by(tank_id=tank_id).all()]
 
 
 @router.post("/{tank_id}/plants", response_model=TankPlantOut, status_code=201)
-def add_plant(tank_id: str, body: TankPlantCreate, db: Session = Depends(get_db), _tank: Tank = Depends(require_owned_tank)):
+def add_plant(tank_id: str, body: TankPlantCreate, db: Session = Depends(get_db), _tank: Tank = Depends(require_tank_edit)):
     if not species_service.validate_slug(body.species_slug):
         raise HTTPException(422, f"Unknown species slug: {body.species_slug}")
     row = TankPlant(tank_id=tank_id, **body.model_dump())
@@ -41,7 +41,7 @@ def add_plant(tank_id: str, body: TankPlantCreate, db: Session = Depends(get_db)
 
 
 @router.patch("/{tank_id}/plants/{plant_id}", response_model=TankPlantOut)
-def update_plant(tank_id: str, plant_id: str, body: TankPlantUpdate, db: Session = Depends(get_db), _tank: Tank = Depends(require_owned_tank)):
+def update_plant(tank_id: str, plant_id: str, body: TankPlantUpdate, db: Session = Depends(get_db), _tank: Tank = Depends(require_tank_edit)):
     row = db.query(TankPlant).filter_by(id=plant_id, tank_id=tank_id).first()
     if not row:
         raise HTTPException(404, "Plant entry not found")
@@ -55,7 +55,7 @@ def update_plant(tank_id: str, plant_id: str, body: TankPlantUpdate, db: Session
 
 
 @router.delete("/{tank_id}/plants/{plant_id}", status_code=204)
-def remove_plant(tank_id: str, plant_id: str, db: Session = Depends(get_db), _tank: Tank = Depends(require_owned_tank)):
+def remove_plant(tank_id: str, plant_id: str, db: Session = Depends(get_db), _tank: Tank = Depends(require_tank_edit)):
     row = db.query(TankPlant).filter_by(id=plant_id, tank_id=tank_id).first()
     if not row:
         raise HTTPException(404, "Plant entry not found")

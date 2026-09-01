@@ -7,7 +7,7 @@ from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session as DBSession
 
 from app.database import get_db
-from app.models.models import User, AuthSettings, Tank, DASHBOARD_SECTION_IDS, DASHBOARD_STAT_KEYS
+from app.models.models import User, AuthSettings, Tank, TankShare, DASHBOARD_SECTION_IDS, DASHBOARD_STAT_KEYS
 from app.schemas.schemas import (
     RegisterRequest, LoginRequest, ChangePasswordRequest, UserOut, UserListItemOut, UserUpdateRequest,
     AuthConfigOut, AuthSettingsOut, AuthSettingsUpdate, PermissionsOut, PermissionsUpdate, ProfileUpdate,
@@ -173,9 +173,10 @@ def update_profile(body: ProfileUpdate, user: User = Depends(get_current_user), 
         tank_id = data.pop("default_tank_id")
         if not tank_id:
             user.default_tank_id = None
-        elif db.query(Tank.id).filter_by(id=tank_id, owner_id=user.id).first():
+        elif db.query(Tank.id).filter_by(id=tank_id, owner_id=user.id).first() or \
+                db.query(TankShare.id).filter_by(tank_id=tank_id, user_id=user.id).first():
             user.default_tank_id = tank_id
-        # else: not a tank this user owns — ignore, leave the existing value as-is
+        # else: not a tank this user owns or has been shared — ignore, leave the existing value as-is
     for k, v in data.items():
         setattr(user, k, v)
     db.commit()
