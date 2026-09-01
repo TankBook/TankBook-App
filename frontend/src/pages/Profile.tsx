@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react'
-import { CalendarDays, Ruler, UserCircle, Lock, Bell } from 'lucide-react'
+import { CalendarDays, Ruler, Droplets, UserCircle, Lock, Bell } from 'lucide-react'
 import { Card, FieldLabel } from '../components/ui'
 import { useSettings, formatDate, DateFormat, UnitSystem } from '../context/SettingsContext'
 import { useAuth } from '../context/AuthContext'
+import { useTanks } from '../hooks'
 import { api } from '../api/client'
 
 const PUSH_SUPPORTED =
@@ -30,9 +31,11 @@ const UNIT_OPTIONS: { value: UnitSystem; label: string; example: string }[] = [
 
 export default function Profile() {
   const { user, updateProfile } = useAuth()
-  const { dateFormat, setDateFormat, unitSystem, setUnitSystem } = useSettings()
+  const { dateFormat, setDateFormat, unitSystem, setUnitSystem, defaultTank, setDefaultTank } = useSettings()
+  const { data: tanks } = useTanks()
   const [savingDateFormat, setSavingDateFormat] = useState(false)
   const [savingUnitSystem, setSavingUnitSystem] = useState(false)
+  const [savingDefaultTank, setSavingDefaultTank] = useState(false)
   const exampleDate = new Date()
 
   const [currentPassword, setCurrentPassword] = useState('')
@@ -128,6 +131,11 @@ export default function Profile() {
     try { await setUnitSystem(u) } finally { setSavingUnitSystem(false) }
   }
 
+  async function pickDefaultTank(id: string | null) {
+    setSavingDefaultTank(true)
+    try { await setDefaultTank(id) } finally { setSavingDefaultTank(false) }
+  }
+
   return (
     <div>
       <h1 style={{ margin: '0 0 4px', fontSize: 22, fontWeight: 500, color: 'var(--text)', display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -203,6 +211,24 @@ export default function Profile() {
               </label>
             ))}
           </div>
+        </section>
+
+        <section style={{ paddingBottom: 20, borderBottom: '0.5px solid var(--border-sub)' }}>
+          <p style={{ fontWeight: 500, fontSize: 14, margin: '0 0 4px', color: 'var(--text)', display: 'flex', alignItems: 'center', gap: 6 }}><Droplets size={14} color="var(--text-2)" />Default Tank</p>
+          <p style={{ fontSize: 12, color: 'var(--text-2)', margin: '0 0 14px' }}>
+            Pre-selects this tank on pages with a tank dropdown, like the Livestock Journal.
+          </p>
+          <select
+            value={defaultTank ?? ''}
+            disabled={savingDefaultTank}
+            onChange={e => pickDefaultTank(e.target.value || null)}
+            style={{ width: '100%', boxSizing: 'border-box', opacity: savingDefaultTank ? 0.6 : 1 }}
+          >
+            <option value="">No default</option>
+            {tanks?.map(t => (
+              <option key={t.id} value={t.id}>{t.name}</option>
+            ))}
+          </select>
         </section>
 
         <section style={{ paddingBottom: 20, borderBottom: '0.5px solid var(--border-sub)' }}>

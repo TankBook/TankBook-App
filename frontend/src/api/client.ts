@@ -273,6 +273,7 @@ export interface AuthUser {
   permissions: Record<string, PermissionLevel>
   date_format: string
   unit_system: string
+  default_tank_id: string | null
   notifications_enabled: boolean
   dashboard_layout: DashboardSectionLayout[]
   dashboard_stats: string[]
@@ -630,7 +631,7 @@ export const api = {
     logout: () => authPost<void>('/auth/logout', {}),
     changePassword: (body: { current_password?: string; new_password: string }) =>
       authPost<AuthUser>('/auth/change-password', body),
-    updateProfile: (body: { date_format?: string; unit_system?: string; notifications_enabled?: boolean; dashboard_layout?: DashboardSectionLayout[]; dashboard_stats?: string[] }) =>
+    updateProfile: (body: { date_format?: string; unit_system?: string; default_tank_id?: string | null; notifications_enabled?: boolean; dashboard_layout?: DashboardSectionLayout[]; dashboard_stats?: string[] }) =>
       patch<AuthUser>('/auth/me', body),
     getSettings: () => get<AuthSettings>('/auth/settings'),
     updateSettings: (body: AuthSettingsUpdate) => patch<AuthSettings>('/auth/settings', body),

@@ -40,7 +40,7 @@ class Tank(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     owner_id: Mapped[str] = mapped_column(String, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
 
-    owner: Mapped["User"] = relationship()
+    owner: Mapped["User"] = relationship(foreign_keys=[owner_id])
     fish: Mapped[list["TankFish"]] = relationship(back_populates="tank", cascade="all, delete-orphan")
     plants: Mapped[list["TankPlant"]] = relationship(back_populates="tank", cascade="all, delete-orphan")
     parameters: Mapped[list["WaterParameter"]] = relationship(back_populates="tank", cascade="all, delete-orphan")
@@ -220,12 +220,12 @@ class HealthCase(Base):
 
 
 class AppSettings(Base):
-    """Single-row table holding app-wide settings, shared by every account. Date format and unit
-    system are per-user (see User) — everything left here is genuinely instance-wide."""
+    """Single-row table holding app-wide settings, shared by every account. Date format, unit
+    system, and default tank are per-user (see User) — everything left here is genuinely
+    instance-wide."""
     __tablename__ = "app_settings"
 
     id: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: "default")
-    default_tank_id: Mapped[str | None] = mapped_column(String, nullable=True)
     alert_retention_days: Mapped[int | None] = mapped_column(Integer, nullable=True)
     app_url: Mapped[str | None] = mapped_column(String, nullable=True)
     feeding_amount_presets_json: Mapped[str | None] = mapped_column(Text, nullable=True)
@@ -351,6 +351,7 @@ class User(Base):
     oidc_subject: Mapped[str | None] = mapped_column(String, nullable=True, unique=True)
     date_format: Mapped[str] = mapped_column(String, default="DD/MM/YYYY")
     unit_system: Mapped[str] = mapped_column(String, default="cm")
+    default_tank_id: Mapped[str | None] = mapped_column(String, ForeignKey("tanks.id", ondelete="SET NULL"), nullable=True)
     notifications_enabled: Mapped[bool] = mapped_column(Boolean, default=False)
     dashboard_layout_json: Mapped[str | None] = mapped_column(Text, nullable=True)
     dashboard_stats_json: Mapped[str | None] = mapped_column(Text, nullable=True)

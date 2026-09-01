@@ -1,8 +1,8 @@
 import { useState, useRef, useEffect } from 'react'
-import { Info, Download, Upload, Droplets, RefreshCw, Bell, Globe, Utensils, X, AlertTriangle, HardDrive, Fish, Image as ImageIcon, Bot, Lock, SlidersHorizontal, Users as UsersIcon, KeyRound, Pencil, Trash2, Shield, HelpCircle, type LucideIcon } from 'lucide-react'
+import { Info, Download, Upload, RefreshCw, Bell, Globe, Utensils, X, AlertTriangle, HardDrive, Fish, Image as ImageIcon, Bot, Lock, SlidersHorizontal, Users as UsersIcon, KeyRound, Pencil, Trash2, Shield, HelpCircle, type LucideIcon } from 'lucide-react'
 import { useSettings, formatDate, formatDateTime } from '../context/SettingsContext'
 import { Card, Modal, ConfirmDialog, StatCard, FieldLabel } from '../components/ui'
-import { api, hasPermission, Tank, AgentSettings, AuthSettings, UserListItem, PermissionLevel, ExportSelection } from '../api/client'
+import { api, hasPermission, AgentSettings, AuthSettings, UserListItem, PermissionLevel, ExportSelection } from '../api/client'
 import { useAuth } from '../context/AuthContext'
 
 const PROVIDER_OPTIONS: { value: 'anthropic' | 'openai' | 'ollama'; label: string }[] = [
@@ -738,7 +738,7 @@ const OTHER_EXPORT_FIELDS: { key: keyof ExportSelection; label: string }[] = [
 ]
 
 export default function Settings() {
-  const { defaultTank, setDefaultTank, alertRetentionDays, setAlertRetentionDays, appUrl, setAppUrl, feedingAmountPresets, setFeedingAmountPresets, loading } = useSettings()
+  const { alertRetentionDays, setAlertRetentionDays, appUrl, setAppUrl, feedingAmountPresets, setFeedingAmountPresets, loading } = useSettings()
   const { user: loggedInUser } = useAuth()
   const canEditAi = hasPermission(loggedInUser?.permissions.ai, 'edit')
   const canEditGeneral = hasPermission(loggedInUser?.permissions.general, 'edit')
@@ -749,8 +749,6 @@ export default function Settings() {
     t.id === 'general' || t.id === 'about' ? canEditGeneral :
     true
   )
-  const [tanks, setTanks] = useState<Tank[]>([])
-  const [draftDefaultTank, setDraftDefaultTank] = useState(defaultTank ?? '')
   const [draftAlertRetentionDays, setDraftAlertRetentionDays] = useState<number | null>(alertRetentionDays)
   const [draftAppUrl, setDraftAppUrl] = useState(appUrl ?? '')
   const [draftFeedingAmountPresets, setDraftFeedingAmountPresets] = useState<string[]>(feedingAmountPresets)
@@ -769,7 +767,6 @@ export default function Settings() {
 
   useEffect(() => {
     if (!loading) {
-      setDraftDefaultTank(defaultTank ?? '')
       setDraftAlertRetentionDays(alertRetentionDays)
       setDraftAppUrl(appUrl ?? '')
       setDraftFeedingAmountPresets(feedingAmountPresets)
@@ -783,14 +780,9 @@ export default function Settings() {
     setNewPreset('')
   }
 
-  useEffect(() => {
-    api.tanks.list().then(setTanks)
-  }, [])
-
   const feedingAmountPresetsChanged = JSON.stringify(draftFeedingAmountPresets) !== JSON.stringify(feedingAmountPresets)
 
-  const settingsChanged = draftDefaultTank !== (defaultTank ?? '')
-    || draftAlertRetentionDays !== alertRetentionDays
+  const settingsChanged = draftAlertRetentionDays !== alertRetentionDays
     || draftAppUrl !== (appUrl ?? '')
     || feedingAmountPresetsChanged
 
@@ -799,7 +791,6 @@ export default function Settings() {
     setSettingsSaved(false)
     try {
       await Promise.all([
-        draftDefaultTank !== (defaultTank ?? '') && setDefaultTank(draftDefaultTank || null),
         draftAlertRetentionDays !== alertRetentionDays && setAlertRetentionDays(draftAlertRetentionDays),
         draftAppUrl !== (appUrl ?? '') && setAppUrl(draftAppUrl || null),
         feedingAmountPresetsChanged && setFeedingAmountPresets(draftFeedingAmountPresets),
@@ -811,7 +802,6 @@ export default function Settings() {
   }
 
   function resetToDefaults() {
-    setDraftDefaultTank('')
     setDraftAlertRetentionDays(null)
     setDraftAppUrl('')
     setDraftFeedingAmountPresets(['1 pinch', '1 cube'])
@@ -941,23 +931,6 @@ export default function Settings() {
 
         {activeTab === 'general' && canEditGeneral && (
       <Card style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 16, padding: 24, flex: 1, minWidth: 0, width: '100%', boxSizing: 'border-box' }}>
-
-        <section style={{ paddingBottom: 20, borderBottom: '0.5px solid var(--border-sub)' }}>
-          <p style={{ fontWeight: 500, fontSize: 14, margin: '0 0 4px', color: 'var(--text)', display: 'flex', alignItems: 'center', gap: 6 }}><Droplets size={14} color="var(--text-2)" />Default Tank</p>
-          <p style={{ fontSize: 12, color: 'var(--text-2)', margin: '0 0 14px' }}>
-            Pre-selects this tank on pages with a tank dropdown, like the Livestock Journal.
-          </p>
-          <select
-            value={draftDefaultTank}
-            onChange={e => { setDraftDefaultTank(e.target.value); setSettingsSaved(false) }}
-            style={{ width: '100%' }}
-          >
-            <option value="">No default</option>
-            {tanks.map(t => (
-              <option key={t.id} value={t.id}>{t.name}</option>
-            ))}
-          </select>
-        </section>
 
         <section style={{ paddingBottom: 20, borderBottom: '0.5px solid var(--border-sub)' }}>
           <p style={{ fontWeight: 500, fontSize: 14, margin: '0 0 4px', color: 'var(--text)', display: 'flex', alignItems: 'center', gap: 6 }}><Bell size={14} color="var(--text-2)" />Alert Retention</p>

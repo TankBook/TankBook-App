@@ -290,14 +290,12 @@ class HealthCaseOut(BaseModel):
 # --- App settings ---
 
 class AppSettingsUpdate(BaseModel):
-    default_tank_id: str | None = None
     alert_retention_days: int | None = None
     app_url: str | None = None
     feeding_amount_presets: list[str] | None = None
 
 
 class AppSettingsOut(BaseModel):
-    default_tank_id: str | None = None
     alert_retention_days: int | None = None
     app_url: str | None = None
     feeding_amount_presets: list[str] = []
@@ -544,6 +542,7 @@ class UserOut(BaseModel):
     permissions: dict[str, str] = {}
     date_format: str
     unit_system: str
+    default_tank_id: str | None = None
     notifications_enabled: bool
     dashboard_layout: list[DashboardSectionLayout] = []
     dashboard_stats: list[str] = []
@@ -552,6 +551,7 @@ class UserOut(BaseModel):
 class ProfileUpdate(BaseModel):
     date_format: str | None = None
     unit_system: str | None = None
+    default_tank_id: str | None = None
     notifications_enabled: bool | None = None
     dashboard_layout: list[DashboardSectionLayout] | None = None
     dashboard_stats: list[str] | None = None

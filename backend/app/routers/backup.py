@@ -58,7 +58,6 @@ def export_backup(body: ExportSelection = ExportSelection(), db: Session = Depen
     if body.settings:
         settings = db.query(AppSettings).filter_by(id="default").first()
         result["settings"] = {
-            "default_tank_id": settings.default_tank_id if settings else None,
             "alert_retention_days": settings.alert_retention_days if settings else None,
             "app_url": settings.app_url if settings else None,
             "feeding_amount_presets": settings.feeding_amount_presets if settings else [],
@@ -225,7 +224,6 @@ def import_backup(payload: dict, db: Session = Depends(get_db), user: User = req
         if not s:
             s = AppSettings(id="default")
             db.add(s)
-        s.default_tank_id = src_settings.get("default_tank_id")
         s.alert_retention_days = src_settings.get("alert_retention_days")
         s.app_url = src_settings.get("app_url")
         presets = src_settings.get("feeding_amount_presets")

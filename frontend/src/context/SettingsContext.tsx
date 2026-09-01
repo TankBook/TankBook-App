@@ -58,7 +58,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
   const unitSystem = (user?.unit_system as UnitSystem) ?? 'cm'
   const dashboardLayout = user?.dashboard_layout ?? []
   const dashboardStats = user?.dashboard_stats ?? []
-  const [defaultTank, setDefaultTankState] = useState<string | null>(null)
+  const defaultTank = user?.default_tank_id ?? null
   const [alertRetentionDays, setAlertRetentionDaysState] = useState<number | null>(null)
   const [appUrl, setAppUrlState] = useState<string | null>(null)
   const [feedingAmountPresets, setFeedingAmountPresetsState] = useState<string[]>([])
@@ -71,7 +71,6 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     fetch('/api/settings/')
       .then(r => r.json())
       .then(d => {
-        setDefaultTankState(d.default_tank_id ?? null)
         setAlertRetentionDaysState(d.alert_retention_days ?? null)
         setAppUrlState(d.app_url ?? null)
         setFeedingAmountPresetsState(d.feeding_amount_presets ?? [])
@@ -102,12 +101,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
   }
 
   async function setDefaultTank(id: string | null) {
-    setDefaultTankState(id)
-    await fetch('/api/settings/', {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ default_tank_id: id }),
-    })
+    await updateProfile({ default_tank_id: id })
   }
 
   async function setAlertRetentionDays(days: number | null) {
