@@ -17,6 +17,7 @@
   <img src="https://img.shields.io/badge/PostgreSQL-16-4169E1?style=flat-square&logo=postgresql&logoColor=white" alt="PostgreSQL 16" />
   <img src="https://img.shields.io/badge/Docker-Compose-2496ED?style=flat-square&logo=docker&logoColor=white" alt="Docker Compose" />
   <img src="https://img.shields.io/badge/self--hosted-brightgreen?style=flat-square" alt="Self-hosted" />
+  <img src="https://img.shields.io/badge/multi--user-blueviolet?style=flat-square" alt="Multi-user" />
 </p>
 
 ---
@@ -65,8 +66,8 @@
       <strong>Calculators</strong> — tank volume calculator (rectangular and cylinder) and chemical dosage calculator for API liquid and powder treatments
     </td>
     <td align="center">
-      <img src="docs/screenshots/settings.png" alt="Settings" /><br/>
-      <strong>Settings</strong> — configure date format, dimension units, and default tank; export or import a full data backup
+      <img src="docs/screenshots/settings.png" alt="Admin" /><br/>
+      <strong>Admin</strong> — manage users and grant per-account permissions, configure SSO, and control instance-wide settings
     </td>
   </tr>
 </table>
@@ -77,14 +78,26 @@
 
 | Page | Description |
 |---|---|
-| **Dashboard** | Overview of all tanks with live parameter readings, alerts, and upcoming tasks |
-| **Tank detail** | Per-tank view with livestock, plants, water parameters, maintenance schedule, daily tasks, and alerts |
-| **Species** | Searchable catalogue of fish, invertebrates, amphibians, and plants with care data; add and edit entries via the built-in form |
+| **Dashboard** | Configurable overview of your tanks — 6 top stat cards chosen per user, live parameter readings, upcoming/overdue tasks, tap water tracking, and per-user section visibility |
+| **Tank detail** | Per-tank view with livestock, plants, water parameters, maintenance schedule, daily tasks, gallery, and alerts, on a rectangular or cylinder tank visualisation |
+| **Rooms** | Lay tanks out on a persistent 2D top-down map per room, with drag-and-drop (and touch) positioning |
+| **Species** | Searchable catalogue of fish, invertebrates, amphibians, and plants with care data; add and edit entries via the built-in form, with AI-drafted entries as a starting point |
 | **Compatibility checker** | Build a stocklist and instantly see conflicts, temperament warnings, and water parameter overlaps |
-| **Tank journal** | Per-tank event log — observations, illness, treatments, births, deaths, and more |
-| **Calculators** | Tank volume and chemical dosage calculators |
-| **Spending tracker** | Log and categorise aquarium expenses with per-tank and per-category breakdowns |
-| **Settings** | Date format, unit system, and full data backup / restore |
+| **Tank journal** | Per-tank event log — observations, water changes, treatments, births, deaths, and Quarantine/Disease case tracking with updates and resolution |
+| **AI assistant** | Global chat widget backed by a pluggable provider (Anthropic, OpenAI, or a local Ollama model) that can answer questions about your tanks, water parameters, tasks, and alerts |
+| **Calculators** | Tank volume calculator and API chemical dosage calculator |
+| **Inventory** | Track consumable stock (food, chemicals, and more) with low-stock thresholds |
+| **Spending tracker** | Log aquarium expenses with a per-item quantity, linked to a tank and category, with per-tank and per-category totals |
+| **Notifications** | Web Push alerts for due maintenance tasks |
+| **Settings & Profile** | Per-user date format, unit system, and default tank; instance-wide admin settings; full or selective data backup / restore |
+
+### Accounts, permissions & sharing
+
+TankBook is multi-user. The first account created on a fresh instance automatically becomes an admin.
+
+- **Local accounts or SSO** — sign in with a local email/password, or configure OIDC single sign-on (with an in-app setup guide for the provider-side configuration).
+- **Tiered permissions** — admins grant each user a level (none / use / edit, plus a delete tier for species) across four categories: AI assistant, general settings, user management, and the species catalogue.
+- **Per-tank ownership and sharing** — every tank has an owner. Owners can share an individual tank with another user as a **view-only** or **edit** collaborator from the tank's Edit tab; every add/edit/delete control is hidden from view-only collaborators, enforced on the backend as well as the UI. Deleting a tank and managing who has access to it always stay owner-only.
 
 ---
 
@@ -93,6 +106,9 @@
 - **Backend**: FastAPI + SQLAlchemy + Alembic (Python 3.12)
 - **Database**: PostgreSQL 16
 - **Frontend**: React 18 + TypeScript + Vite
+- **Auth**: Session-based local accounts, plus optional OIDC single sign-on
+- **AI assistant**: Pluggable provider — Anthropic, OpenAI, or a local Ollama model
+- **Notifications**: Web Push
 - **Container**: Single Docker image — frontend is bundled into the backend at build time
 - **Species data**: YAML files — kept as a local copy only, not tracked in git
 
@@ -113,7 +129,7 @@ docker compose up --build -d
 # API docs →  http://localhost:3000/api/docs
 ```
 
-The app applies all database migrations automatically on startup.
+The app applies all database migrations automatically on startup. The first account you register becomes the instance admin, with full permissions; subsequent accounts start with no permissions until an admin grants them.
 
 ### Using dev.sh
 
@@ -169,7 +185,7 @@ TankBook-App/
 │   │   ├── models/                # ORM models
 │   │   ├── schemas/               # Pydantic request/response schemas
 │   │   ├── routers/               # API route handlers
-│   │   └── services/              # Species loader, alert checker
+│   │   └── services/              # Species loader, alert checker, ownership/permissions, AI agent, push notifications
 │   └── alembic/                   # Database migrations
 ├── frontend/
 │   └── src/
@@ -259,5 +275,5 @@ docker compose exec app alembic history
 
 The **Settings** page includes a Data backup section:
 
-- **Export** — downloads a `tankbook-backup-YYYY-MM-DD.json` file containing all tanks, livestock, water parameters, maintenance tasks, journal entries, and app settings.
+- **Export** — downloads a `tankbook-backup-YYYY-MM-DD.json` file, either everything or a chosen selection of categories (tanks, livestock, water parameters, maintenance tasks, journal entries, inventory, spending, and app settings).
 - **Import** — restores from a backup file. Requires two-step confirmation as it **replaces all current data**.
