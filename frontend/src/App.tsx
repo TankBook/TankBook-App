@@ -348,13 +348,16 @@ function Nav() {
   const { pathname } = useLocation()
   const { logout, user } = useAuth()
   const [menuOpen, setMenuOpen] = useState(false)
-  const [isMobile, setIsMobile] = useState(() => window.matchMedia('(max-width: 1280px)').matches)
+  // NAV_LINKS has grown to 9 entries plus Profile/Admin/logout/Quick Add — that no longer
+  // fits on one line until ~1560-1580px (measured with every link visible), so the
+  // collapsed/hamburger nav needs to kick in well above the old 1280px breakpoint.
+  const [isMobile, setIsMobile] = useState(() => window.matchMedia('(max-width: 1650px)').matches)
 
   const navLinks = NAV_LINKS.filter(([to]) => to !== '/assistant' || hasPermission(user?.permissions.ai, 'use'))
   const canAccessAdmin = hasAnyPermission(user?.permissions, 'edit')
 
   useEffect(() => {
-    const mq = window.matchMedia('(max-width: 1280px)')
+    const mq = window.matchMedia('(max-width: 1650px)')
     const handler = (e: MediaQueryListEvent) => { setIsMobile(e.matches); setMenuOpen(false) }
     mq.addEventListener('change', handler)
     return () => mq.removeEventListener('change', handler)
