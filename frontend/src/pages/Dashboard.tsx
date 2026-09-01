@@ -715,21 +715,23 @@ export default function Dashboard() {
                 }}
               />
             ))}
-            <button
-              onClick={() => setShowForm(true)}
-              style={{
-                display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-                gap: 8, minHeight: 160,
-                background: 'transparent', borderRadius: 14, cursor: 'pointer',
-                border: '1.5px dashed var(--border)', color: 'var(--text-3)',
-                transition: 'border-color 0.15s, color 0.15s',
-              }}
-              onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--blue-border)'; e.currentTarget.style.color = 'var(--blue)' }}
-              onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.color = 'var(--text-3)' }}
-            >
-              <Plus size={24} />
-              <span style={{ fontSize: 13, fontWeight: 500 }}>Add Tank</span>
-            </button>
+            {editMode && (
+              <button
+                onClick={() => setShowForm(true)}
+                style={{
+                  display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                  gap: 8, minHeight: 160,
+                  background: 'transparent', borderRadius: 14, cursor: 'pointer',
+                  border: '1.5px dashed var(--border)', color: 'var(--text-3)',
+                  transition: 'border-color 0.15s, color 0.15s',
+                }}
+                onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--blue-border)'; e.currentTarget.style.color = 'var(--blue)' }}
+                onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.color = 'var(--text-3)' }}
+              >
+                <Plus size={24} />
+                <span style={{ fontSize: 13, fontWeight: 500 }}>Add Tank</span>
+              </button>
+            )}
           </div>
         </div>
       </DashboardSection>
