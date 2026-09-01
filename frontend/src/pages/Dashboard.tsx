@@ -176,13 +176,14 @@ type DragProps = {
   isLast: boolean
 }
 
-function TankOverviewCard({ tank, drag, isMobile }: { tank: DashboardStats['tanks'][0]; drag: DragProps; isMobile: boolean }) {
+function TankOverviewCard({ tank, drag, isMobile, editMode }: { tank: DashboardStats['tanks'][0]; drag: DragProps; isMobile: boolean; editMode: boolean }) {
   const navigate = useNavigate()
   const hasAlerts = tank.unack_alerts > 0 || tank.overdue_tasks > 0
+  const draggableNow = editMode && !isMobile
 
   return (
     <div
-      draggable={!isMobile}
+      draggable={draggableNow}
       onClick={() => navigate(`/tanks/${tank.id}`)}
       onDragStart={drag.onDragStart}
       onDragOver={drag.onDragOver}
@@ -191,7 +192,7 @@ function TankOverviewCard({ tank, drag, isMobile }: { tank: DashboardStats['tank
       style={{
         background: 'var(--surface)',
         border: `0.5px solid ${drag.isDragOver ? 'var(--blue-border)' : 'var(--border)'}`,
-        borderRadius: 14, padding: '1rem 1.1rem', cursor: drag.isDragging ? 'grabbing' : 'grab',
+        borderRadius: 14, padding: '1rem 1.1rem', cursor: draggableNow ? (drag.isDragging ? 'grabbing' : 'grab') : 'pointer',
         display: 'flex', flexDirection: 'column', gap: 12,
         transition: 'border-color 0.15s, opacity 0.15s',
         opacity: drag.isDragging ? 0.4 : 1,
@@ -229,7 +230,7 @@ function TankOverviewCard({ tank, drag, isMobile }: { tank: DashboardStats['tank
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
           <WaterTypeBadge type={tank.water_type} />
-          {isMobile ? (
+          {editMode && (isMobile ? (
             <div style={{ display: 'flex', flexDirection: 'column', flexShrink: 0 }}>
               <button
                 type="button"
@@ -252,7 +253,7 @@ function TankOverviewCard({ tank, drag, isMobile }: { tank: DashboardStats['tank
             </div>
           ) : (
             <GripVertical size={14} style={{ color: 'var(--text-4)', flexShrink: 0 }} />
-          )}
+          ))}
         </div>
       </div>
 
@@ -688,6 +689,7 @@ export default function Dashboard() {
                 key={t.id}
                 tank={t}
                 isMobile={isMobile}
+                editMode={editMode}
                 drag={{
                   isDragging: dragId === t.id,
                   isDragOver: dragOverId === t.id,
