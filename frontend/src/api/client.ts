@@ -31,6 +31,7 @@ export interface Expense {
   tank_id: string | null
   inventory_item_id: string | null
   amount: number
+  quantity: number
   category: string
   description: string | null
   purchase_date: string
@@ -561,9 +562,9 @@ export const api = {
   },
   spending: {
     list: (tankId?: string) => get<Expense[]>(`/expenses${tankId ? `?tank_id=${tankId}` : ''}`),
-    add: (body: Pick<Expense, 'tank_id' | 'amount' | 'category' | 'description' | 'purchase_date' | 'notes'>) =>
+    add: (body: Pick<Expense, 'tank_id' | 'amount' | 'quantity' | 'category' | 'description' | 'purchase_date' | 'notes'>) =>
       post<Expense>('/expenses', body),
-    update: (id: string, body: Partial<Pick<Expense, 'tank_id' | 'amount' | 'category' | 'description' | 'purchase_date' | 'notes'>>) =>
+    update: (id: string, body: Partial<Pick<Expense, 'tank_id' | 'amount' | 'quantity' | 'category' | 'description' | 'purchase_date' | 'notes'>>) =>
       patch<Expense>(`/expenses/${id}`, body),
     remove: (id: string) => del(`/expenses/${id}`),
   },

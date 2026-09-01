@@ -145,7 +145,7 @@ def export_backup(body: ExportSelection = ExportSelection(), db: Session = Depen
     if body.expenses:
         result["expenses"] = [
             {"id": e.id, "tank_id": e.tank_id, "inventory_item_id": e.inventory_item_id,
-             "amount": e.amount, "category": e.category,
+             "amount": e.amount, "quantity": e.quantity, "category": e.category,
              "description": e.description, "purchase_date": e.purchase_date,
              "notes": e.notes, "created_at": _dt(e.created_at)}
             for e in db.query(Expense).all()
@@ -356,7 +356,7 @@ def import_backup(payload: dict, db: Session = Depends(get_db), user: User = req
         for e in payload.get("expenses", []):
             db.add(Expense(
                 id=e["id"], tank_id=e.get("tank_id"), inventory_item_id=e.get("inventory_item_id"),
-                amount=e["amount"], category=e["category"], description=e.get("description"),
+                amount=e["amount"], quantity=e.get("quantity", 1), category=e["category"], description=e.get("description"),
                 purchase_date=e["purchase_date"], notes=e.get("notes"),
                 created_at=_parse_dt(e.get("created_at")) or datetime.utcnow(),
             ))

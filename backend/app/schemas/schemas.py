@@ -454,6 +454,7 @@ class ExpenseCreate(BaseModel):
     tank_id: str | None = None
     inventory_item_id: str | None = None
     amount: float
+    quantity: int = 1
     category: str
     description: str | None = None
     purchase_date: str
@@ -464,6 +465,7 @@ class ExpenseUpdate(BaseModel):
     tank_id: str | None = None
     inventory_item_id: str | None = None
     amount: float | None = None
+    quantity: int | None = None
     category: str | None = None
     description: str | None = None
     purchase_date: str | None = None

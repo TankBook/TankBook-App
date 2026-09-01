@@ -125,7 +125,7 @@ function QuickAdd() {
     if (!expAmount || isNaN(Number(expAmount))) return
     setSaving(true)
     try {
-      await api.spending.add({ tank_id: expTank || null, amount: Number(expAmount), category: expCat, description: expDesc || null, purchase_date: expDate, notes: null })
+      await api.spending.add({ tank_id: expTank || null, amount: Number(expAmount), quantity: 1, category: expCat, description: expDesc || null, purchase_date: expDate, notes: null })
       close()
     } finally { setSaving(false) }
   }

@@ -283,7 +283,8 @@ class Expense(Base):
     id: Mapped[str] = mapped_column(String, primary_key=True, default=new_uuid)
     tank_id: Mapped[str | None] = mapped_column(String, ForeignKey("tanks.id", ondelete="SET NULL"), nullable=True)
     inventory_item_id: Mapped[str | None] = mapped_column(String, ForeignKey("inventory_items.id", ondelete="SET NULL"), nullable=True)
-    amount: Mapped[float] = mapped_column(Float, nullable=False)
+    amount: Mapped[float] = mapped_column(Float, nullable=False)  # per-unit price; total cost is amount * quantity
+    quantity: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
     category: Mapped[str] = mapped_column(String, nullable=False)
     description: Mapped[str | None] = mapped_column(String)
     purchase_date: Mapped[str] = mapped_column(String, nullable=False)
