@@ -336,6 +336,18 @@ const TEST_STRIP_MASTER: Record<string, StripEntry[]> = {
 // API 5-in-1 Test Strips — dip strips. GH/KH shown in ppm (tube label) but stored as dGH/dKH.
 const PPM_TO_DEG = 17.848
 const TEST_STRIP_5IN1: Record<string, StripEntry[]> = {
+  // The 5-in-1 strip itself doesn't test ammonia — API sells a separate Ammonia
+  // Test Strips dip-strip product for that, using the same colour scale as the
+  // liquid Master Kit's ammonia test.
+  'Ammonia': [
+    { value: 0,    color: '#f0e040' },
+    { value: 0.25, color: '#c8d43c' },
+    { value: 0.50, color: '#9cc438' },
+    { value: 1.0,  color: '#70b034' },
+    { value: 2.0,  color: '#4a9430' },
+    { value: 4.0,  color: '#2a7428' },
+    { value: 8.0,  color: '#105420' },
+  ],
   'pH': [
     { value: 6.0, color: '#f0d040' },
     { value: 6.5, color: '#d4c028' },
@@ -3279,6 +3291,7 @@ ${taskRows ? `<h2>Pending Maintenance</h2>
         const kitData = stripKit === '5in1' ? TEST_STRIP_5IN1 : TEST_STRIP_MASTER
         const entries = kitData[stripModal.label]
         const isGHKH5in1 = stripKit === '5in1' && (stripModal.label === 'GH (dGH)' || stripModal.label === 'KH (dKH)' || stripModal.label === 'KH / Alk')
+        const isAmmonia5in1 = stripKit === '5in1' && stripModal.label === 'Ammonia'
         return (
           <div
             style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 300, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}
@@ -3319,6 +3332,11 @@ ${taskRows ? `<h2>Pending Maintenance</h2>
                   {isGHKH5in1 && (
                     <p style={{ fontSize: 11, color: 'var(--text-3)', margin: '0 0 12px' }}>
                       Values shown in ppm (as printed on tube) — converted to dGH/dKH when saved.
+                    </p>
+                  )}
+                  {isAmmonia5in1 && (
+                    <p style={{ fontSize: 11, color: 'var(--text-3)', margin: '0 0 12px' }}>
+                      The 5-in-1 strip doesn't test ammonia — this is API's separate Ammonia Test Strips chart.
                     </p>
                   )}
                   <div style={{ display: 'grid', gridTemplateColumns: `repeat(${entries.length}, 1fr)`, gap: 6 }}>
