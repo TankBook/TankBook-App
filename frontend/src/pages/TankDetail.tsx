@@ -6,7 +6,7 @@ import {
   ResponsiveContainer,
 } from 'recharts'
 import { useTank, useFish, usePlants, useParameters, useAlerts } from '../hooks'
-import { api, canEditTank, isTankOwner, type Tank, type TankShare } from '../api/client'
+import { api, canEditTank, isTankOwner, type Tank, type TankShare, type Group } from '../api/client'
 import { useSettings, formatDate, formatDateTime, fromMM, toMM, fmtDim, dimInputProps } from '../context/SettingsContext'
 import { Card, FieldLabel, Tag, SectionTitle, tabStyle } from '../components/ui'
 import { type Species, SpeciesDetailModal } from '../components/SpeciesDetail'
@@ -480,6 +480,9 @@ function EditTankPanel({ tank, onSave }: { tank: Tank; onSave: () => void }) {
   const [co2Method, setCo2Method] = useState(tank.co2_method ?? '')
   const [hasHeater, setHasHeater] = useState(tank.has_heater)
   const [heaterWatts, setHeaterWatts] = useState(tank.heater_watts != null ? String(tank.heater_watts) : '')
+  const [groupId, setGroupId] = useState(tank.group_id ?? '')
+  const [groups, setGroups] = useState<Group[]>([])
+  useEffect(() => { api.groups.list().then(setGroups) }, [])
   const [saved, setSaved] = useState(false)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [deleting, setDeleting] = useState(false)
@@ -549,6 +552,7 @@ function EditTankPanel({ tank, onSave }: { tank: Tank; onSave: () => void }) {
       light_watts: hasLighting && lightWatts ? Number(lightWatts) : null,
       light_technology: hasLighting && lightTechnology ? lightTechnology : null,
       setup_date: tank.setup_date,
+      group_id: groupId || null,
     })
     onSave()
     setSaved(true)
@@ -595,6 +599,15 @@ function EditTankPanel({ tank, onSave }: { tank: Tank; onSave: () => void }) {
           <option value="brackish">Brackish</option>
         </select>
       </div>
+      {groups.length > 0 && (
+        <div style={{ marginBottom: 12 }}>
+          <FieldLabel>Group</FieldLabel>
+          <select value={groupId} onChange={e => setGroupId(e.target.value)} style={{ width: '100%', boxSizing: 'border-box' }}>
+            <option value="">Personal</option>
+            {groups.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
+          </select>
+        </div>
+      )}
       <div style={{ marginBottom: 12 }}>
         <FieldLabel>Substrate</FieldLabel>
         <input value={substrate} onChange={e => setSubstrate(e.target.value)} style={{ width: '100%', boxSizing: 'border-box' }} />
