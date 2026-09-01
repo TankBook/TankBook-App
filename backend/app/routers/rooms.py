@@ -22,25 +22,32 @@ def _require_room(room_id: str, user: User = Depends(get_current_user), db: Sess
     return room
 
 
+def _accessible_tank_ids(db: Session, user: User) -> set[str]:
+    owned = {t.id for t in db.query(Tank.id).filter_by(owner_id=user.id).all()}
+    shared = {r.tank_id for r in db.query(TankShare.tank_id).filter_by(user_id=user.id).all()}
+    group_ids = user_group_ids(db, user.id)
+    grouped = {t.id for t in db.query(Tank.id).filter(Tank.group_id.in_(group_ids)).all()} if group_ids else set()
+    return owned | shared | grouped
+
+
+def _to_out(room: Room, accessible_tank_ids: set[str]) -> RoomOut:
+    # Same room can hold tanks placed by different owners/groups — never show a position
+    # for a tank the caller themselves can't access, even though they can see the room.
+    return RoomOut(
+        id=room.id, name=room.name, width_m=room.width_m, length_m=room.length_m,
+        owner_id=room.owner_id, group_id=room.group_id,
+        tank_positions=[p for p in room.tank_positions if p.tank_id in accessible_tank_ids],
+    )
+
+
 @router.get("/", response_model=list[RoomOut])
 def list_rooms(db: Session = Depends(get_db), user: User = Depends(get_current_user)):
     group_ids = user_group_ids(db, user.id)
-    owned_tank_ids = {t.id for t in db.query(Tank.id).filter_by(owner_id=user.id).all()}
-    shared_tank_ids = {r.tank_id for r in db.query(TankShare.tank_id).filter_by(user_id=user.id).all()}
-    grouped_tank_ids = {t.id for t in db.query(Tank.id).filter(Tank.group_id.in_(group_ids)).all()} if group_ids else set()
-    accessible_tank_ids = owned_tank_ids | shared_tank_ids | grouped_tank_ids
-
+    accessible_tank_ids = _accessible_tank_ids(db, user)
     rooms = db.query(Room).filter(
         (Room.owner_id == user.id) | (Room.group_id.in_(group_ids) if group_ids else False)
     ).order_by(Room.created_at).all()
-    return [
-        RoomOut(
-            id=room.id, name=room.name, width_m=room.width_m, length_m=room.length_m,
-            owner_id=room.owner_id, group_id=room.group_id,
-            tank_positions=[p for p in room.tank_positions if p.tank_id in accessible_tank_ids],
-        )
-        for room in rooms
-    ]
+    return [_to_out(room, accessible_tank_ids) for room in rooms]
 
 
 @router.post("/", status_code=201, response_model=RoomOut)
@@ -49,7 +56,7 @@ def create_room(body: RoomCreate, db: Session = Depends(get_db), user: User = De
     row = Room(**body.model_dump(), owner_id=user.id)
     db.add(row)
     db.commit(); db.refresh(row)
-    return row
+    return _to_out(row, _accessible_tank_ids(db, user))
 
 
 @router.patch("/{room_id}", response_model=RoomOut)
@@ -60,7 +67,7 @@ def update_room(body: RoomUpdate, db: Session = Depends(get_db), user: User = De
     for field, value in data.items():
         setattr(row, field, value)
     db.commit(); db.refresh(row)
-    return row
+    return _to_out(row, _accessible_tank_ids(db, user))
 
 
 @router.delete("/{room_id}", status_code=204)
