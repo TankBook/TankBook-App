@@ -96,8 +96,9 @@
 TankBook is multi-user. The first account created on a fresh instance automatically becomes an admin.
 
 - **Local accounts or SSO** — sign in with a local email/password, or configure OIDC single sign-on (with an in-app setup guide for the provider-side configuration).
-- **Tiered permissions** — admins grant each user a level (none / use / edit, plus a delete tier for species) across four categories: AI assistant, general settings, user management, and the species catalogue.
+- **Tiered permissions** — admins grant each user a level (none / use / edit, plus a delete tier for species) across five categories: AI assistant, general settings, user management, the species catalogue, and tank creation.
 - **Per-tank ownership and sharing** — every tank has an owner. Owners can share an individual tank with another user as a **view-only** or **edit** collaborator from the tank's Edit tab; every add/edit/delete control is hidden from view-only collaborators, enforced on the backend as well as the UI. Deleting a tank and managing who has access to it always stay owner-only.
+- **Household groups** — beyond one-to-one sharing, a group gives every member access to anything assigned to it (tanks, expenses, inventory, rooms, tap water tests) without sharing each item individually. Manage groups from the Profile page.
 
 ---
 
