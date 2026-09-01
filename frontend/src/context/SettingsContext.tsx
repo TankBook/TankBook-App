@@ -19,8 +19,6 @@ interface SettingsContextValue {
   setAppUrl: (url: string | null) => Promise<void>
   feedingAmountPresets: string[]
   setFeedingAmountPresets: (presets: string[]) => Promise<void>
-  allowTankCreation: boolean
-  setAllowTankCreation: (allow: boolean) => Promise<void>
   dashboardLayout: DashboardSectionLayout[]
   setDashboardLayout: (layout: DashboardSectionLayout[]) => Promise<void>
   dashboardStats: string[]
@@ -43,8 +41,6 @@ const SettingsContext = createContext<SettingsContextValue>({
   setAppUrl: async () => {},
   feedingAmountPresets: [],
   setFeedingAmountPresets: async () => {},
-  allowTankCreation: true,
-  setAllowTankCreation: async () => {},
   dashboardLayout: [],
   setDashboardLayout: async () => {},
   dashboardStats: [],
@@ -66,7 +62,6 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
   const [alertRetentionDays, setAlertRetentionDaysState] = useState<number | null>(null)
   const [appUrl, setAppUrlState] = useState<string | null>(null)
   const [feedingAmountPresets, setFeedingAmountPresetsState] = useState<string[]>([])
-  const [allowTankCreation, setAllowTankCreationState] = useState(true)
   const [theme, setTheme] = useState<Theme>(
     () => (localStorage.getItem('theme') as Theme) ?? 'light'
   )
@@ -79,7 +74,6 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
         setAlertRetentionDaysState(d.alert_retention_days ?? null)
         setAppUrlState(d.app_url ?? null)
         setFeedingAmountPresetsState(d.feeding_amount_presets ?? [])
-        setAllowTankCreationState(d.allow_tank_creation ?? true)
       })
       .catch(() => {})
       .finally(() => setLoading(false))
@@ -137,21 +131,12 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     })
   }
 
-  async function setAllowTankCreation(allow: boolean) {
-    setAllowTankCreationState(allow)
-    await fetch('/api/settings/', {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ allow_tank_creation: allow }),
-    })
-  }
-
   function toggleTheme() {
     setTheme(t => (t === 'light' ? 'dark' : 'light'))
   }
 
   return (
-    <SettingsContext.Provider value={{ dateFormat, setDateFormat, unitSystem, setUnitSystem, defaultTank, setDefaultTank, alertRetentionDays, setAlertRetentionDays, appUrl, setAppUrl, feedingAmountPresets, setFeedingAmountPresets, allowTankCreation, setAllowTankCreation, dashboardLayout, setDashboardLayout, dashboardStats, setDashboardStats, theme, toggleTheme, loading }}>
+    <SettingsContext.Provider value={{ dateFormat, setDateFormat, unitSystem, setUnitSystem, defaultTank, setDefaultTank, alertRetentionDays, setAlertRetentionDays, appUrl, setAppUrl, feedingAmountPresets, setFeedingAmountPresets, dashboardLayout, setDashboardLayout, dashboardStats, setDashboardStats, theme, toggleTheme, loading }}>
       {children}
     </SettingsContext.Provider>
   )

@@ -244,7 +244,6 @@ class AppSettings(Base):
     id: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: "default")
     alert_retention_days: Mapped[int | None] = mapped_column(Integer, nullable=True)
     app_url: Mapped[str | None] = mapped_column(String, nullable=True)
-    allow_tank_creation: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     feeding_amount_presets_json: Mapped[str | None] = mapped_column(Text, nullable=True)
     vapid_public_key: Mapped[str | None] = mapped_column(String, nullable=True)
     vapid_private_key: Mapped[str | None] = mapped_column(Text, nullable=True)

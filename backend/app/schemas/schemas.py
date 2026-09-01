@@ -307,14 +307,12 @@ class AppSettingsUpdate(BaseModel):
     alert_retention_days: int | None = None
     app_url: str | None = None
     feeding_amount_presets: list[str] | None = None
-    allow_tank_creation: bool | None = None
 
 
 class AppSettingsOut(BaseModel):
     alert_retention_days: int | None = None
     app_url: str | None = None
     feeding_amount_presets: list[str] = []
-    allow_tank_creation: bool = True
     updated_at: datetime
     model_config = {"from_attributes": True}
 
@@ -616,6 +614,7 @@ class PermissionsOut(BaseModel):
     general: Literal["none", "use", "edit"]
     users: Literal["none", "use", "edit"]
     species: Literal["none", "use", "edit", "delete"]
+    tanks: Literal["none", "use", "edit"]
 
 
 class PermissionsUpdate(BaseModel):
@@ -623,3 +622,4 @@ class PermissionsUpdate(BaseModel):
     general: Literal["none", "use", "edit"] | None = None
     users: Literal["none", "use", "edit"] | None = None
     species: Literal["none", "use", "edit", "delete"] | None = None
+    tanks: Literal["none", "use", "edit"] | None = None

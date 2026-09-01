@@ -9,8 +9,11 @@ from app.services.auth import get_current_user
 # (users:edit) explicitly grants it. The one exception is the very first account on an
 # instance, which is granted edit on everything at registration time (see auth.py's
 # register()) so there's always someone able to administer a fresh install.
-PERMISSION_KEYS = ["ai", "general", "users", "species"]
-DEFAULT_LEVELS = {"ai": "none", "general": "none", "users": "none", "species": "none"}
+# "tanks" is the other exception: tank creation was always open to every account before
+# this permission existed, so it defaults to allowed (edit) rather than denied, and an
+# admin can revoke it per account instead of it being opt-in.
+PERMISSION_KEYS = ["ai", "general", "users", "species", "tanks"]
+DEFAULT_LEVELS = {"ai": "none", "general": "none", "users": "none", "species": "none", "tanks": "edit"}
 # "delete" only has meaning for species today (edit lets you create/correct entries
 # without also being trusted to remove them) — the other keys just never use it.
 LEVEL_RANK = {"none": 0, "use": 1, "edit": 2, "delete": 3}

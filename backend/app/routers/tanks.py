@@ -7,9 +7,11 @@ from app.models.models import Tank, TankShare, User
 from app.schemas.schemas import TankCreate, TankOut, TankShareCreate, TankShareOut
 from app.services.auth import get_current_user
 from app.services.ownership import require_owned_tank, require_tank_view, require_tank_edit
-from app.routers.settings import get_or_create_settings
+from app.services.permissions import require_permission
 
 router = APIRouter()
+
+require_tanks_create = Depends(require_permission("tanks", "edit"))
 
 
 def _attach_access(tank: Tank, viewer_id: str, db: Session) -> Tank:
@@ -42,9 +44,7 @@ def reorder_tanks(order: list[dict], db: Session = Depends(get_db), user: User =
 
 
 @router.post("/", response_model=TankOut, status_code=201)
-def create_tank(body: TankCreate, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
-    if not get_or_create_settings(db).allow_tank_creation:
-        raise HTTPException(403, "Tank creation is currently disabled on this instance")
+def create_tank(body: TankCreate, db: Session = Depends(get_db), user: User = Depends(get_current_user), _perm: User = require_tanks_create):
     count = db.query(func.count(Tank.id)).filter_by(owner_id=user.id).scalar() or 0
     tank = Tank(**body.model_dump(), sort_order=count, owner_id=user.id)
     db.add(tank)

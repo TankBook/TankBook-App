@@ -2,8 +2,9 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Layers, Fish, Leaf, Bug, Waves, Bell, Clock, CalendarClock, Plus, AlertTriangle, Timer, Thermometer, FlaskConical, GripVertical, Filter, Droplets, X, ChevronUp, ChevronDown, Eye, EyeOff, Pencil, type LucideIcon } from 'lucide-react'
 import { useTanks } from '../hooks'
-import { api, type TapWaterTest, type DashboardSectionLayout } from '../api/client'
+import { api, hasPermission, type TapWaterTest, type DashboardSectionLayout } from '../api/client'
 import { useSettings, formatDate, toMM, dimInputProps } from '../context/SettingsContext'
+import { useAuth } from '../context/AuthContext'
 import { Card, FieldLabel, StatCard, Tag } from '../components/ui'
 
 interface DashboardStats {
@@ -350,7 +351,9 @@ function todayIso() {
 
 export default function Dashboard() {
   const { loading, reload } = useTanks()
-  const { dateFormat, unitSystem, dashboardLayout, setDashboardLayout, dashboardStats, setDashboardStats, allowTankCreation } = useSettings()
+  const { dateFormat, unitSystem, dashboardLayout, setDashboardLayout, dashboardStats, setDashboardStats } = useSettings()
+  const { user } = useAuth()
+  const canCreateTanks = hasPermission(user?.permissions.tanks, 'edit')
   const dimProps = dimInputProps(unitSystem)
   const [stats, setStats] = useState<DashboardStats | null>(null)
   const [showForm, setShowForm] = useState(false)
@@ -723,7 +726,7 @@ export default function Dashboard() {
                 }}
               />
             ))}
-            {editMode && allowTankCreation && (
+            {editMode && canCreateTanks && (
               <button
                 onClick={() => setShowForm(true)}
                 style={{
