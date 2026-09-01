@@ -1319,7 +1319,7 @@ export default function TankDetail() {
   const [stripModal, setStripModal] = useState<{ label: string; setter: (v: string) => void } | null>(null)
   const [stripKit, setStripKit] = useState<'master' | '5in1'>('master')
   const [hiddenOptimumLines, setHiddenOptimumLines] = useState<Record<string, boolean>>({})
-  const [mobileChartEndOffset, setMobileChartEndOffset] = useState(0)
+  const [chartEndOffset, setChartEndOffset] = useState(0)
   const [speciesList, setSpeciesList] = useState<Species[]>([])
   const [speciesInfoTarget, setSpeciesInfoTarget] = useState<Species | null>(null)
 
@@ -1686,11 +1686,12 @@ ${taskRows ? `<h2>Pending Maintenance</h2>
 
   const unackAlerts = alerts.data?.filter(a => !a.acknowledged) ?? []
   const allChartData = [...(params.data ?? [])].reverse()
-  const mobileChartMaxOffset = Math.max(0, allChartData.length - 3)
-  const mobileChartOffset = Math.min(mobileChartEndOffset, mobileChartMaxOffset)
-  const mobileChartEnd = allChartData.length - mobileChartOffset
-  const mobileChartStart = Math.max(0, mobileChartEnd - 3)
-  const chartData = isMobile ? allChartData.slice(mobileChartStart, mobileChartEnd) : allChartData
+  const chartPageSize = isMobile ? 3 : 6
+  const chartMaxOffset = Math.max(0, allChartData.length - chartPageSize)
+  const chartOffset = Math.min(chartEndOffset, chartMaxOffset)
+  const chartEnd = allChartData.length - chartOffset
+  const chartStart = Math.max(0, chartEnd - chartPageSize)
+  const chartData = allChartData.slice(chartStart, chartEnd)
   const hasParamInput = [ph, temp, ammonia, nitrite, nitrate, gh, kh, salinity, sg].some(v => v.trim() !== '')
 
   const pendingTasks = tasks.filter(t => t.status === 'pending')
@@ -2293,22 +2294,22 @@ ${taskRows ? `<h2>Pending Maintenance</h2>
 
           {allChartData.length > 0 && (
             <>
-              {isMobile && allChartData.length > 3 && (
+              {allChartData.length > chartPageSize && (
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, padding: '2px 2px' }}>
                   <button
-                    onClick={() => setMobileChartEndOffset(o => Math.min(mobileChartMaxOffset, o + 3))}
-                    disabled={mobileChartOffset >= mobileChartMaxOffset}
-                    style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, padding: '6px 10px', borderRadius: 8, border: '0.5px solid var(--btn-border)', background: 'var(--surface)', color: mobileChartOffset >= mobileChartMaxOffset ? 'var(--text-4)' : 'var(--text-2)', cursor: mobileChartOffset >= mobileChartMaxOffset ? 'default' : 'pointer' }}
+                    onClick={() => setChartEndOffset(o => Math.min(chartMaxOffset, o + chartPageSize))}
+                    disabled={chartOffset >= chartMaxOffset}
+                    style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, padding: '6px 10px', borderRadius: 8, border: '0.5px solid var(--btn-border)', background: 'var(--surface)', color: chartOffset >= chartMaxOffset ? 'var(--text-4)' : 'var(--text-2)', cursor: chartOffset >= chartMaxOffset ? 'default' : 'pointer' }}
                   >
                     <Prev size={13} />Older
                   </button>
                   <span style={{ fontSize: 11, color: 'var(--text-3)' }}>
-                    {formatDate(allChartData[mobileChartStart].recorded_at, dateFormat)} – {formatDate(allChartData[mobileChartEnd - 1].recorded_at, dateFormat)}
+                    {formatDate(allChartData[chartStart].recorded_at, dateFormat)} – {formatDate(allChartData[chartEnd - 1].recorded_at, dateFormat)}
                   </span>
                   <button
-                    onClick={() => setMobileChartEndOffset(o => Math.max(0, o - 3))}
-                    disabled={mobileChartOffset <= 0}
-                    style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, padding: '6px 10px', borderRadius: 8, border: '0.5px solid var(--btn-border)', background: 'var(--surface)', color: mobileChartOffset <= 0 ? 'var(--text-4)' : 'var(--text-2)', cursor: mobileChartOffset <= 0 ? 'default' : 'pointer' }}
+                    onClick={() => setChartEndOffset(o => Math.max(0, o - chartPageSize))}
+                    disabled={chartOffset <= 0}
+                    style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, padding: '6px 10px', borderRadius: 8, border: '0.5px solid var(--btn-border)', background: 'var(--surface)', color: chartOffset <= 0 ? 'var(--text-4)' : 'var(--text-2)', cursor: chartOffset <= 0 ? 'default' : 'pointer' }}
                   >
                     Newer<Next size={13} />
                   </button>
