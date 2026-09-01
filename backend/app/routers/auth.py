@@ -50,6 +50,24 @@ def _record_login_failure(email: str) -> None:
     _failed_logins[email].append(datetime.utcnow())
 
 
+# Same shape as the login limiter, but keyed by user id — an attacker who has stolen a
+# live session cookie doesn't know the account's password either, and without this,
+# /change-password's current-password check would let them brute-force it unlimited times.
+_failed_password_checks: dict[str, list[datetime]] = defaultdict(list)
+
+
+def _check_password_rate_limit(user_id: str) -> None:
+    now = datetime.utcnow()
+    attempts = [t for t in _failed_password_checks[user_id] if now - t < LOGIN_LOCKOUT_WINDOW]
+    _failed_password_checks[user_id] = attempts
+    if len(attempts) >= LOGIN_MAX_ATTEMPTS:
+        raise HTTPException(429, "Too many incorrect attempts. Try again in a few minutes.")
+
+
+def _record_password_check_failure(user_id: str) -> None:
+    _failed_password_checks[user_id].append(datetime.utcnow())
+
+
 def _to_out(db: DBSession, user: User) -> UserOut:
     return UserOut(
         id=user.id, email=user.email, display_name=user.display_name, has_password=bool(user.password_hash),
@@ -244,11 +262,14 @@ def update_user_permissions(user_id: str, body: PermissionsUpdate, db: DBSession
 
 @router.post("/change-password", response_model=UserOut)
 def change_password(body: ChangePasswordRequest, user: User = Depends(get_current_user), db: DBSession = Depends(get_db)):
+    _check_password_rate_limit(user.id)
     if user.password_hash and not verify_password(body.current_password or "", user.password_hash):
+        _record_password_check_failure(user.id)
         raise HTTPException(401, "Current password is incorrect")
     if len(body.new_password) < MIN_PASSWORD_LENGTH:
         raise HTTPException(422, f"Password must be at least {MIN_PASSWORD_LENGTH} characters")
     user.password_hash = hash_password(body.new_password)
+    _failed_password_checks.pop(user.id, None)
     db.commit()
     return _to_out(db, user)
 

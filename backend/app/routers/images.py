@@ -8,7 +8,7 @@ from fastapi.responses import FileResponse
 from app.models.models import Tank
 from app.services.permissions import require_permission
 from app.services.ownership import require_tank_view, require_tank_edit
-from app.services.url_safety import assert_public_url, UnsafeUrlError
+from app.services.url_safety import fetch_guard, UnsafeUrlError
 
 router = APIRouter()
 require_species_edit = Depends(require_permission("species", "edit"))
@@ -80,11 +80,6 @@ def fetch_species_image(slug: str, latin_name: str = Query(...), _perm=require_s
     image_url = photo.get("large_url") or photo.get("medium_url") or photo.get("url")
     if not image_url:
         raise HTTPException(404, "No image URL in iNaturalist response")
-    try:
-        assert_public_url(image_url)
-    except UnsafeUrlError as e:
-        raise HTTPException(502, f"Refusing to fetch image URL: {e}")
-
     # Guess extension from URL path (before any query string)
     url_path = image_url.split("?")[0].lower()
     ext = ".jpg"
@@ -94,9 +89,14 @@ def fetch_species_image(slug: str, latin_name: str = Query(...), _perm=require_s
             break
 
     try:
-        req2 = urllib.request.Request(image_url, headers={"User-Agent": "TankBook/1.0"})
-        with urllib.request.urlopen(req2, timeout=15) as resp2:
-            image_data = resp2.read()
+        # Pin DNS for the duration of the fetch so the address checked is the address
+        # connected to (closes a DNS-rebinding bypass of the public-URL check).
+        with fetch_guard(image_url):
+            req2 = urllib.request.Request(image_url, headers={"User-Agent": "TankBook/1.0"})
+            with urllib.request.urlopen(req2, timeout=15) as resp2:
+                image_data = resp2.read()
+    except UnsafeUrlError as e:
+        raise HTTPException(502, f"Refusing to fetch image URL: {e}")
     except Exception as e:
         raise HTTPException(502, f"Failed to download image: {e}")
 

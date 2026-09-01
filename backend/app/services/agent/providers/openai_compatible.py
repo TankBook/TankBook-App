@@ -1,9 +1,11 @@
+import contextlib
 import json
 import httpx
+from urllib.parse import urlparse
 
 from app.services.agent.errors import AgentNotConfigured, AgentProviderError
 from app.services.agent.providers.base import AgentResponse, ToolCall
-from app.services.url_safety import assert_not_metadata_endpoint, UnsafeUrlError
+from app.services.url_safety import assert_not_metadata_endpoint, pinned_dns, UnsafeUrlError
 
 
 class OpenAICompatibleProvider:
@@ -56,7 +58,11 @@ class OpenAICompatibleProvider:
             # (e.g. a self-hosted Ollama instance) — only block cloud metadata endpoints,
             # which are never a legitimate target regardless of who set this.
             assert_not_metadata_endpoint(self.base_url)
-            resp = httpx.post(f"{self.base_url}/chat/completions", json=body, headers=headers, timeout=60)
+            # Pin DNS for the configured host so a rebind between this check and the
+            # actual request can't slip a request through to a blocked address.
+            hostname = urlparse(self.base_url).hostname
+            with pinned_dns(hostname) if hostname else contextlib.nullcontext():
+                resp = httpx.post(f"{self.base_url}/chat/completions", json=body, headers=headers, timeout=60)
             resp.raise_for_status()
         except UnsafeUrlError as e:
             raise AgentProviderError(f"Refusing to contact this provider: {e}")

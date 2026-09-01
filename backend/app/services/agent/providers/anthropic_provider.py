@@ -1,8 +1,10 @@
+import contextlib
 import httpx
 
 from app.services.agent.errors import AgentNotConfigured, AgentProviderError
 from app.services.agent.providers.base import AgentResponse, ToolCall
-from app.services.url_safety import assert_not_metadata_endpoint, UnsafeUrlError
+from urllib.parse import urlparse
+from app.services.url_safety import assert_not_metadata_endpoint, pinned_dns, UnsafeUrlError
 
 ANTHROPIC_VERSION = "2023-06-01"
 DEFAULT_BASE_URL = "https://api.anthropic.com"
@@ -56,7 +58,11 @@ class AnthropicProvider:
 
         try:
             assert_not_metadata_endpoint(self.base_url)
-            resp = httpx.post(f"{self.base_url}/v1/messages", json=body, headers=headers, timeout=60)
+            # Pin DNS for the configured host so a rebind between this check and the
+            # actual request can't slip a request through to a blocked address.
+            hostname = urlparse(self.base_url).hostname
+            with pinned_dns(hostname) if hostname else contextlib.nullcontext():
+                resp = httpx.post(f"{self.base_url}/v1/messages", json=body, headers=headers, timeout=60)
             resp.raise_for_status()
         except UnsafeUrlError as e:
             raise AgentProviderError(f"Refusing to contact this provider: {e}")

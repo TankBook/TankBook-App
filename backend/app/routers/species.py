@@ -3,9 +3,9 @@ import urllib.error
 from fastapi import APIRouter, Depends, Query, UploadFile, File, HTTPException
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
-from app.services.species import species_service
+from app.services.species import species_service, is_safe_slug
 from app.services.permissions import require_permission
-from app.services.url_safety import assert_public_url, UnsafeUrlError
+from app.services.url_safety import fetch_guard, UnsafeUrlError
 import yaml
 
 REQUIRED_FIELDS = ("slug", "type", "common_name", "latin_name")
@@ -33,7 +33,10 @@ def _parse_and_save(contents: bytes) -> dict:
     if species_type not in VALID_TYPES:
         raise HTTPException(status_code=400, detail=f"type must be one of: {', '.join(sorted(VALID_TYPES))}")
 
-    species_service.save_yaml(data["slug"], species_type, contents)
+    try:
+        species_service.save_yaml(data["slug"], species_type, contents)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
     species_service.load()
     return {"ok": True, "slug": data["slug"], "common_name": data["common_name"], "type": species_type}
 
@@ -165,15 +168,15 @@ async def upload_species_from_url(body: UrlImportBody, _perm=require_species_edi
 
     try:
         # Species import should only ever reach the public internet — block anything
-        # that resolves to a private/loopback/link-local address (SSRF hardening).
-        assert_public_url(url)
+        # that resolves to a private/loopback/link-local address (SSRF hardening), and
+        # pin DNS for the duration of the fetch so the address checked is the address
+        # connected to (closes a DNS-rebinding bypass of that check).
+        with fetch_guard(url):
+            req = urllib.request.Request(url, headers={"User-Agent": "TankBook/0.5.0"})
+            with urllib.request.urlopen(req, timeout=10) as response:
+                contents = response.read()
     except UnsafeUrlError as e:
         raise HTTPException(status_code=400, detail=f"Refusing to fetch this URL: {e}")
-
-    try:
-        req = urllib.request.Request(url, headers={"User-Agent": "TankBook/0.5.0"})
-        with urllib.request.urlopen(req, timeout=10) as response:
-            contents = response.read()
     except urllib.error.HTTPError as e:
         raise HTTPException(status_code=400, detail=f"HTTP {e.code} fetching URL: {e.reason}")
     except Exception as e:
@@ -198,7 +201,10 @@ def create_species(body: SpeciesBody, _perm=require_species_edit):
         raise HTTPException(400, "slug, common_name, and latin_name are required")
     data = _build_species_dict(body)
     contents = yaml.dump(data, allow_unicode=True, sort_keys=False, default_flow_style=False).encode()
-    species_service.save_yaml(body.slug, body.type, contents)
+    try:
+        species_service.save_yaml(body.slug, body.type, contents)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
     species_service.load()
     return {"ok": True, "slug": body.slug, "common_name": body.common_name, "type": body.type}
 
@@ -209,6 +215,8 @@ def update_species(slug: str, body: SpeciesBody, _perm=require_species_edit):
         raise HTTPException(404, f"Species not found: {slug}")
     if body.type not in VALID_TYPES:
         raise HTTPException(400, f"type must be one of: {', '.join(sorted(VALID_TYPES))}")
+    if not is_safe_slug(body.slug):
+        raise HTTPException(status_code=400, detail=f"Invalid slug: {body.slug!r} (use lowercase letters, digits, and hyphens only)")
     species_service.delete_yaml_for_slug(slug)
     data = _build_species_dict(body)
     contents = yaml.dump(data, allow_unicode=True, sort_keys=False, default_flow_style=False).encode()
