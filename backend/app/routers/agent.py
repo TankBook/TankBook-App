@@ -65,21 +65,21 @@ def update_settings(body: AgentSettingsUpdate, db: Session = Depends(get_db), _p
 
 
 @router.get("/conversations", response_model=list[ConversationOut])
-def list_conversations(db: Session = Depends(get_db), _perm=require_ai_use):
-    return db.query(Conversation).order_by(Conversation.updated_at.desc()).all()
+def list_conversations(db: Session = Depends(get_db), user=require_ai_use):
+    return db.query(Conversation).filter_by(user_id=user.id).order_by(Conversation.updated_at.desc()).all()
 
 
 @router.get("/conversations/{conversation_id}", response_model=ConversationDetailOut)
-def get_conversation(conversation_id: str, db: Session = Depends(get_db), _perm=require_ai_use):
-    conversation = db.query(Conversation).filter_by(id=conversation_id).first()
+def get_conversation(conversation_id: str, db: Session = Depends(get_db), user=require_ai_use):
+    conversation = db.query(Conversation).filter_by(id=conversation_id, user_id=user.id).first()
     if not conversation:
         raise HTTPException(404, "Conversation not found")
     return conversation
 
 
 @router.delete("/conversations/{conversation_id}", status_code=204)
-def delete_conversation(conversation_id: str, db: Session = Depends(get_db), _perm=require_ai_use):
-    conversation = db.query(Conversation).filter_by(id=conversation_id).first()
+def delete_conversation(conversation_id: str, db: Session = Depends(get_db), user=require_ai_use):
+    conversation = db.query(Conversation).filter_by(id=conversation_id, user_id=user.id).first()
     if not conversation:
         raise HTTPException(404, "Conversation not found")
     db.delete(conversation)
@@ -89,11 +89,11 @@ def delete_conversation(conversation_id: str, db: Session = Depends(get_db), _pe
 @router.post("/chat", response_model=AgentChatResponse)
 def chat(body: AgentChatRequest, db: Session = Depends(get_db), user=require_ai_use):
     if body.conversation_id:
-        conversation = db.query(Conversation).filter_by(id=body.conversation_id).first()
+        conversation = db.query(Conversation).filter_by(id=body.conversation_id, user_id=user.id).first()
         if not conversation:
             raise HTTPException(404, "Conversation not found")
     else:
-        conversation = Conversation(title=_make_title(body.message))
+        conversation = Conversation(title=_make_title(body.message), user_id=user.id)
         db.add(conversation)
         db.flush()
 
