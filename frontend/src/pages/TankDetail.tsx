@@ -3291,7 +3291,6 @@ ${taskRows ? `<h2>Pending Maintenance</h2>
         const kitData = stripKit === '5in1' ? TEST_STRIP_5IN1 : TEST_STRIP_MASTER
         const entries = kitData[stripModal.label]
         const isGHKH5in1 = stripKit === '5in1' && (stripModal.label === 'GH (dGH)' || stripModal.label === 'KH (dKH)' || stripModal.label === 'KH / Alk')
-        const isAmmonia5in1 = stripKit === '5in1' && stripModal.label === 'Ammonia'
         return (
           <div
             style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 300, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}
@@ -3319,7 +3318,7 @@ ${taskRows ? `<h2>Pending Maintenance</h2>
                       color: stripKit === kit ? 'var(--blue)' : 'var(--text-2)',
                     }}
                   >
-                    {kit === 'master' ? 'Master Test Kit' : '5-in-1 Test Strip'}
+                    {kit === 'master' ? 'Master Test Kit' : stripModal.label === 'Ammonia' ? 'API Ammonia Test Strip' : '5-in-1 Test Strip'}
                   </button>
                 ))}
               </div>
@@ -3332,11 +3331,6 @@ ${taskRows ? `<h2>Pending Maintenance</h2>
                   {isGHKH5in1 && (
                     <p style={{ fontSize: 11, color: 'var(--text-3)', margin: '0 0 12px' }}>
                       Values shown in ppm (as printed on tube) — converted to dGH/dKH when saved.
-                    </p>
-                  )}
-                  {isAmmonia5in1 && (
-                    <p style={{ fontSize: 11, color: 'var(--text-3)', margin: '0 0 12px' }}>
-                      The 5-in-1 strip doesn't test ammonia — this is API's separate Ammonia Test Strips chart.
                     </p>
                   )}
                   <div style={{ display: 'grid', gridTemplateColumns: `repeat(${entries.length}, 1fr)`, gap: 6 }}>
