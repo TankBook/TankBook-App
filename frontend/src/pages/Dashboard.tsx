@@ -350,7 +350,7 @@ function todayIso() {
 
 export default function Dashboard() {
   const { loading, reload } = useTanks()
-  const { dateFormat, unitSystem, dashboardLayout, setDashboardLayout, dashboardStats, setDashboardStats } = useSettings()
+  const { dateFormat, unitSystem, dashboardLayout, setDashboardLayout, dashboardStats, setDashboardStats, allowTankCreation } = useSettings()
   const dimProps = dimInputProps(unitSystem)
   const [stats, setStats] = useState<DashboardStats | null>(null)
   const [showForm, setShowForm] = useState(false)
@@ -723,7 +723,7 @@ export default function Dashboard() {
                 }}
               />
             ))}
-            {editMode && (
+            {editMode && allowTankCreation && (
               <button
                 onClick={() => setShowForm(true)}
                 style={{

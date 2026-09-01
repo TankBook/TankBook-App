@@ -41,6 +41,7 @@ function todayIso() {
 }
 
 function QuickAdd() {
+  const { allowTankCreation } = useSettings()
   const [open, setOpen] = useState(false)
   const [mode, setMode] = useState<'pick' | 'tank' | 'param' | 'expense' | 'inventory'>('pick')
   const [tanks, setTanks] = useState<{ id: string; name: string }[]>([])
@@ -164,7 +165,7 @@ function QuickAdd() {
     body = (
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
         {([
-          { Icon: Fish,     label: 'Add Tank',            sub: 'Create a new tank',            m: 'tank'      },
+          ...(allowTankCreation ? [{ Icon: Fish, label: 'Add Tank', sub: 'Create a new tank', m: 'tank' as const }] : []),
           { Icon: Droplets, label: 'Record Parameters',   sub: 'Log water quality for a tank', m: 'param'     },
           { Icon: Receipt,  label: 'New Expense',         sub: 'Track a purchase',             m: 'expense'   },
           { Icon: Package,  label: 'Add Inventory Item',  sub: 'Log stock for food or supplies', m: 'inventory' },

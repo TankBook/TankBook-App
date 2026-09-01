@@ -738,7 +738,7 @@ const OTHER_EXPORT_FIELDS: { key: keyof ExportSelection; label: string }[] = [
 ]
 
 export default function Settings() {
-  const { alertRetentionDays, setAlertRetentionDays, appUrl, setAppUrl, feedingAmountPresets, setFeedingAmountPresets, loading } = useSettings()
+  const { alertRetentionDays, setAlertRetentionDays, appUrl, setAppUrl, feedingAmountPresets, setFeedingAmountPresets, allowTankCreation, setAllowTankCreation, loading } = useSettings()
   const { user: loggedInUser } = useAuth()
   const canEditAi = hasPermission(loggedInUser?.permissions.ai, 'edit')
   const canEditGeneral = hasPermission(loggedInUser?.permissions.general, 'edit')
@@ -752,6 +752,7 @@ export default function Settings() {
   const [draftAlertRetentionDays, setDraftAlertRetentionDays] = useState<number | null>(alertRetentionDays)
   const [draftAppUrl, setDraftAppUrl] = useState(appUrl ?? '')
   const [draftFeedingAmountPresets, setDraftFeedingAmountPresets] = useState<string[]>(feedingAmountPresets)
+  const [draftAllowTankCreation, setDraftAllowTankCreation] = useState(allowTankCreation)
   const [savingSettings, setSavingSettings] = useState(false)
   const [settingsSaved, setSettingsSaved] = useState(false)
   const [newPreset, setNewPreset] = useState('')
@@ -770,6 +771,7 @@ export default function Settings() {
       setDraftAlertRetentionDays(alertRetentionDays)
       setDraftAppUrl(appUrl ?? '')
       setDraftFeedingAmountPresets(feedingAmountPresets)
+      setDraftAllowTankCreation(allowTankCreation)
     }
   }, [loading])
 
@@ -785,6 +787,7 @@ export default function Settings() {
   const settingsChanged = draftAlertRetentionDays !== alertRetentionDays
     || draftAppUrl !== (appUrl ?? '')
     || feedingAmountPresetsChanged
+    || draftAllowTankCreation !== allowTankCreation
 
   async function saveSettings() {
     setSavingSettings(true)
@@ -794,6 +797,7 @@ export default function Settings() {
         draftAlertRetentionDays !== alertRetentionDays && setAlertRetentionDays(draftAlertRetentionDays),
         draftAppUrl !== (appUrl ?? '') && setAppUrl(draftAppUrl || null),
         feedingAmountPresetsChanged && setFeedingAmountPresets(draftFeedingAmountPresets),
+        draftAllowTankCreation !== allowTankCreation && setAllowTankCreation(draftAllowTankCreation),
       ])
       setSettingsSaved(true)
     } finally {
@@ -805,6 +809,7 @@ export default function Settings() {
     setDraftAlertRetentionDays(null)
     setDraftAppUrl('')
     setDraftFeedingAmountPresets(['1 pinch', '1 cube'])
+    setDraftAllowTankCreation(true)
     setSettingsSaved(false)
   }
 
@@ -1010,6 +1015,21 @@ export default function Settings() {
               ))}
             </div>
           )}
+        </section>
+
+        <section style={{ paddingBottom: 20, borderBottom: '0.5px solid var(--border-sub)' }}>
+          <p style={{ fontWeight: 500, fontSize: 14, margin: '0 0 4px', color: 'var(--text)', display: 'flex', alignItems: 'center', gap: 6 }}><Fish size={14} color="var(--text-2)" />Tank Creation</p>
+          <p style={{ fontSize: 12, color: 'var(--text-2)', margin: '0 0 14px' }}>
+            When off, nobody on this instance — including admins — can create new tanks until it's switched back on. Existing tanks are unaffected.
+          </p>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: 'var(--text)', cursor: 'pointer' }}>
+            <input
+              type="checkbox"
+              checked={draftAllowTankCreation}
+              onChange={e => { setDraftAllowTankCreation(e.target.checked); setSettingsSaved(false) }}
+            />
+            Allow tank creation
+          </label>
         </section>
 
         <section style={{ display: 'flex', flexDirection: isMobile ? 'column-reverse' : 'row', alignItems: isMobile ? 'stretch' : 'center', justifyContent: 'space-between', gap: 12 }}>

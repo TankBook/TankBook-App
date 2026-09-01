@@ -307,12 +307,14 @@ class AppSettingsUpdate(BaseModel):
     alert_retention_days: int | None = None
     app_url: str | None = None
     feeding_amount_presets: list[str] | None = None
+    allow_tank_creation: bool | None = None
 
 
 class AppSettingsOut(BaseModel):
     alert_retention_days: int | None = None
     app_url: str | None = None
     feeding_amount_presets: list[str] = []
+    allow_tank_creation: bool = True
     updated_at: datetime
     model_config = {"from_attributes": True}
 
