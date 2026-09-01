@@ -6,6 +6,7 @@ import { api, hasPermission, type TapWaterTest, type DashboardSectionLayout, typ
 import { useSettings, formatDate, toMM, dimInputProps } from '../context/SettingsContext'
 import { useAuth } from '../context/AuthContext'
 import { Card, FieldLabel, StatCard, Tag } from '../components/ui'
+import { getParamStatus } from '../utils/paramStatus'
 
 interface DashboardStats {
   total_tanks: number
@@ -102,12 +103,27 @@ function WaterTypeBadge({ type }: { type: string }) {
 }
 
 const PARAMS = [
-  { key: 'latest_ph',      label: 'pH',   color: 'var(--blue)',              fmt: (v: number) => v.toFixed(1) },
-  { key: 'latest_temp',    label: 'Temp', color: 'var(--orange, #ef6c00)',   fmt: (v: number) => `${v.toFixed(0)}°` },
-  { key: 'latest_ammonia', label: 'NH₃',  color: 'var(--red)',               fmt: (v: number) => v.toFixed(2) },
-  { key: 'latest_nitrite', label: 'NO₂',  color: 'var(--amber)',             fmt: (v: number) => v.toFixed(2) },
-  { key: 'latest_nitrate', label: 'NO₃',  color: 'var(--green)',             fmt: (v: number) => v.toFixed(0) },
+  { key: 'latest_ph',      label: 'pH',   color: 'var(--blue)',              fmt: (v: number) => v.toFixed(1),  rangeKey: 'ph' },
+  { key: 'latest_temp',    label: 'Temp', color: 'var(--orange, #ef6c00)',   fmt: (v: number) => `${v.toFixed(0)}°`, rangeKey: 'temperature_c' },
+  { key: 'latest_ammonia', label: 'NH₃',  color: 'var(--red)',               fmt: (v: number) => v.toFixed(2),  rangeKey: 'ammonia_ppm' },
+  { key: 'latest_nitrite', label: 'NO₂',  color: 'var(--amber)',             fmt: (v: number) => v.toFixed(2),  rangeKey: 'nitrite_ppm' },
+  { key: 'latest_nitrate', label: 'NO₃',  color: 'var(--green)',             fmt: (v: number) => v.toFixed(0),  rangeKey: 'nitrate_ppm' },
 ] as const
+
+// Ring summary for the tank card header — counts how many of the 5 latest readings are
+// outside the ok/ideal range (see utils/paramStatus). Params with no reading yet are
+// left out of the total rather than counted against the tank.
+function ringStats(tank: DashboardStats['tanks'][0]) {
+  let total = 0
+  let bad = 0
+  for (const p of PARAMS) {
+    const val = tank[p.key] as number | null
+    if (val == null) continue
+    total += 1
+    if (getParamStatus(p.rangeKey, val, tank.water_type) === 'bad') bad += 1
+  }
+  return { total, bad, ok: total - bad }
+}
 
 const TAP_WATER_PARAMS = [
   { key: 'ph',           label: 'pH',       color: 'var(--blue)',               fmt: (v: number) => v.toFixed(1) },
@@ -182,6 +198,9 @@ function TankOverviewCard({ tank, drag, isMobile, editMode }: { tank: DashboardS
   const navigate = useNavigate()
   const hasAlerts = tank.unack_alerts > 0 || tank.overdue_tasks > 0
   const draggableNow = editMode && !isMobile && tank.my_access === 'owner'
+  const ring = ringStats(tank)
+  const ringCircumference = 113.1
+  const ringColor = ring.bad > 0 ? 'var(--red)' : 'var(--green)'
 
   return (
     <div
@@ -228,15 +247,38 @@ function TankOverviewCard({ tank, drag, isMobile, editMode }: { tank: DashboardS
                 <FlaskConical size={11} /> CO₂
               </span>
             )}
+            <WaterTypeBadge type={tank.water_type} />
+            {tank.my_access !== 'owner' && (
+              <span title={tank.my_access === 'edit' ? 'Shared with you — you can edit' : 'Shared with you — view only'} style={{ fontSize: 10, fontWeight: 500, color: 'var(--text-2)', background: 'var(--tag-bg)', border: '0.5px solid var(--border)', borderRadius: 5, padding: '1px 6px' }}>
+                Shared
+              </span>
+            )}
           </div>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
-          {tank.my_access !== 'owner' && (
-            <span title={tank.my_access === 'edit' ? 'Shared with you — you can edit' : 'Shared with you — view only'} style={{ fontSize: 10, fontWeight: 500, color: 'var(--text-2)', background: 'var(--tag-bg)', border: '0.5px solid var(--border)', borderRadius: 5, padding: '1px 6px' }}>
-              Shared
-            </span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+          {ring.total > 0 && (
+            <div title={ring.bad > 0 ? `${ring.bad} reading${ring.bad > 1 ? 's' : ''} outside the safe range` : 'All parameters in range'} style={{ position: 'relative', width: 40, height: 40, flexShrink: 0 }}>
+              <svg viewBox="0 0 44 44" width="40" height="40">
+                <circle cx="22" cy="22" r="18" fill="none" stroke="var(--border-sub)" strokeWidth="4.5" />
+                {ring.bad > 0 ? (
+                  <circle
+                    cx="22" cy="22" r="18" fill="none" stroke={ringColor} strokeWidth="4.5" strokeLinecap="round"
+                    strokeDasharray={`${(ring.bad / ring.total) * ringCircumference} ${ringCircumference}`}
+                    transform="rotate(-90 22 22)"
+                  />
+                ) : (
+                  <circle
+                    cx="22" cy="22" r="18" fill="none" stroke={ringColor} strokeWidth="4.5" strokeLinecap="round"
+                    strokeDasharray={`${ringCircumference}`}
+                    transform="rotate(-90 22 22)"
+                  />
+                )}
+              </svg>
+              <span style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 700, color: ringColor }}>
+                {ring.ok}/{ring.total}
+              </span>
+            </div>
           )}
-          <WaterTypeBadge type={tank.water_type} />
           {editMode && tank.my_access === 'owner' && (isMobile ? (
             <div style={{ display: 'flex', flexDirection: 'column', flexShrink: 0 }}>
               <button
@@ -283,44 +325,6 @@ function TankOverviewCard({ tank, drag, isMobile, editMode }: { tank: DashboardS
             </div>
           )
         })}
-      </div>
-
-      {/* Footer */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 6 }}>
-        <div style={{ display: 'flex', gap: 10, fontSize: 12, color: 'var(--text-2)', flexWrap: 'wrap' }}>
-          {tank.fish_count > 0 && (
-            <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-              <Fish size={12} />
-              {tank.fish_count} fish · {tank.fish_species} sp
-            </span>
-          )}
-          {tank.invertebrate_count > 0 && (
-            <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-              <Bug size={12} />
-              {tank.invertebrate_count} inv · {tank.invertebrate_species} sp
-            </span>
-          )}
-          {tank.amphibian_count > 0 && (
-            <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-              <Waves size={12} />
-              {tank.amphibian_count} amp · {tank.amphibian_species} sp
-            </span>
-          )}
-          {tank.plant_species > 0 && (
-            <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-              <Leaf size={12} />
-              {tank.plant_species} plant sp
-            </span>
-          )}
-          {tank.fish_count === 0 && tank.invertebrate_count === 0 && tank.amphibian_count === 0 && tank.plant_species === 0 && (
-            <span style={{ color: 'var(--text-4)' }}>No inhabitants yet</span>
-          )}
-        </div>
-        {tank.latest_recorded && (
-          <span style={{ fontSize: 10, color: 'var(--text-4)' }}>
-            {new Date(tank.latest_recorded).toLocaleDateString()}
-          </span>
-        )}
       </div>
 
       {/* Alerts strip */}
