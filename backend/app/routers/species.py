@@ -10,10 +10,17 @@ import yaml
 
 REQUIRED_FIELDS = ("slug", "type", "common_name", "latin_name")
 VALID_TYPES = {"fish", "plant", "invertebrate", "amphibian"}
+MAX_YAML_BYTES = 1 * 1024 * 1024
 
 router = APIRouter()
 require_species_edit = Depends(require_permission("species", "edit"))
 require_species_delete = Depends(require_permission("species", "delete"))
+
+# Mounted in main.py without the app-wide `authenticated` dependency — species YAML is
+# shared reference data, not per-user data, and this lets one self-hosted instance pull
+# a species definition straight from another (e.g. `species/upload-url` pointed at a
+# peer instance) without needing a login on the source instance.
+public_router = APIRouter()
 
 
 def _parse_and_save(contents: bytes) -> dict:
@@ -150,6 +157,8 @@ async def upload_species(file: UploadFile = File(...), _perm=require_species_edi
     if not file.filename or not file.filename.lower().endswith((".yaml", ".yml")):
         raise HTTPException(status_code=400, detail="File must be a .yaml or .yml file")
     contents = await file.read()
+    if len(contents) > MAX_YAML_BYTES:
+        raise HTTPException(status_code=413, detail=f"File too large (max {MAX_YAML_BYTES // (1024 * 1024)}MB)")
     return _parse_and_save(contents)
 
 
@@ -174,7 +183,9 @@ async def upload_species_from_url(body: UrlImportBody, _perm=require_species_edi
         with fetch_guard(url):
             req = urllib.request.Request(url, headers={"User-Agent": "TankBook/0.5.0"})
             with urllib.request.urlopen(req, timeout=10) as response:
-                contents = response.read()
+                # Read one byte past the cap so an oversized response is caught below
+                # rather than trusting a (spoofable) Content-Length header.
+                contents = response.read(MAX_YAML_BYTES + 1)
     except UnsafeUrlError as e:
         raise HTTPException(status_code=400, detail=f"Refusing to fetch this URL: {e}")
     except urllib.error.HTTPError as e:
@@ -182,10 +193,13 @@ async def upload_species_from_url(body: UrlImportBody, _perm=require_species_edi
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Failed to fetch URL: {e}")
 
+    if len(contents) > MAX_YAML_BYTES:
+        raise HTTPException(status_code=413, detail=f"File too large (max {MAX_YAML_BYTES // (1024 * 1024)}MB)")
+
     return _parse_and_save(contents)
 
 
-@router.get("/{slug}/yaml")
+@public_router.get("/{slug}/yaml")
 def download_species_yaml(slug: str):
     path = species_service.get_yaml_path(slug)
     if not path:

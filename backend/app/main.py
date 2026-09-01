@@ -54,6 +54,7 @@ app.include_router(plants.router, prefix="/api/plants", tags=["plants"], depende
 app.include_router(parameters.router, prefix="/api/parameters", tags=["parameters"], dependencies=authenticated)
 app.include_router(alerts.router, prefix="/api/alerts", tags=["alerts"], dependencies=authenticated)
 app.include_router(species.router, prefix="/api/species", tags=["species"], dependencies=authenticated)
+app.include_router(species.public_router, prefix="/api/species", tags=["species"])
 app.include_router(maintenance.router, prefix="/api/tanks", tags=["maintenance"], dependencies=authenticated)
 app.include_router(daily_tasks.router, prefix="/api/tanks", tags=["daily_tasks"], dependencies=authenticated)
 app.include_router(settings.router, prefix="/api/settings", tags=["settings"], dependencies=authenticated)

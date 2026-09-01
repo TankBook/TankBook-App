@@ -16,6 +16,8 @@ require_species_delete = Depends(require_permission("species", "delete"))
 
 IMAGES_PATH = Path("/app/images")
 
+MAX_IMAGE_BYTES = 10 * 1024 * 1024
+
 ALLOWED_TYPES = {"image/jpeg", "image/png", "image/webp", "image/gif"}
 EXT_MAP = {"image/jpeg": ".jpg", "image/png": ".png", "image/webp": ".webp", "image/gif": ".gif"}
 MEDIA_MAP = {".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".png": "image/png", ".webp": "image/webp", ".gif": "image/gif"}
@@ -33,6 +35,9 @@ def _find(slug: str) -> Path | None:
 async def upload_species_image(slug: str, file: UploadFile = File(...), _perm=require_species_edit):
     if file.content_type not in ALLOWED_TYPES:
         raise HTTPException(400, f"Unsupported type: {file.content_type}. Use JPEG, PNG, WebP, or GIF.")
+    contents = await file.read()
+    if len(contents) > MAX_IMAGE_BYTES:
+        raise HTTPException(413, f"Image too large (max {MAX_IMAGE_BYTES // (1024 * 1024)}MB)")
     ext = EXT_MAP[file.content_type]
     dest_dir = IMAGES_PATH / "species"
     dest_dir.mkdir(parents=True, exist_ok=True)
@@ -41,7 +46,6 @@ async def upload_species_image(slug: str, file: UploadFile = File(...), _perm=re
         old = dest_dir / f"{slug}{old_ext}"
         if old.exists():
             old.unlink()
-    contents = await file.read()
     (dest_dir / f"{slug}{ext}").write_bytes(contents)
     return {"ok": True, "url": f"/api/images/species/{slug}"}
 
@@ -94,11 +98,16 @@ def fetch_species_image(slug: str, latin_name: str = Query(...), _perm=require_s
         with fetch_guard(image_url):
             req2 = urllib.request.Request(image_url, headers={"User-Agent": "TankBook/1.0"})
             with urllib.request.urlopen(req2, timeout=15) as resp2:
-                image_data = resp2.read()
+                # Read one byte past the cap so an oversized response is caught below
+                # rather than trusting a (spoofable) Content-Length header.
+                image_data = resp2.read(MAX_IMAGE_BYTES + 1)
     except UnsafeUrlError as e:
         raise HTTPException(502, f"Refusing to fetch image URL: {e}")
     except Exception as e:
         raise HTTPException(502, f"Failed to download image: {e}")
+
+    if len(image_data) > MAX_IMAGE_BYTES:
+        raise HTTPException(502, f"Image too large (max {MAX_IMAGE_BYTES // (1024 * 1024)}MB)")
 
     dest_dir = IMAGES_PATH / "species"
     dest_dir.mkdir(parents=True, exist_ok=True)
@@ -135,11 +144,13 @@ def _safe_filename(filename: str) -> str:
 async def upload_tank_image(tank_id: str, file: UploadFile = File(...), _tank: Tank = Depends(require_tank_edit)):
     if file.content_type not in ALLOWED_TYPES:
         raise HTTPException(400, f"Unsupported type: {file.content_type}. Use JPEG, PNG, WebP, or GIF.")
+    contents = await file.read()
+    if len(contents) > MAX_IMAGE_BYTES:
+        raise HTTPException(413, f"Image too large (max {MAX_IMAGE_BYTES // (1024 * 1024)}MB)")
     ext = EXT_MAP[file.content_type]
     dest_dir = _tank_dir(tank_id)
     dest_dir.mkdir(parents=True, exist_ok=True)
     filename = f"{uuid.uuid4().hex}{ext}"
-    contents = await file.read()
     (dest_dir / filename).write_bytes(contents)
     return {"ok": True, "filename": filename, "url": f"/api/images/tanks/{tank_id}/{filename}"}
 
