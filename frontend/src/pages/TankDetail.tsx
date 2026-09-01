@@ -1852,18 +1852,6 @@ ${taskRows ? `<h2>Pending Maintenance</h2>
         <Card style={{ display: 'grid', gap: 16 }}>
           <h2 style={{ margin: 0, fontSize: 24, fontWeight: 600, color: 'var(--text)', textAlign: 'center' }}>{tank.name}</h2>
           <TankDimensionWireframe tank={tank} unitSystem={unitSystem} />
-          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fit, minmax(140px, 1fr))', gap: 12 }}>
-            {[
-              { label: 'Fish', count: inhabitantCounts.fish },
-              { label: 'Invertebrates', count: inhabitantCounts.invertebrate },
-              { label: 'Amphibians', count: inhabitantCounts.amphibian },
-            ].map(({ label, count }) => (
-              <Card key={label} style={{ textAlign: 'center', padding: '14px 12px' }}>
-                <p style={{ margin: 0, fontSize: 11, color: 'var(--text-2)' }}>{label}</p>
-                <p style={{ margin: '4px 0 0', fontSize: 24, fontWeight: 600, color: 'var(--text)' }}>{count}</p>
-              </Card>
-            ))}
-          </div>
 
           {(() => {
             const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0)
@@ -1898,6 +1886,19 @@ ${taskRows ? `<h2>Pending Maintenance</h2>
               </div>
             )
           })()}
+
+          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fit, minmax(140px, 1fr))', gap: 12 }}>
+            {[
+              { label: 'Fish', count: inhabitantCounts.fish },
+              { label: 'Invertebrates', count: inhabitantCounts.invertebrate },
+              { label: 'Amphibians', count: inhabitantCounts.amphibian },
+            ].map(({ label, count }) => (
+              <Card key={label} style={{ textAlign: 'center', padding: '14px 12px' }}>
+                <p style={{ margin: 0, fontSize: 11, color: 'var(--text-2)' }}>{label}</p>
+                <p style={{ margin: '4px 0 0', fontSize: 24, fontWeight: 600, color: 'var(--text)' }}>{count}</p>
+              </Card>
+            ))}
+          </div>
 
           {(() => {
             const latest = params.data?.[0]
