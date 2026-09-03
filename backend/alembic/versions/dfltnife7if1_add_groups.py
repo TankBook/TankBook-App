@@ -7,9 +7,16 @@ with the existing per-tank owner/TankShare sharing.
 
 Expenses, inventory items, rooms, and tap water tests had no owner
 concept at all before this — they gain owner_id (backfilled to the
-instance's earliest-created user; empty on a fresh install since those
-tables can't have rows without a user existing first) alongside the new
-optional group_id.
+instance's earliest-created user) alongside the new optional group_id.
+
+An instance upgrading straight from a pre-accounts version can have rows
+in these tables but zero users at the point this migration runs (these
+tables predate the whole auth system, and migrations always run before
+anyone has had a chance to register) — there's nobody to backfill to
+yet. owner_id stays nullable in that case; the first account to ever
+register claims every orphaned row (see auth.py's
+_bootstrap_admin_if_first_user), which happens moments later and before
+anyone could otherwise reach the API, since every route requires auth.
 
 Revision ID: dfltnife7if1
 Revises: cn5ak4cb8gs4
@@ -55,7 +62,6 @@ def upgrade() -> None:
         op.add_column(table, sa.Column('group_id', sa.String(), sa.ForeignKey('groups.id', ondelete='SET NULL'), nullable=True))
         if earliest_user_id:
             conn.execute(sa.text(f"UPDATE {table} SET owner_id = :uid"), {"uid": earliest_user_id})
-        op.alter_column(table, 'owner_id', nullable=False)
 
 
 def downgrade() -> None:

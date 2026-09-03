@@ -7,7 +7,10 @@ from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session as DBSession
 
 from app.database import get_db
-from app.models.models import User, AuthSettings, Tank, TankShare, DASHBOARD_SECTION_IDS, DASHBOARD_STAT_KEYS
+from app.models.models import (
+    User, AuthSettings, Tank, TankShare, Expense, InventoryItem, Room, TapWaterTest,
+    DASHBOARD_SECTION_IDS, DASHBOARD_STAT_KEYS,
+)
 from app.schemas.schemas import (
     RegisterRequest, LoginRequest, ChangePasswordRequest, UserOut, UserListItemOut, UserUpdateRequest,
     AuthConfigOut, AuthSettingsOut, AuthSettingsUpdate, PermissionsOut, PermissionsUpdate, ProfileUpdate,
@@ -97,6 +100,15 @@ def _bootstrap_admin_if_first_user(db: DBSession, user: User) -> None:
             permissions_service.set_level(db, user.id, key, "edit")
         # species has a 4th tier above "edit" — give the instance's first account full access
         permissions_service.set_level(db, user.id, "species", "delete")
+
+        # An instance upgrading from before accounts existed can have tanks, expenses,
+        # inventory, rooms, and tap water tests with no owner — the migrations that added
+        # owner_id couldn't backfill them since no user existed yet at migration time (see
+        # those migrations for details). Claim everything orphaned for the account that's
+        # about to administer the instance, same as it would already own if it had existed
+        # before this data did.
+        for model in (Tank, Expense, InventoryItem, Room, TapWaterTest):
+            db.query(model).filter(model.owner_id.is_(None)).update({"owner_id": user.id})
 
 
 def _settings_to_out(settings: AuthSettings) -> AuthSettingsOut:

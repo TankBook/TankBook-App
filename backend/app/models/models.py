@@ -65,7 +65,11 @@ class Tank(Base):
     light_technology: Mapped[str | None] = mapped_column(String)
     setup_date: Mapped[datetime | None] = mapped_column(DateTime)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
-    owner_id: Mapped[str] = mapped_column(String, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    # Nullable at the DB level: an instance upgrading from before accounts existed can have
+    # tanks with no user yet to backfill to at migration time. The first account to register
+    # claims every orphaned row (see auth.py's _bootstrap_admin_if_first_user), so this is
+    # only ever unset in the brief window before that first registration.
+    owner_id: Mapped[str | None] = mapped_column(String, ForeignKey("users.id", ondelete="CASCADE"), nullable=True)
     group_id: Mapped[str | None] = mapped_column(String, ForeignKey("groups.id", ondelete="SET NULL"), nullable=True)
 
     owner: Mapped["User"] = relationship(foreign_keys=[owner_id])
@@ -163,7 +167,8 @@ class TapWaterTest(Base):
     tds_ppm: Mapped[float | None] = mapped_column(Float)
     recorded_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     notes: Mapped[str | None] = mapped_column(Text)
-    owner_id: Mapped[str] = mapped_column(String, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    # See Tank.owner_id above — nullable for the same first-registration-claims-orphans reason.
+    owner_id: Mapped[str | None] = mapped_column(String, ForeignKey("users.id", ondelete="CASCADE"), nullable=True)
     group_id: Mapped[str | None] = mapped_column(String, ForeignKey("groups.id", ondelete="SET NULL"), nullable=True)
 
 
@@ -337,7 +342,8 @@ class Expense(Base):
     purchase_date: Mapped[str] = mapped_column(String, nullable=False)
     notes: Mapped[str | None] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
-    owner_id: Mapped[str] = mapped_column(String, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    # See Tank.owner_id above — nullable for the same first-registration-claims-orphans reason.
+    owner_id: Mapped[str | None] = mapped_column(String, ForeignKey("users.id", ondelete="CASCADE"), nullable=True)
     group_id: Mapped[str | None] = mapped_column(String, ForeignKey("groups.id", ondelete="SET NULL"), nullable=True)
 
 
@@ -349,7 +355,8 @@ class Room(Base):
     width_m: Mapped[float] = mapped_column(Float, default=3.0)
     length_m: Mapped[float] = mapped_column(Float, default=2.4)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
-    owner_id: Mapped[str] = mapped_column(String, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    # See Tank.owner_id above — nullable for the same first-registration-claims-orphans reason.
+    owner_id: Mapped[str | None] = mapped_column(String, ForeignKey("users.id", ondelete="CASCADE"), nullable=True)
     group_id: Mapped[str | None] = mapped_column(String, ForeignKey("groups.id", ondelete="SET NULL"), nullable=True)
 
     tank_positions: Mapped[list["RoomTankPosition"]] = relationship(back_populates="room", cascade="all, delete-orphan")
@@ -379,7 +386,8 @@ class InventoryItem(Base):
     unit_label: Mapped[str | None] = mapped_column(String, nullable=True)
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
-    owner_id: Mapped[str] = mapped_column(String, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    # See Tank.owner_id above — nullable for the same first-registration-claims-orphans reason.
+    owner_id: Mapped[str | None] = mapped_column(String, ForeignKey("users.id", ondelete="CASCADE"), nullable=True)
     group_id: Mapped[str | None] = mapped_column(String, ForeignKey("groups.id", ondelete="SET NULL"), nullable=True)
 
 
