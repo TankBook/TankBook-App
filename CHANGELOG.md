@@ -4,6 +4,13 @@ All notable changes to TankBook are documented here.
 
 ---
 
+## [1.0.1] — 2026-09-03
+
+### Fixed
+- Instances upgrading from a version before accounts existed (i.e. any real upgrade with pre-existing tanks, expenses, inventory, rooms, or tap water tests) failed to migrate and crash-looped on startup — the migrations backfilling ownership of that data assumed a user already existed to backfill to, which is never true at migration time. The first account to register now claims all such orphaned data immediately upon registration, closing the gap.
+
+---
+
 ## [1.0.0] — 2026-09-02
 
 TankBook's first stable release — no longer a single-user tool. See [RELEASE-NOTES-1.0.0.md](RELEASE-NOTES-1.0.0.md) for the full writeup.

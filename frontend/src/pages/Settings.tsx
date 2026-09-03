@@ -705,7 +705,7 @@ function formatBytes(bytes: number): string {
   return `${value.toFixed(1)} ${units[unitIndex]}`
 }
 
-const APP_VERSION = '1.0.0'
+const APP_VERSION = '1.0.1'
 const GITHUB_REPO = 'TankBook/TankBook-App'
 
 function semverNewer(current: string, latest: string): boolean {
