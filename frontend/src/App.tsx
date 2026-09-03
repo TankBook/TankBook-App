@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { BrowserRouter, Routes, Route, Link, useLocation } from 'react-router-dom'
-import { LayoutDashboard, BookOpen, Cog, NotebookPen, ShieldCheck, Calculator, Receipt, Menu, X, Plus, Fish, Droplets, ChevronLeft, Package, Building, Sun, Moon, type LucideIcon } from 'lucide-react'
-import { api } from './api/client'
+import { LayoutDashboard, BookOpen, Cog, NotebookPen, ShieldCheck, Calculator, Receipt, Menu, X, Plus, Fish, Droplets, ChevronLeft, Package, Building, Sun, Moon, Bot, LogOut, UserCircle, type LucideIcon } from 'lucide-react'
+import { api, hasPermission, hasAnyPermission } from './api/client'
 import RoomLayout from './pages/RoomLayout'
 import RoomDetail from './pages/RoomDetail'
 
@@ -13,30 +13,23 @@ function GitHubIcon({ size = 14 }: { size?: number }) {
   )
 }
 
-function AquaDropIcon({ size = 26 }: { size?: number }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
-      <path
-        d="M12 21C12 21 4.5 14 4.5 9.5C4.5 5.91 7.91 3 12 3C16.09 3 19.5 5.91 19.5 9.5C19.5 14 12 21 12 21Z"
-        fill="#26C6DA" fillOpacity="0.2" stroke="#26C6DA" strokeWidth="1.6" strokeLinejoin="round"
-      />
-      <path d="M12 17.5V11" stroke="#43A047" strokeWidth="1.6" strokeLinecap="round"/>
-      <path d="M12 15.5C12 15.5 8.5 13.5 8.5 10.5C8.5 10.5 12 11 12 15.5Z" fill="#43A047"/>
-      <path d="M12 12.5C12 12.5 15.5 10.5 15.5 7.5C15.5 7.5 12 8 12 12.5Z" fill="#43A047"/>
-    </svg>
-  )
-}
+import { AquaDropIcon } from './components/ui'
 import Dashboard from './pages/Dashboard'
 import SpendingTracker from './pages/SpendingTracker'
 import TankDetail from './pages/TankDetail'
 import SpeciesBrowser from './pages/SpeciesBrowser'
 import Settings from './pages/Settings'
+import Profile from './pages/Profile'
 import LivestockJournal from './pages/LivestockJournal'
 import CompatibilityChecker from './pages/CompatibilityChecker'
 import Calculators from './pages/Calculators'
 import Inventory from './pages/Inventory'
+import Assistant from './pages/Assistant'
 import UpdateToast from './components/UpdateToast'
+import AssistantWidget from './components/AssistantWidget'
+import Login from './pages/Login'
 import { SettingsProvider, useSettings } from './context/SettingsContext'
+import { AuthProvider, useAuth } from './context/AuthContext'
 
 const QA_CATEGORIES = ['Equipment', 'Livestock', 'Plants', 'Food', 'Chemicals', 'Medication', 'Decor', 'Subscription', 'Other']
 const QA_INV_CATEGORIES = ['Equipment', 'Plants', 'Food', 'Chemicals', 'Medication', 'Decor', 'Tanks', 'Other'] as const
@@ -48,6 +41,8 @@ function todayIso() {
 }
 
 function QuickAdd() {
+  const { user } = useAuth()
+  const canCreateTanks = hasPermission(user?.permissions.tanks, 'edit')
   const [open, setOpen] = useState(false)
   const [mode, setMode] = useState<'pick' | 'tank' | 'param' | 'expense' | 'inventory'>('pick')
   const [tanks, setTanks] = useState<{ id: string; name: string }[]>([])
@@ -84,11 +79,17 @@ function QuickAdd() {
   const [invThreshold, setInvThreshold] = useState('1')
   const [invUnit, setInvUnit] = useState('')
 
+  const [groups, setGroups] = useState<{ id: string; name: string }[]>([])
+  const [qaGroupId, setQaGroupId] = useState('')
+
   useEffect(() => {
-    if (open) api.tanks.list().then(t => {
-      setTanks(t)
-      if (t.length) setParamTank(t[0].id)
-    })
+    if (open) {
+      api.tanks.list().then(t => {
+        setTanks(t)
+        if (t.length) setParamTank(t[0].id)
+      })
+      api.groups.list().then(setGroups)
+    }
   }, [open])
 
   function resetForms() {
@@ -97,6 +98,7 @@ function QuickAdd() {
     setPh(''); setTemp(''); setAmmonia(''); setNitrite(''); setNitrate('')
     setExpTank(''); setExpAmount(''); setExpCat(QA_CATEGORIES[0]); setExpDesc(''); setExpDate(todayIso())
     setInvName(''); setInvCat(QA_INV_CATEGORIES[0]); setInvQty('1'); setInvThreshold('1'); setInvUnit('')
+    setQaGroupId('')
   }
 
   function close() { setOpen(false); resetForms() }
@@ -105,7 +107,7 @@ function QuickAdd() {
     if (!qaName || !qaVolume) return
     setSaving(true)
     try {
-      await api.tanks.create({ name: qaName, volume_litres: Number(qaVolume), water_type: qaWaterType, co2_injection: false, co2_source: null, co2_method: null, has_heater: false, heater_watts: null, has_lighting: false, light_intensity: null, light_watts: null, light_technology: null, setup_date: null, substrate: null, lighting: null, has_filter: false, filter_flow_lph: null, width_mm: null, height_mm: null, depth_mm: null })
+      await api.tanks.create({ name: qaName, volume_litres: Number(qaVolume), water_type: qaWaterType, shape: 'rectangle', co2_injection: false, co2_source: null, co2_method: null, has_heater: false, heater_watts: null, has_lighting: false, light_intensity: null, light_watts: null, light_technology: null, setup_date: null, substrate: null, lighting: null, has_filter: false, filter_flow_lph: null, width_mm: null, height_mm: null, depth_mm: null, group_id: qaGroupId || null })
       close()
     } finally { setSaving(false) }
   }
@@ -123,7 +125,7 @@ function QuickAdd() {
     if (!invName) return
     setSaving(true)
     try {
-      await api.inventory.create({ name: invName, category: invCat, quantity: Number(invQty) || 0, low_stock_threshold: Number(invThreshold) || 1, unit_label: invUnit || null, notes: null })
+      await api.inventory.create({ name: invName, category: invCat, quantity: Number(invQty) || 0, low_stock_threshold: Number(invThreshold) || 1, unit_label: invUnit || null, notes: null, group_id: qaGroupId || null })
       close()
     } finally { setSaving(false) }
   }
@@ -132,7 +134,7 @@ function QuickAdd() {
     if (!expAmount || isNaN(Number(expAmount))) return
     setSaving(true)
     try {
-      await api.spending.add({ tank_id: expTank || null, amount: Number(expAmount), category: expCat, description: expDesc || null, purchase_date: expDate, notes: null })
+      await api.spending.add({ tank_id: expTank || null, amount: Number(expAmount), quantity: 1, category: expCat, description: expDesc || null, purchase_date: expDate, notes: null, group_id: qaGroupId || null })
       close()
     } finally { setSaving(false) }
   }
@@ -171,7 +173,7 @@ function QuickAdd() {
     body = (
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
         {([
-          { Icon: Fish,     label: 'Add Tank',            sub: 'Create a new tank',            m: 'tank'      },
+          ...(canCreateTanks ? [{ Icon: Fish, label: 'Add Tank', sub: 'Create a new tank', m: 'tank' as const }] : []),
           { Icon: Droplets, label: 'Record Parameters',   sub: 'Log water quality for a tank', m: 'param'     },
           { Icon: Receipt,  label: 'New Expense',         sub: 'Track a purchase',             m: 'expense'   },
           { Icon: Package,  label: 'Add Inventory Item',  sub: 'Log stock for food or supplies', m: 'inventory' },
@@ -209,6 +211,15 @@ function QuickAdd() {
             </select>
           </div>
         </div>
+        {groups.length > 0 && (
+          <div style={{ marginBottom: 12 }}>
+            {lbl('Group')}
+            <select value={qaGroupId} onChange={e => setQaGroupId(e.target.value)} style={{ width: '100%' }}>
+              <option value="">Personal</option>
+              {groups.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
+            </select>
+          </div>
+        )}
         {saveRow(saveTank, !qaName || !qaVolume)}
       </>
     )
@@ -275,6 +286,15 @@ function QuickAdd() {
             <input type="date" value={expDate} onChange={e => setExpDate(e.target.value)} style={inputStyle} />
           </div>
         </div>
+        {groups.length > 0 && (
+          <div style={{ marginBottom: 4 }}>
+            {lbl('Group')}
+            <select value={qaGroupId} onChange={e => setQaGroupId(e.target.value)} style={{ width: '100%' }}>
+              <option value="">Personal</option>
+              {groups.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
+            </select>
+          </div>
+        )}
         {saveRow(saveExpense, !expAmount || isNaN(Number(expAmount)))}
       </>
     )
@@ -309,6 +329,15 @@ function QuickAdd() {
             <input type="number" min="0" value={invThreshold} onChange={e => setInvThreshold(e.target.value)} style={inputStyle} />
           </div>
         </div>
+        {groups.length > 0 && (
+          <div style={{ marginBottom: 4 }}>
+            {lbl('Group')}
+            <select value={qaGroupId} onChange={e => setQaGroupId(e.target.value)} style={{ width: '100%' }}>
+              <option value="">Personal</option>
+              {groups.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
+            </select>
+          </div>
+        )}
         {saveRow(saveInventory, !invName)}
       </>
     )
@@ -348,16 +377,23 @@ const NAV_LINKS: [string, string, LucideIcon][] = [
   ['/calculators', 'Calculators', Calculator],
   ['/spending', 'Spending', Receipt],
   ['/inventory', 'Inventory', Package],
+  ['/assistant', 'Assistant', Bot],
 ]
 
 function Nav() {
   const { pathname } = useLocation()
-  const { theme, toggleTheme } = useSettings()
+  const { logout, user } = useAuth()
   const [menuOpen, setMenuOpen] = useState(false)
-  const [isMobile, setIsMobile] = useState(() => window.matchMedia('(max-width: 1280px)').matches)
+  // NAV_LINKS has grown to 9 entries plus Profile/Admin/logout/Quick Add — that no longer
+  // fits on one line until ~1560-1580px (measured with every link visible), so the
+  // collapsed/hamburger nav needs to kick in well above the old 1280px breakpoint.
+  const [isMobile, setIsMobile] = useState(() => window.matchMedia('(max-width: 1650px)').matches)
+
+  const navLinks = NAV_LINKS.filter(([to]) => to !== '/assistant' || hasPermission(user?.permissions.ai, 'use'))
+  const canAccessAdmin = hasAnyPermission(user?.permissions, 'edit')
 
   useEffect(() => {
-    const mq = window.matchMedia('(max-width: 1280px)')
+    const mq = window.matchMedia('(max-width: 1650px)')
     const handler = (e: MediaQueryListEvent) => { setIsMobile(e.matches); setMenuOpen(false) }
     mq.addEventListener('change', handler)
     return () => mq.removeEventListener('change', handler)
@@ -378,6 +414,21 @@ function Nav() {
     </Link>
   )
 
+  const logoutButton = (
+    <button
+      onClick={() => logout()}
+      title="Log out"
+      style={{
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        padding: '6px', border: '0.5px solid var(--border)', borderRadius: 8,
+        background: 'transparent', color: 'var(--text-2)',
+        cursor: 'pointer', lineHeight: 0,
+      }}
+    >
+      <LogOut size={16} />
+    </button>
+  )
+
   return (
     <nav style={{
       position: 'relative',
@@ -394,37 +445,30 @@ function Nav() {
       </span>
 
       <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4, minWidth: 0 }}>
-        {!isMobile && NAV_LINKS.map(([to, label, Icon]) => link(to, label, Icon))}
+        {!isMobile && navLinks.map(([to, label, Icon]) => link(to, label, Icon))}
       </div>
 
-      <QuickAdd />
-
-      <button
-        onClick={toggleTheme}
-        title={theme === 'light' ? 'Switch to dark mode' : 'Switch to light mode'}
-        style={{
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          padding: '6px', border: '0.5px solid var(--border)', borderRadius: 8,
-          background: 'transparent', color: 'var(--text-2)',
-          cursor: 'pointer', lineHeight: 0, marginRight: 4,
-        }}
-      >
-        {theme === 'light' ? <Moon size={16} /> : <Sun size={16} />}
-      </button>
-
       {isMobile ? (
-        <button
-          onClick={() => setMenuOpen(o => !o)}
-          style={{
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            padding: '6px', border: '0.5px solid var(--border)', borderRadius: 8,
-            background: 'transparent', color: 'var(--text-2)', cursor: 'pointer', lineHeight: 0,
-          }}
-        >
-          {menuOpen ? <X size={18} /> : <Menu size={18} />}
-        </button>
+        <>
+          <QuickAdd />
+          <button
+            onClick={() => setMenuOpen(o => !o)}
+            style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              padding: '6px', border: '0.5px solid var(--border)', borderRadius: 8,
+              background: 'transparent', color: 'var(--text-2)', cursor: 'pointer', lineHeight: 0,
+            }}
+          >
+            {menuOpen ? <X size={18} /> : <Menu size={18} />}
+          </button>
+        </>
       ) : (
-        link('/settings', 'Settings', Cog)
+        <>
+          <QuickAdd />
+          {link('/profile', 'Profile', UserCircle)}
+          {canAccessAdmin && link('/settings', 'Admin', Cog)}
+          {logoutButton}
+        </>
       )}
 
       {isMobile && menuOpen && (
@@ -434,8 +478,22 @@ function Nav() {
           display: 'flex', flexDirection: 'column', gap: 2, padding: '8px 16px 12px',
           boxShadow: '0 8px 24px rgba(0,0,0,0.12)',
         }}>
-          {NAV_LINKS.map(([to, label, Icon]) => link(to, label, Icon, () => setMenuOpen(false)))}
-          {link('/settings', 'Settings', Cog, () => setMenuOpen(false))}
+          {navLinks.map(([to, label, Icon]) => link(to, label, Icon, () => setMenuOpen(false)))}
+          <div style={{ height: 1, background: 'var(--border-sub)', margin: '4px 0' }} />
+          {link('/profile', 'Profile', UserCircle, () => setMenuOpen(false))}
+          {canAccessAdmin && link('/settings', 'Admin', Cog, () => setMenuOpen(false))}
+          <button
+            onClick={() => { setMenuOpen(false); logout() }}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 6,
+              padding: '6px 14px', borderRadius: 8, fontSize: 14,
+              border: 'none', background: 'transparent', color: 'var(--text-2)',
+              cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit',
+            }}
+          >
+            <LogOut size={14} />
+            Logout
+          </button>
         </div>
       )}
     </nav>
@@ -443,6 +501,7 @@ function Nav() {
 }
 
 function Footer() {
+  const { theme, toggleTheme } = useSettings()
   return (
     <footer style={{
       borderTop: '0.5px solid var(--border)',
@@ -458,54 +517,86 @@ function Footer() {
         <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)', letterSpacing: '0.04em' }}>TANKBOOK</span>
         <span style={{ fontSize: 12, color: 'var(--text-2)' }}>© {new Date().getFullYear()}</span>
       </span>
-      <a
-        href="https://github.com/TankBook/TankBook-App"
-        target="_blank"
-        rel="noopener noreferrer"
-        style={{
-          display: 'flex', alignItems: 'center', gap: 6,
-          fontSize: 12, color: 'var(--text-2)', textDecoration: 'none',
-          padding: '5px 12px', borderRadius: 8,
-          border: '0.5px solid var(--border)',
-          background: 'transparent',
-          cursor: 'pointer',
-          transition: 'color 0.15s, border-color 0.15s',
-        }}
-        onMouseEnter={e => { (e.currentTarget as HTMLAnchorElement).style.color = 'var(--blue)'; (e.currentTarget as HTMLAnchorElement).style.borderColor = 'var(--blue-border)' }}
-        onMouseLeave={e => { (e.currentTarget as HTMLAnchorElement).style.color = 'var(--text-2)'; (e.currentTarget as HTMLAnchorElement).style.borderColor = 'var(--border)' }}
-      >
-        <GitHubIcon size={14} />
-        GitHub
-      </a>
+      <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <button
+          onClick={toggleTheme}
+          title={theme === 'light' ? 'Switch to dark mode' : 'Switch to light mode'}
+          style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            padding: '6px', border: '0.5px solid var(--border)', borderRadius: 8,
+            background: 'transparent', color: 'var(--text-2)',
+            cursor: 'pointer', lineHeight: 0,
+          }}
+        >
+          {theme === 'light' ? <Moon size={16} /> : <Sun size={16} />}
+        </button>
+        <a
+          href="https://github.com/TankBook/TankBook-App"
+          target="_blank"
+          rel="noopener noreferrer"
+          style={{
+            display: 'flex', alignItems: 'center', gap: 6,
+            fontSize: 12, color: 'var(--text-2)', textDecoration: 'none',
+            padding: '5px 12px', borderRadius: 8,
+            border: '0.5px solid var(--border)',
+            background: 'transparent',
+            cursor: 'pointer',
+            transition: 'color 0.15s, border-color 0.15s',
+          }}
+          onMouseEnter={e => { (e.currentTarget as HTMLAnchorElement).style.color = 'var(--blue)'; (e.currentTarget as HTMLAnchorElement).style.borderColor = 'var(--blue-border)' }}
+          onMouseLeave={e => { (e.currentTarget as HTMLAnchorElement).style.color = 'var(--text-2)'; (e.currentTarget as HTMLAnchorElement).style.borderColor = 'var(--border)' }}
+        >
+          <GitHubIcon size={14} />
+          GitHub
+        </a>
+      </span>
     </footer>
+  )
+}
+
+function AppShell() {
+  const { user, loading } = useAuth()
+
+  if (loading) return null
+  if (!user) return <Login />
+
+  return (
+    <>
+      <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', background: 'var(--bg)', fontFamily: 'system-ui, sans-serif' }}>
+        <Nav />
+        <div style={{ flex: 1, maxWidth: 960, width: '100%', margin: '0 auto', padding: '32px 24px' }}>
+          <Routes>
+            <Route path="/" element={<Dashboard />} />
+            <Route path="/rooms" element={<RoomLayout />} />
+            <Route path="/rooms/:id" element={<RoomDetail />} />
+            <Route path="/tanks/:id" element={<TankDetail />} />
+            <Route path="/species" element={<SpeciesBrowser />} />
+            <Route path="/compatibility" element={<CompatibilityChecker />} />
+            <Route path="/journal" element={<LivestockJournal />} />
+            <Route path="/calculators" element={<Calculators />} />
+            <Route path="/profile" element={<Profile />} />
+            <Route path="/settings" element={<Settings />} />
+            <Route path="/spending" element={<SpendingTracker />} />
+            <Route path="/inventory" element={<Inventory />} />
+            <Route path="/assistant" element={<Assistant />} />
+          </Routes>
+        </div>
+        <Footer />
+      </div>
+      <UpdateToast />
+      <AssistantWidget />
+    </>
   )
 }
 
 export default function App() {
   return (
-    <SettingsProvider>
-      <BrowserRouter>
-        <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', background: 'var(--bg)', fontFamily: 'system-ui, sans-serif' }}>
-          <Nav />
-          <div style={{ flex: 1, maxWidth: 960, width: '100%', margin: '0 auto', padding: '32px 24px' }}>
-            <Routes>
-              <Route path="/" element={<Dashboard />} />
-              <Route path="/rooms" element={<RoomLayout />} />
-              <Route path="/rooms/:id" element={<RoomDetail />} />
-              <Route path="/tanks/:id" element={<TankDetail />} />
-              <Route path="/species" element={<SpeciesBrowser />} />
-              <Route path="/compatibility" element={<CompatibilityChecker />} />
-              <Route path="/journal" element={<LivestockJournal />} />
-              <Route path="/calculators" element={<Calculators />} />
-              <Route path="/settings" element={<Settings />} />
-              <Route path="/spending" element={<SpendingTracker />} />
-              <Route path="/inventory" element={<Inventory />} />
-            </Routes>
-          </div>
-          <Footer />
-        </div>
-        <UpdateToast />
-      </BrowserRouter>
-    </SettingsProvider>
+    <AuthProvider>
+      <SettingsProvider>
+        <BrowserRouter>
+          <AppShell />
+        </BrowserRouter>
+      </SettingsProvider>
+    </AuthProvider>
   )
 }

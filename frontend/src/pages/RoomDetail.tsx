@@ -3,6 +3,7 @@ import { useNavigate, useParams, Link } from 'react-router-dom'
 import { ChevronLeft, ExternalLink, Pencil, Plus, Trash2, X } from 'lucide-react'
 import { useRoomLayoutState, defaultTankPosition, tankFootprintPercent } from '../hooks/useRoomLayout'
 import { Card, FieldLabel, Tag } from '../components/ui'
+import { canEditTank } from '../api/client'
 
 export default function RoomDetail() {
   const { id } = useParams<{ id: string }>()
@@ -132,14 +133,15 @@ export default function RoomDetail() {
             {room.tankIds.map((tankId, index) => {
               const tank = tankLookup.get(tankId)
               if (!tank) return null
+              const canEdit = canEditTank(tank)
               const position = room.tankPositions[tank.id] ?? defaultTankPosition(index)
               const { width: tankWidth, length: tankLength } = tankFootprintPercent(tank, room)
               return (
                 <div
                   key={tank.id}
-                  onPointerDown={e => startTankMove(e, room.id, tank.id)}
-                  title={`${tank.name} - drag to position`}
-                  style={{ position: 'absolute', left: `${position.x}%`, top: `${position.y}%`, transform: 'translate(-50%, -50%)', width: `${tankWidth}%`, minHeight: `${tankLength}%`, padding: '7px 8px', boxSizing: 'border-box', display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 3, borderRadius: 7, border: `1.5px solid ${movingTank?.tankId === tank.id ? 'var(--amber)' : 'var(--blue)'}`, background: 'var(--surface)', boxShadow: '0 2px 6px rgba(0,0,0,0.12)', cursor: movingTank?.tankId === tank.id ? 'grabbing' : 'grab', userSelect: 'none' }}
+                  onPointerDown={e => canEdit && startTankMove(e, room.id, tank.id)}
+                  title={`${tank.name}${canEdit ? ' - drag to position' : ''}`}
+                  style={{ position: 'absolute', left: `${position.x}%`, top: `${position.y}%`, transform: 'translate(-50%, -50%)', width: `${tankWidth}%`, minHeight: `${tankLength}%`, padding: '7px 8px', boxSizing: 'border-box', display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 3, borderRadius: 7, border: `1.5px solid ${movingTank?.tankId === tank.id ? 'var(--amber)' : 'var(--blue)'}`, background: 'var(--surface)', boxShadow: '0 2px 6px rgba(0,0,0,0.12)', cursor: canEdit ? (movingTank?.tankId === tank.id ? 'grabbing' : 'grab') : 'default', userSelect: 'none' }}
                 >
                   <button
                     type="button"
@@ -148,6 +150,7 @@ export default function RoomDetail() {
                     onClick={() => navigate(`/tanks/${tank.id}?fromRoom=${room.id}&fromRoomName=${encodeURIComponent(room.name)}`)}
                     style={{ position: 'absolute', top: 2, left: 2, display: 'grid', placeItems: 'center', width: 24, height: 24, padding: 0, border: 'none', borderRadius: 5, background: 'var(--surface-2)', color: 'var(--text-2)', cursor: 'pointer' }}
                   ><ExternalLink size={12} /></button>
+                  {canEdit && (
                   <button
                     type="button"
                     aria-label={`Remove ${tank.name} from ${room.name}`}
@@ -155,6 +158,7 @@ export default function RoomDetail() {
                     onClick={() => moveTankToRoom(tank.id, null)}
                     style={{ position: 'absolute', top: 2, right: 2, display: 'grid', placeItems: 'center', width: 24, height: 24, padding: 0, border: 'none', borderRadius: 5, background: 'var(--surface-2)', color: 'var(--text-2)', cursor: 'pointer' }}
                   ><X size={12} /></button>
+                  )}
                   <strong style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 12, color: 'var(--text)', marginTop: 2 }}>{tank.name}</strong>
                   <span style={{ fontSize: 10, color: 'var(--text-2)' }}>{tank.volume_litres} L</span>
                 </div>
@@ -182,12 +186,14 @@ export default function RoomDetail() {
           </div>
         ) : (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 14 }}>
-            {unassignedTanks.map(tank => (
+            {unassignedTanks.map(tank => {
+              const canEdit = canEditTank(tank)
+              return (
               <div
                 key={tank.id}
-                draggable
-                onDragStart={() => handleDragStart(tank.id, null)}
-                style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: 16, borderRadius: 14, border: '0.5px solid var(--border)', background: 'var(--surface-2)', cursor: 'grab' }}
+                draggable={canEdit}
+                onDragStart={() => canEdit && handleDragStart(tank.id, null)}
+                style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: 16, borderRadius: 14, border: '0.5px solid var(--border)', background: 'var(--surface-2)', cursor: canEdit ? 'grab' : 'default' }}
               >
                 <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'center' }}>
                   <p style={{ margin: 0, fontWeight: 600, color: 'var(--text)' }}>{tank.name}</p>
@@ -199,6 +205,7 @@ export default function RoomDetail() {
                   {tank.co2_injection && <span>CO₂</span>}
                   {tank.filter_flow_lph != null && <span>{tank.filter_flow_lph} L/h filter</span>}
                 </div>
+                {canEdit && (
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
                   <p style={{ margin: 0, fontSize: 12, color: 'var(--text-3)' }}>Drag into the room above, or tap to add.</p>
                   <button
@@ -209,8 +216,10 @@ export default function RoomDetail() {
                     <Plus size={13} /> Add
                   </button>
                 </div>
+                )}
               </div>
-            ))}
+              )
+            })}
           </div>
         )}
       </Card>

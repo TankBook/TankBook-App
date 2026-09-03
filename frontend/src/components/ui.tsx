@@ -6,6 +6,7 @@ function formatInline(text: string): string {
   const escaped = text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
   return escaped
     .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+    .replace(/\*(.*?)\*/g, '<em>$1</em>')
     .replace(/__(.*?)__/g, '<u>$1</u>')
 }
 
@@ -14,17 +15,25 @@ export function renderNotes(text: string): string {
   const lines = text.split('\n')
   const parts: string[] = []
   let inList = false
-  for (const line of lines) {
+  const closeList = () => { if (inList) { parts.push('</ul>'); inList = false } }
+
+  for (const rawLine of lines) {
+    const line = rawLine.trimStart()
+    const heading = line.match(/^(#{1,6})\s+(.*)/)
     if (line.startsWith('- ')) {
       if (!inList) { parts.push('<ul style="margin:4px 0 4px;padding-left:18px;">'); inList = true }
       parts.push(`<li style="margin:2px 0">${formatInline(line.slice(2))}</li>`)
+    } else if (heading) {
+      closeList()
+      const size = heading[1].length === 1 ? 15 : 13
+      parts.push(`<span style="display:block;font-weight:600;font-size:${size}px;margin:6px 0 2px">${formatInline(heading[2])}</span>`)
     } else {
-      if (inList) { parts.push('</ul>'); inList = false }
+      closeList()
       if (line.trim() === '') parts.push('<br>')
       else parts.push(`<span style="display:block">${formatInline(line)}</span>`)
     }
   }
-  if (inList) parts.push('</ul>')
+  closeList()
   return parts.join('')
 }
 
@@ -77,6 +86,20 @@ export function RichTextarea({ value, onChange, rows = 4, placeholder }: {
         style={{ width: '100%', boxSizing: 'border-box', resize: 'vertical' }}
       />
     </div>
+  )
+}
+
+export function AquaDropIcon({ size = 26 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <path
+        d="M12 21C12 21 4.5 14 4.5 9.5C4.5 5.91 7.91 3 12 3C16.09 3 19.5 5.91 19.5 9.5C19.5 14 12 21 12 21Z"
+        fill="#26C6DA" fillOpacity="0.2" stroke="#26C6DA" strokeWidth="1.6" strokeLinejoin="round"
+      />
+      <path d="M12 17.5V11" stroke="#43A047" strokeWidth="1.6" strokeLinecap="round"/>
+      <path d="M12 15.5C12 15.5 8.5 13.5 8.5 10.5C8.5 10.5 12 11 12 15.5Z" fill="#43A047"/>
+      <path d="M12 12.5C12 12.5 15.5 10.5 15.5 7.5C15.5 7.5 12 8 12 12.5Z" fill="#43A047"/>
+    </svg>
   )
 }
 

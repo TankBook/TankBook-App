@@ -1,4 +1,6 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react'
+import { useAuth } from './AuthContext'
+import { DashboardSectionLayout } from '../api/client'
 
 export type DateFormat = 'DD/MM/YYYY' | 'MM/DD/YYYY' | 'YYYY-MM-DD'
 export type Theme = 'light' | 'dark'
@@ -17,6 +19,10 @@ interface SettingsContextValue {
   setAppUrl: (url: string | null) => Promise<void>
   feedingAmountPresets: string[]
   setFeedingAmountPresets: (presets: string[]) => Promise<void>
+  dashboardLayout: DashboardSectionLayout[]
+  setDashboardLayout: (layout: DashboardSectionLayout[]) => Promise<void>
+  dashboardStats: string[]
+  setDashboardStats: (keys: string[]) => Promise<void>
   theme: Theme
   toggleTheme: () => void
   loading: boolean
@@ -35,15 +41,24 @@ const SettingsContext = createContext<SettingsContextValue>({
   setAppUrl: async () => {},
   feedingAmountPresets: [],
   setFeedingAmountPresets: async () => {},
+  dashboardLayout: [],
+  setDashboardLayout: async () => {},
+  dashboardStats: [],
+  setDashboardStats: async () => {},
   theme: 'light',
   toggleTheme: () => {},
   loading: true,
 })
 
 export function SettingsProvider({ children }: { children: ReactNode }) {
-  const [dateFormat, setDateFormatState] = useState<DateFormat>('DD/MM/YYYY')
-  const [unitSystem, setUnitSystemState] = useState<UnitSystem>('cm')
-  const [defaultTank, setDefaultTankState] = useState<string | null>(null)
+  // Date format and unit system are per-user preferences, edited on the Profile page —
+  // sourced from and persisted to the logged-in account rather than the shared app settings.
+  const { user, updateProfile } = useAuth()
+  const dateFormat = (user?.date_format as DateFormat) ?? 'DD/MM/YYYY'
+  const unitSystem = (user?.unit_system as UnitSystem) ?? 'cm'
+  const dashboardLayout = user?.dashboard_layout ?? []
+  const dashboardStats = user?.dashboard_stats ?? []
+  const defaultTank = user?.default_tank_id ?? null
   const [alertRetentionDays, setAlertRetentionDaysState] = useState<number | null>(null)
   const [appUrl, setAppUrlState] = useState<string | null>(null)
   const [feedingAmountPresets, setFeedingAmountPresetsState] = useState<string[]>([])
@@ -56,9 +71,6 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     fetch('/api/settings/')
       .then(r => r.json())
       .then(d => {
-        setDateFormatState(d.date_format)
-        setUnitSystemState(d.unit_system ?? 'cm')
-        setDefaultTankState(d.default_tank_id ?? null)
         setAlertRetentionDaysState(d.alert_retention_days ?? null)
         setAppUrlState(d.app_url ?? null)
         setFeedingAmountPresetsState(d.feeding_amount_presets ?? [])
@@ -73,30 +85,23 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
   }, [theme])
 
   async function setDateFormat(f: DateFormat) {
-    setDateFormatState(f)
-    await fetch('/api/settings/', {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ date_format: f }),
-    })
+    await updateProfile({ date_format: f })
   }
 
   async function setUnitSystem(u: UnitSystem) {
-    setUnitSystemState(u)
-    await fetch('/api/settings/', {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ unit_system: u }),
-    })
+    await updateProfile({ unit_system: u })
+  }
+
+  async function setDashboardLayout(layout: DashboardSectionLayout[]) {
+    await updateProfile({ dashboard_layout: layout })
+  }
+
+  async function setDashboardStats(keys: string[]) {
+    await updateProfile({ dashboard_stats: keys })
   }
 
   async function setDefaultTank(id: string | null) {
-    setDefaultTankState(id)
-    await fetch('/api/settings/', {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ default_tank_id: id }),
-    })
+    await updateProfile({ default_tank_id: id })
   }
 
   async function setAlertRetentionDays(days: number | null) {
@@ -131,7 +136,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
   }
 
   return (
-    <SettingsContext.Provider value={{ dateFormat, setDateFormat, unitSystem, setUnitSystem, defaultTank, setDefaultTank, alertRetentionDays, setAlertRetentionDays, appUrl, setAppUrl, feedingAmountPresets, setFeedingAmountPresets, theme, toggleTheme, loading }}>
+    <SettingsContext.Provider value={{ dateFormat, setDateFormat, unitSystem, setUnitSystem, defaultTank, setDefaultTank, alertRetentionDays, setAlertRetentionDays, appUrl, setAppUrl, feedingAmountPresets, setFeedingAmountPresets, dashboardLayout, setDashboardLayout, dashboardStats, setDashboardStats, theme, toggleTheme, loading }}>
       {children}
     </SettingsContext.Provider>
   )

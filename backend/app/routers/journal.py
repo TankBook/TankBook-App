@@ -2,9 +2,10 @@ from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from app.database import get_db
-from app.models.models import JournalEntry, TankFish
+from app.models.models import JournalEntry, TankFish, HealthCase, Tank
 from app.schemas.schemas import JournalEntryCreate, JournalEntryUpdate, JournalEntryOut
 from app.services.species import species_service
+from app.services.ownership import require_tank_view, require_tank_edit
 
 router = APIRouter()
 
@@ -22,6 +23,7 @@ def _enrich(entry: JournalEntry, db: Session) -> dict:
         "id": entry.id,
         "tank_id": entry.tank_id,
         "tank_fish_id": entry.tank_fish_id,
+        "case_id": entry.case_id,
         "event_type": entry.event_type,
         "notes": entry.notes,
         "occurred_at": entry.occurred_at,
@@ -32,7 +34,7 @@ def _enrich(entry: JournalEntry, db: Session) -> dict:
 
 
 @router.get("/{tank_id}/journal", response_model=list[JournalEntryOut])
-def list_journal(tank_id: str, db: Session = Depends(get_db)):
+def list_journal(tank_id: str, db: Session = Depends(get_db), _tank: Tank = Depends(require_tank_view)):
     entries = (
         db.query(JournalEntry)
         .filter_by(tank_id=tank_id)
@@ -43,11 +45,15 @@ def list_journal(tank_id: str, db: Session = Depends(get_db)):
 
 
 @router.post("/{tank_id}/journal", status_code=201)
-def add_journal(tank_id: str, body: JournalEntryCreate, db: Session = Depends(get_db)):
+def add_journal(tank_id: str, body: JournalEntryCreate, db: Session = Depends(get_db), _tank: Tank = Depends(require_tank_edit)):
     if body.tank_fish_id:
         fish = db.query(TankFish).filter_by(id=body.tank_fish_id, tank_id=tank_id).first()
         if not fish:
             raise HTTPException(404, "Fish entry not found in this tank")
+    if body.case_id:
+        case = db.query(HealthCase).filter_by(id=body.case_id, tank_id=tank_id).first()
+        if not case:
+            raise HTTPException(404, "Case not found in this tank")
     data = body.model_dump()
     if data.get("occurred_at") is None:
         data["occurred_at"] = datetime.utcnow()
@@ -59,7 +65,7 @@ def add_journal(tank_id: str, body: JournalEntryCreate, db: Session = Depends(ge
 
 
 @router.patch("/{tank_id}/journal/{entry_id}")
-def update_journal(tank_id: str, entry_id: str, body: JournalEntryUpdate, db: Session = Depends(get_db)):
+def update_journal(tank_id: str, entry_id: str, body: JournalEntryUpdate, db: Session = Depends(get_db), _tank: Tank = Depends(require_tank_edit)):
     entry = db.query(JournalEntry).filter_by(id=entry_id, tank_id=tank_id).first()
     if not entry:
         raise HTTPException(404, "Journal entry not found")
@@ -67,6 +73,10 @@ def update_journal(tank_id: str, entry_id: str, body: JournalEntryUpdate, db: Se
         if body.tank_fish_id != "" and not db.query(TankFish).filter_by(id=body.tank_fish_id, tank_id=tank_id).first():
             raise HTTPException(404, "Fish entry not found in this tank")
         entry.tank_fish_id = body.tank_fish_id or None
+    if body.case_id is not None:
+        if body.case_id != "" and not db.query(HealthCase).filter_by(id=body.case_id, tank_id=tank_id).first():
+            raise HTTPException(404, "Case not found in this tank")
+        entry.case_id = body.case_id or None
     if body.event_type is not None:
         entry.event_type = body.event_type
     if body.notes is not None:
@@ -79,7 +89,7 @@ def update_journal(tank_id: str, entry_id: str, body: JournalEntryUpdate, db: Se
 
 
 @router.delete("/{tank_id}/journal/{entry_id}", status_code=204)
-def delete_journal(tank_id: str, entry_id: str, db: Session = Depends(get_db)):
+def delete_journal(tank_id: str, entry_id: str, db: Session = Depends(get_db), _tank: Tank = Depends(require_tank_edit)):
     entry = db.query(JournalEntry).filter_by(id=entry_id, tank_id=tank_id).first()
     if not entry:
         raise HTTPException(404, "Journal entry not found")

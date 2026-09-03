@@ -1,18 +1,23 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Layers, Fish, Leaf, Bug, Waves, Bell, Clock, Plus, AlertTriangle, Timer, Thermometer, FlaskConical, GripVertical, Filter, Droplets, X, ChevronUp, ChevronDown } from 'lucide-react'
+import { Layers, Fish, Leaf, Bug, Waves, Bell, Clock, CalendarClock, Plus, AlertTriangle, Timer, GripVertical, Droplets, X, ChevronUp, ChevronDown, Eye, EyeOff, Pencil, type LucideIcon } from 'lucide-react'
 import { useTanks } from '../hooks'
-import { api, type TapWaterTest } from '../api/client'
+import { api, hasPermission, type TapWaterTest, type DashboardSectionLayout, type Group } from '../api/client'
 import { useSettings, formatDate, toMM, dimInputProps } from '../context/SettingsContext'
+import { useAuth } from '../context/AuthContext'
 import { Card, FieldLabel, StatCard, Tag } from '../components/ui'
+import { getParamStatus } from '../utils/paramStatus'
 
 interface DashboardStats {
   total_tanks: number
-  total_fish: number
-  total_species: number
-  total_plants: number
+  fish_count: number
+  fish_species: number
+  invertebrate_species: number
+  amphibian_species: number
+  plant_species: number
   unack_alerts: number
   overdue_tasks: number
+  tasks_due_today: number
   upcoming_tasks: Array<{
     id: string; tank_id: string; task_type: string
     description: string | null; due_at: string; is_recurring: boolean; recur_every_weeks: number | null
@@ -20,6 +25,7 @@ interface DashboardStats {
   tanks: Array<{
     id: string; name: string; volume_litres: number; water_type: string; co2_injection: boolean; has_heater: boolean; filter_flow_lph: number | null
     substrate: string | null
+    my_access: 'owner' | 'edit' | 'view'
     fish_count: number; fish_species: number
     invertebrate_count: number; invertebrate_species: number
     amphibian_count: number; amphibian_species: number
@@ -28,6 +34,61 @@ interface DashboardStats {
     latest_ammonia: number | null; latest_nitrite: number | null; latest_nitrate: number | null
     latest_recorded: string | null
   }>
+}
+
+// The 6 stat-card slots along the top are static in number/position, but each
+// slot's content is user-configurable in edit mode, picked from this set.
+const STAT_DEFS: Record<string, { label: string; icon: LucideIcon; value: (s: DashboardStats) => number; accent?: (v: number) => string | undefined }> = {
+  tanks:                 { label: 'Tanks',                 icon: Layers,        value: s => s.total_tanks },
+  fish:                  { label: 'Fish',                  icon: Fish,          value: s => s.fish_count },
+  fish_species:          { label: 'Fish Species',           icon: Fish,          value: s => s.fish_species },
+  invertebrate_species:  { label: 'Invertebrate Species',   icon: Bug,           value: s => s.invertebrate_species },
+  amphibian_species:     { label: 'Amphibian Species',      icon: Waves,         value: s => s.amphibian_species },
+  tasks_due_today:       { label: 'Tasks Due Today',        icon: CalendarClock, value: s => s.tasks_due_today, accent: v => v > 0 ? 'var(--amber)' : undefined },
+  plant_species:         { label: 'Plant Species',          icon: Leaf,          value: s => s.plant_species },
+  alerts:                { label: 'Alerts',                 icon: Bell,          value: s => s.unack_alerts, accent: v => v > 0 ? 'var(--amber)' : undefined },
+  overdue_tasks:         { label: 'Overdue Tasks',           icon: Clock,         value: s => s.overdue_tasks, accent: v => v > 0 ? 'var(--red)' : undefined },
+}
+const STAT_KEYS = Object.keys(STAT_DEFS)
+const DEFAULT_STAT_KEYS = ['tanks', 'fish', 'fish_species', 'plant_species', 'alerts', 'overdue_tasks']
+
+function ConfigurableStatCard({ statKey, stats, editMode, onEdit }: {
+  statKey: string
+  stats: DashboardStats
+  editMode: boolean
+  onEdit: () => void
+}) {
+  const [hovered, setHovered] = useState(false)
+  const def = STAT_DEFS[statKey] ?? STAT_DEFS[DEFAULT_STAT_KEYS[0]]
+  const value = def.value(stats)
+  const accent = def.accent?.(value)
+  if (!editMode) {
+    return <StatCard label={def.label} value={value} icon={def.icon} accent={accent} />
+  }
+  return (
+    <div
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      style={{ position: 'relative' }}
+    >
+      <StatCard label={def.label} value={value} icon={def.icon} accent={accent} />
+      {hovered && (
+        <button
+          onClick={onEdit}
+          title="Change this stat"
+          style={{
+            position: 'absolute', top: 8, right: 8,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            width: 22, height: 22, borderRadius: 6,
+            border: '0.5px solid var(--blue-border)', background: 'var(--blue-bg)', color: 'var(--blue)',
+            cursor: 'pointer', padding: 0,
+          }}
+        >
+          <Pencil size={12} />
+        </button>
+      )}
+    </div>
+  )
 }
 
 const WATER_TYPE_STYLES: Record<string, { bg: string; color: string; label: string }> = {
@@ -42,12 +103,27 @@ function WaterTypeBadge({ type }: { type: string }) {
 }
 
 const PARAMS = [
-  { key: 'latest_ph',      label: 'pH',   color: 'var(--blue)',              fmt: (v: number) => v.toFixed(1) },
-  { key: 'latest_temp',    label: 'Temp', color: 'var(--orange, #ef6c00)',   fmt: (v: number) => `${v.toFixed(0)}°` },
-  { key: 'latest_ammonia', label: 'NH₃',  color: 'var(--red)',               fmt: (v: number) => v.toFixed(2) },
-  { key: 'latest_nitrite', label: 'NO₂',  color: 'var(--amber)',             fmt: (v: number) => v.toFixed(2) },
-  { key: 'latest_nitrate', label: 'NO₃',  color: 'var(--green)',             fmt: (v: number) => v.toFixed(0) },
+  { key: 'latest_ph',      label: 'pH',   color: 'var(--blue)',              fmt: (v: number) => v.toFixed(1),  rangeKey: 'ph' },
+  { key: 'latest_temp',    label: 'Temp', color: 'var(--orange, #ef6c00)',   fmt: (v: number) => `${v.toFixed(0)}°`, rangeKey: 'temperature_c' },
+  { key: 'latest_ammonia', label: 'NH₃',  color: 'var(--red)',               fmt: (v: number) => v.toFixed(2),  rangeKey: 'ammonia_ppm' },
+  { key: 'latest_nitrite', label: 'NO₂',  color: 'var(--amber)',             fmt: (v: number) => v.toFixed(2),  rangeKey: 'nitrite_ppm' },
+  { key: 'latest_nitrate', label: 'NO₃',  color: 'var(--green)',             fmt: (v: number) => v.toFixed(0),  rangeKey: 'nitrate_ppm' },
 ] as const
+
+// Ring summary for the tank card header — counts how many of the 5 latest readings are
+// outside the ok/ideal range (see utils/paramStatus). Params with no reading yet are
+// left out of the total rather than counted against the tank.
+function ringStats(tank: DashboardStats['tanks'][0]) {
+  let total = 0
+  let bad = 0
+  for (const p of PARAMS) {
+    const val = tank[p.key] as number | null
+    if (val == null) continue
+    total += 1
+    if (getParamStatus(p.rangeKey, val, tank.water_type) === 'bad') bad += 1
+  }
+  return { total, bad, ok: total - bad }
+}
 
 const TAP_WATER_PARAMS = [
   { key: 'ph',           label: 'pH',       color: 'var(--blue)',               fmt: (v: number) => v.toFixed(1) },
@@ -57,6 +133,53 @@ const TAP_WATER_PARAMS = [
   { key: 'nitrate_ppm',  label: 'NO₃',      color: 'var(--green)',              fmt: (v: number) => v.toFixed(0) },
   { key: 'tds_ppm',      label: 'TDS',      color: 'var(--violet, #7c4dff)',    fmt: (v: number) => v.toFixed(0) },
 ] as const
+
+const DASHBOARD_SECTIONS: { id: string; label: string }[] = [
+  { id: 'stats', label: 'Stats' },
+  { id: 'tanks', label: 'Your Tanks' },
+  { id: 'tasks', label: 'Upcoming Tasks' },
+  { id: 'tap_water', label: 'Tap Water' },
+]
+
+function DashboardSection({
+  id, editMode, layout, onToggle, children,
+}: {
+  id: string
+  editMode: boolean
+  layout: DashboardSectionLayout[]
+  onToggle: (id: string) => void
+  children: React.ReactNode
+}) {
+  const visible = layout.find(s => s.id === id)?.visible ?? true
+  if (!editMode && !visible) return null
+  return (
+    <div style={editMode ? {
+      position: 'relative', opacity: visible ? 1 : 0.5,
+      border: '1px dashed var(--border)', borderRadius: 14,
+      padding: '40px 12px 12px', margin: '0 0 16px',
+    } : { position: 'relative' }}>
+      {editMode && (
+        <button
+          onClick={() => onToggle(id)}
+          title={visible ? 'Hide this section' : 'Show this section'}
+          style={{
+            position: 'absolute', top: 8, right: 8, zIndex: 1,
+            display: 'flex', alignItems: 'center', gap: 6,
+            padding: '4px 10px', borderRadius: 999, fontSize: 12, fontWeight: 500,
+            border: `0.5px solid ${visible ? 'var(--blue-border)' : 'var(--btn-border)'}`,
+            background: visible ? 'var(--blue-bg)' : 'var(--surface)',
+            color: visible ? 'var(--blue)' : 'var(--text-2)',
+            cursor: 'pointer',
+          }}
+        >
+          {visible ? <Eye size={13} /> : <EyeOff size={13} />}
+          {visible ? 'Visible' : 'Hidden'}
+        </button>
+      )}
+      {children}
+    </div>
+  )
+}
 
 type DragProps = {
   isDragging: boolean
@@ -71,13 +194,18 @@ type DragProps = {
   isLast: boolean
 }
 
-function TankOverviewCard({ tank, drag }: { tank: DashboardStats['tanks'][0]; drag: DragProps }) {
+function TankOverviewCard({ tank, drag, isMobile, editMode }: { tank: DashboardStats['tanks'][0]; drag: DragProps; isMobile: boolean; editMode: boolean }) {
   const navigate = useNavigate()
   const hasAlerts = tank.unack_alerts > 0 || tank.overdue_tasks > 0
+  const draggableNow = editMode && !isMobile && tank.my_access === 'owner'
+  const ring = ringStats(tank)
+  const ringCircumference = 113.1
+  const ringColor = ring.bad > 0 ? 'var(--red)' : 'var(--green)'
+  const restingBorderColor = ring.bad > 0 ? 'var(--red-border)' : 'var(--border)'
 
   return (
     <div
-      draggable
+      draggable={draggableNow}
       onClick={() => navigate(`/tanks/${tank.id}`)}
       onDragStart={drag.onDragStart}
       onDragOver={drag.onDragOver}
@@ -85,15 +213,15 @@ function TankOverviewCard({ tank, drag }: { tank: DashboardStats['tanks'][0]; dr
       onDragEnd={drag.onDragEnd}
       style={{
         background: 'var(--surface)',
-        border: `0.5px solid ${drag.isDragOver ? 'var(--blue-border)' : 'var(--border)'}`,
-        borderRadius: 14, padding: '1rem 1.1rem', cursor: drag.isDragging ? 'grabbing' : 'grab',
+        border: `0.5px solid ${drag.isDragOver ? 'var(--blue-border)' : restingBorderColor}`,
+        borderRadius: 14, padding: '1rem 1.1rem', cursor: draggableNow ? (drag.isDragging ? 'grabbing' : 'grab') : 'pointer',
         display: 'flex', flexDirection: 'column', gap: 12,
         transition: 'border-color 0.15s, opacity 0.15s',
         opacity: drag.isDragging ? 0.4 : 1,
         boxShadow: drag.isDragOver ? '0 0 0 2px color-mix(in srgb, var(--blue) 20%, transparent)' : 'none',
       }}
       onMouseEnter={e => { if (!drag.isDragging) e.currentTarget.style.borderColor = 'var(--blue-border)' }}
-      onMouseLeave={e => { if (!drag.isDragOver) e.currentTarget.style.borderColor = 'var(--border)' }}
+      onMouseLeave={e => { if (!drag.isDragOver) e.currentTarget.style.borderColor = restingBorderColor }}
     >
       {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
@@ -105,46 +233,62 @@ function TankOverviewCard({ tank, drag }: { tank: DashboardStats['tanks'][0]; dr
             <span style={{ fontSize: 11, color: 'var(--text-3)', background: 'var(--surface-2)', padding: '1px 7px', borderRadius: 5, border: '0.5px solid var(--border)' }}>
               {tank.volume_litres} L
             </span>
-            {tank.has_heater && (
-              <span title="Heater" style={{ display: 'inline-flex', alignItems: 'center', gap: 3, fontSize: 11, color: 'var(--orange, #ef6c00)', background: 'var(--orange-bg)', padding: '1px 6px', borderRadius: 5, border: '0.5px solid var(--orange-border, color-mix(in srgb, var(--orange, #ef6c00) 30%, transparent))' }}>
-                <Thermometer size={11} /> Heater
-              </span>
-            )}
-            {tank.filter_flow_lph && (
-              <span title={`Filter — ${tank.filter_flow_lph} L/h`} style={{ display: 'inline-flex', alignItems: 'center', gap: 3, fontSize: 11, color: 'var(--blue)', background: 'var(--blue-bg)', padding: '1px 6px', borderRadius: 5, border: '0.5px solid var(--blue-border, color-mix(in srgb, var(--blue) 30%, transparent))' }}>
-                <Filter size={11} /> Filter
-              </span>
-            )}
-            {tank.co2_injection && (
-              <span title="CO₂ Injection" style={{ display: 'inline-flex', alignItems: 'center', gap: 3, fontSize: 11, color: 'var(--green)', background: 'var(--green-bg)', padding: '1px 6px', borderRadius: 5, border: '0.5px solid var(--green-border, color-mix(in srgb, var(--green) 30%, transparent))' }}>
-                <FlaskConical size={11} /> CO₂
+            <WaterTypeBadge type={tank.water_type} />
+            {tank.my_access !== 'owner' && (
+              <span title={tank.my_access === 'edit' ? 'Shared with you — you can edit' : 'Shared with you — view only'} style={{ fontSize: 10, fontWeight: 500, color: 'var(--text-2)', background: 'var(--tag-bg)', border: '0.5px solid var(--border)', borderRadius: 5, padding: '1px 6px' }}>
+                Shared
               </span>
             )}
           </div>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
-          <WaterTypeBadge type={tank.water_type} />
-          <div style={{ display: 'flex', flexDirection: 'column', flexShrink: 0 }}>
-            <button
-              type="button"
-              aria-label="Move tank earlier"
-              disabled={drag.isFirst}
-              onClick={e => { e.stopPropagation(); drag.onMoveUp() }}
-              style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 26, height: 22, padding: 0, border: 'none', background: 'none', color: drag.isFirst ? 'var(--text-4)' : 'var(--text-2)', cursor: drag.isFirst ? 'default' : 'pointer' }}
-            >
-              <ChevronUp size={13} />
-            </button>
-            <button
-              type="button"
-              aria-label="Move tank later"
-              disabled={drag.isLast}
-              onClick={e => { e.stopPropagation(); drag.onMoveDown() }}
-              style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 26, height: 22, padding: 0, border: 'none', background: 'none', color: drag.isLast ? 'var(--text-4)' : 'var(--text-2)', cursor: drag.isLast ? 'default' : 'pointer' }}
-            >
-              <ChevronDown size={13} />
-            </button>
-          </div>
-          <GripVertical size={14} style={{ color: 'var(--text-4)', flexShrink: 0 }} />
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+          {ring.total > 0 && (
+            <div title={ring.bad > 0 ? `${ring.bad} reading${ring.bad > 1 ? 's' : ''} outside the safe range` : 'All parameters in range'} style={{ position: 'relative', width: 40, height: 40, flexShrink: 0 }}>
+              <svg viewBox="0 0 44 44" width="40" height="40">
+                <circle cx="22" cy="22" r="18" fill="none" stroke="var(--border-sub)" strokeWidth="4.5" />
+                {ring.bad > 0 ? (
+                  <circle
+                    cx="22" cy="22" r="18" fill="none" stroke={ringColor} strokeWidth="4.5" strokeLinecap="round"
+                    strokeDasharray={`${(ring.bad / ring.total) * ringCircumference} ${ringCircumference}`}
+                    transform="rotate(-90 22 22)"
+                  />
+                ) : (
+                  <circle
+                    cx="22" cy="22" r="18" fill="none" stroke={ringColor} strokeWidth="4.5" strokeLinecap="round"
+                    strokeDasharray={`${ringCircumference}`}
+                    transform="rotate(-90 22 22)"
+                  />
+                )}
+              </svg>
+              <span style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 700, color: ringColor }}>
+                {ring.ok}/{ring.total}
+              </span>
+            </div>
+          )}
+          {editMode && tank.my_access === 'owner' && (isMobile ? (
+            <div style={{ display: 'flex', flexDirection: 'column', flexShrink: 0 }}>
+              <button
+                type="button"
+                aria-label="Move tank earlier"
+                disabled={drag.isFirst}
+                onClick={e => { e.stopPropagation(); drag.onMoveUp() }}
+                style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 26, height: 22, padding: 0, border: 'none', background: 'none', color: drag.isFirst ? 'var(--text-4)' : 'var(--text-2)', cursor: drag.isFirst ? 'default' : 'pointer' }}
+              >
+                <ChevronUp size={13} />
+              </button>
+              <button
+                type="button"
+                aria-label="Move tank later"
+                disabled={drag.isLast}
+                onClick={e => { e.stopPropagation(); drag.onMoveDown() }}
+                style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 26, height: 22, padding: 0, border: 'none', background: 'none', color: drag.isLast ? 'var(--text-4)' : 'var(--text-2)', cursor: drag.isLast ? 'default' : 'pointer' }}
+              >
+                <ChevronDown size={13} />
+              </button>
+            </div>
+          ) : (
+            <GripVertical size={14} style={{ color: 'var(--text-4)', flexShrink: 0 }} />
+          ))}
         </div>
       </div>
 
@@ -169,44 +313,6 @@ function TankOverviewCard({ tank, drag }: { tank: DashboardStats['tanks'][0]; dr
         })}
       </div>
 
-      {/* Footer */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 6 }}>
-        <div style={{ display: 'flex', gap: 10, fontSize: 12, color: 'var(--text-2)', flexWrap: 'wrap' }}>
-          {tank.fish_count > 0 && (
-            <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-              <Fish size={12} />
-              {tank.fish_count} fish · {tank.fish_species} sp
-            </span>
-          )}
-          {tank.invertebrate_count > 0 && (
-            <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-              <Bug size={12} />
-              {tank.invertebrate_count} inv · {tank.invertebrate_species} sp
-            </span>
-          )}
-          {tank.amphibian_count > 0 && (
-            <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-              <Waves size={12} />
-              {tank.amphibian_count} amp · {tank.amphibian_species} sp
-            </span>
-          )}
-          {tank.plant_species > 0 && (
-            <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-              <Leaf size={12} />
-              {tank.plant_species} plant sp
-            </span>
-          )}
-          {tank.fish_count === 0 && tank.invertebrate_count === 0 && tank.amphibian_count === 0 && tank.plant_species === 0 && (
-            <span style={{ color: 'var(--text-4)' }}>No inhabitants yet</span>
-          )}
-        </div>
-        {tank.latest_recorded && (
-          <span style={{ fontSize: 10, color: 'var(--text-4)' }}>
-            {new Date(tank.latest_recorded).toLocaleDateString()}
-          </span>
-        )}
-      </div>
-
       {/* Alerts strip */}
       {hasAlerts && (
         <div style={{ display: 'flex', gap: 6, paddingTop: 8, borderTop: '0.5px solid var(--border-sub)' }}>
@@ -228,15 +334,27 @@ function TankOverviewCard({ tank, drag }: { tank: DashboardStats['tanks'][0]; dr
   )
 }
 
+function todayIso() {
+  const d = new Date()
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
 export default function Dashboard() {
   const { loading, reload } = useTanks()
-  const { dateFormat, unitSystem } = useSettings()
+  const { dateFormat, unitSystem, dashboardLayout, setDashboardLayout, dashboardStats, setDashboardStats } = useSettings()
+  const { user } = useAuth()
+  const canCreateTanks = hasPermission(user?.permissions.tanks, 'edit')
   const dimProps = dimInputProps(unitSystem)
   const [stats, setStats] = useState<DashboardStats | null>(null)
   const [showForm, setShowForm] = useState(false)
+  const [editMode, setEditMode] = useState(false)
+  const [editingStatSlot, setEditingStatSlot] = useState<number | null>(null)
+  const [statSlotDraft, setStatSlotDraft] = useState('')
   const [completingId, setCompletingId] = useState<string | null>(null)
   const [skipTaskId, setSkipTaskId] = useState<string | null>(null)
   const [skipTimes, setSkipTimes] = useState('1')
+  const [postponeTaskId, setPostponeTaskId] = useState<string | null>(null)
+  const [postponeDate, setPostponeDate] = useState('')
   const [isMobile, setIsMobile] = useState(() => window.matchMedia('(max-width: 768px)').matches)
   const [isTabletWidth, setIsTabletWidth] = useState(() => window.matchMedia('(max-width: 960px)').matches)
 
@@ -265,9 +383,14 @@ export default function Dashboard() {
   const [substrate, setSubstrate] = useState('')
   const [lighting, setLighting] = useState('')
   const [filterFlow, setFilterFlow] = useState('')
+  const [shape, setShape] = useState<'rectangle' | 'cylinder'>('rectangle')
   const [width, setWidth] = useState('')
   const [height, setHeight] = useState('')
   const [depth, setDepth] = useState('')
+  const [groupId, setGroupId] = useState('')
+
+  const [groups, setGroups] = useState<Group[]>([])
+  useEffect(() => { api.groups.list().then(setGroups) }, [])
 
   const [tapWaterTests, setTapWaterTests] = useState<TapWaterTest[]>([])
   const [showTapWaterModal, setShowTapWaterModal] = useState(false)
@@ -278,6 +401,7 @@ export default function Dashboard() {
   const [twNitrate, setTwNitrate] = useState('')
   const [twTds, setTwTds] = useState('')
   const [twNotes, setTwNotes] = useState('')
+  const [twGroupId, setTwGroupId] = useState('')
 
   async function loadStats() {
     const r = await fetch('/api/dashboard')
@@ -299,8 +423,9 @@ export default function Dashboard() {
       nitrate_ppm: twNitrate ? Number(twNitrate) : null,
       tds_ppm: twTds ? Number(twTds) : null,
       notes: twNotes || null,
+      group_id: twGroupId || null,
     })
-    setTwPh(''); setTwGh(''); setTwKh(''); setTwChlorine(''); setTwNitrate(''); setTwTds(''); setTwNotes('')
+    setTwPh(''); setTwGh(''); setTwKh(''); setTwChlorine(''); setTwNitrate(''); setTwTds(''); setTwNotes(''); setTwGroupId('')
     setShowTapWaterModal(false)
     loadTapWaterTests()
   }
@@ -330,9 +455,10 @@ export default function Dashboard() {
       lighting: lighting || null,
       has_filter: !!filterFlow,
       filter_flow_lph: filterFlow ? Number(filterFlow) : null,
+      shape,
       width_mm: width ? toMM(Number(width), unitSystem) : null,
       height_mm: height ? toMM(Number(height), unitSystem) : null,
-      depth_mm: depth ? toMM(Number(depth), unitSystem) : null,
+      depth_mm: shape === 'cylinder' ? null : (depth ? toMM(Number(depth), unitSystem) : null),
       has_heater: false,
       heater_watts: null,
       has_lighting: false,
@@ -340,10 +466,11 @@ export default function Dashboard() {
       light_watts: null,
       light_technology: null,
       setup_date: null,
+      group_id: groupId || null,
     })
     setName(''); setVolume(''); setWaterType('freshwater'); setCo2(false)
     setSubstrate(''); setLighting(''); setFilterFlow('')
-    setWidth(''); setHeight(''); setDepth('')
+    setShape('rectangle'); setWidth(''); setHeight(''); setDepth(''); setGroupId('')
     setShowForm(false)
     reload(); loadStats()
   }
@@ -366,6 +493,14 @@ export default function Dashboard() {
     await loadStats()
   }
 
+  async function postponeTask(tankId: string, taskId: string) {
+    if (!postponeDate) return
+    await api.maintenance.postpone(tankId, taskId, new Date(postponeDate).toISOString())
+    setPostponeTaskId(null)
+    setPostponeDate('')
+    await loadStats()
+  }
+
   function moveTank(tankId: string, direction: -1 | 1) {
     setOrderedTanks(prev => {
       const from = prev.findIndex(t => t.id === tankId)
@@ -379,35 +514,52 @@ export default function Dashboard() {
     })
   }
 
+  function toggleSection(id: string) {
+    const next = dashboardLayout.map(s => s.id === id ? { ...s, visible: !s.visible } : s)
+    setDashboardLayout(next)
+  }
+
   if (loading || !stats) return <p style={{ color: 'var(--text-2)' }}>Loading dashboard…</p>
 
   const hasAnyTwValue = [twPh, twGh, twKh, twChlorine, twNitrate, twTds].some(v => v.trim() !== '')
   const latestTapWater = tapWaterTests[0]
 
+  const statSlots = dashboardStats.length === 6 ? dashboardStats : DEFAULT_STAT_KEYS
+
+  function handleStatSlotChange(slotIndex: number, key: string) {
+    const next = [...statSlots]
+    next[slotIndex] = key
+    setDashboardStats(next)
+  }
+
   const statsRow = (
     <div style={{ display: 'grid', gridTemplateColumns: `repeat(${isMobile ? 2 : isTabletWidth ? 3 : 6}, 1fr)`, gap: 10, marginBottom: 24 }}>
-      <StatCard label="Tanks" value={stats.total_tanks} icon={Layers} />
-      <StatCard label="Fish" value={stats.total_fish} icon={Fish} />
-      <StatCard label="Fish species" value={stats.total_species} icon={Fish} />
-      <StatCard label="Plant species" value={stats.total_plants} icon={Leaf} />
-      <StatCard label="Alerts" value={stats.unack_alerts} icon={Bell} accent={stats.unack_alerts > 0 ? 'var(--amber)' : undefined} />
-      <StatCard label="Overdue tasks" value={stats.overdue_tasks} icon={Clock} accent={stats.overdue_tasks > 0 ? 'var(--red)' : undefined} />
+      {statSlots.map((key, i) => (
+        <ConfigurableStatCard
+          key={i}
+          statKey={key}
+          stats={stats}
+          editMode={editMode}
+          onEdit={() => { setEditingStatSlot(i); setStatSlotDraft(key) }}
+        />
+      ))}
     </div>
   )
 
-  const upcomingTasks = stats.upcoming_tasks.length > 0 && (
-    <div style={{ marginTop: 24 }}>
-      <p style={{ fontWeight: 500, fontSize: 15, margin: '0 0 12px', color: 'var(--text)' }}>Upcoming Tasks</p>
+  const hasUpcomingTasks = stats.upcoming_tasks.length > 0
+
+  const upcomingTasksContent = (
       <Card>
         {stats.upcoming_tasks.map((t, i) => {
           const tank = stats.tanks.find(tk => tk.id === t.tank_id)
           const skipping = skipTaskId === t.id
+          const postponing = postponeTaskId === t.id
           const isLast = i === stats.upcoming_tasks.length - 1
           const today = new Date(); today.setHours(0, 0, 0, 0)
           const due = new Date(t.due_at); due.setHours(0, 0, 0, 0)
           const dueToday = due.getTime() === today.getTime()
           return (
-            <div key={t.id} style={{ padding: '8px 0', borderBottom: !isLast || skipping ? '0.5px solid var(--border-sub)' : 'none' }}>
+            <div key={t.id} style={{ padding: '8px 0', borderBottom: !isLast || skipping || postponing ? '0.5px solid var(--border-sub)' : 'none' }}>
               {isMobile ? (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 6 }}>
@@ -429,9 +581,13 @@ export default function Dashboard() {
                       {completingId === t.id ? '…' : 'Done'}
                     </button>
                     <button
-                      onClick={() => { setSkipTaskId(skipping ? null : t.id); setSkipTimes('1') }}
+                      onClick={() => { setSkipTaskId(skipping ? null : t.id); setSkipTimes('1'); setPostponeTaskId(null) }}
                       style={{ flex: 1, fontSize: 12, padding: '5px 8px', borderRadius: 6, border: '0.5px solid var(--amber-border)', background: skipping ? 'var(--amber-bg)' : 'transparent', color: 'var(--amber)', cursor: 'pointer' }}
                     >Skip</button>
+                    <button
+                      onClick={() => { setPostponeTaskId(postponing ? null : t.id); setPostponeDate(''); setSkipTaskId(null) }}
+                      style={{ flex: 1, fontSize: 12, padding: '5px 8px', borderRadius: 6, border: '0.5px solid var(--blue-border)', background: postponing ? 'var(--blue-bg)' : 'transparent', color: 'var(--blue)', cursor: 'pointer' }}
+                    >Postpone</button>
                   </div>
                 </div>
               ) : (
@@ -456,9 +612,13 @@ export default function Dashboard() {
                         {completingId === t.id ? '…' : 'Done'}
                       </button>
                       <button
-                        onClick={() => { setSkipTaskId(skipping ? null : t.id); setSkipTimes('1') }}
+                        onClick={() => { setSkipTaskId(skipping ? null : t.id); setSkipTimes('1'); setPostponeTaskId(null) }}
                         style={{ fontSize: 11, padding: '2px 8px', borderRadius: 6, border: '0.5px solid var(--amber-border)', background: skipping ? 'var(--amber-bg)' : 'transparent', color: 'var(--amber)', cursor: 'pointer' }}
                       >Skip</button>
+                      <button
+                        onClick={() => { setPostponeTaskId(postponing ? null : t.id); setPostponeDate(''); setSkipTaskId(null) }}
+                        style={{ fontSize: 11, padding: '2px 8px', borderRadius: 6, border: '0.5px solid var(--blue-border)', background: postponing ? 'var(--blue-bg)' : 'transparent', color: 'var(--blue)', cursor: 'pointer' }}
+                      >Postpone</button>
                     </div>
                   </div>
                 </div>
@@ -480,27 +640,62 @@ export default function Dashboard() {
                   <button onClick={() => setSkipTaskId(null)} style={{ fontSize: 11, padding: '2px 6px', borderRadius: 6, border: '0.5px solid var(--btn-border)', background: 'transparent', color: 'var(--text-2)', cursor: 'pointer' }}>Cancel</button>
                 </div>
               )}
+              {postponing && (
+                <div style={{ marginTop: 6, display: 'flex', alignItems: 'center', gap: 6, padding: '6px 8px', borderRadius: 8, background: 'var(--blue-bg)', border: '0.5px solid var(--blue-border)', flexWrap: 'wrap' }}>
+                  <span style={{ fontSize: 11, color: 'var(--blue)', whiteSpace: 'nowrap' }}>Remind me on</span>
+                  <input
+                    type="date" value={postponeDate} min={todayIso()}
+                    onChange={e => setPostponeDate(e.target.value)}
+                    style={{ fontSize: 11, padding: '2px 4px', borderRadius: 6, border: '0.5px solid var(--blue-border)', background: 'var(--surface)', color: 'var(--text)' }}
+                  />
+                  <button
+                    onClick={() => postponeTask(t.tank_id, t.id)}
+                    disabled={!postponeDate}
+                    style={{ fontSize: 11, padding: '2px 8px', borderRadius: 6, border: '0.5px solid var(--blue-border)', background: postponeDate ? 'var(--blue)' : 'var(--surface-2)', color: postponeDate ? '#fff' : 'var(--text-3)', cursor: postponeDate ? 'pointer' : 'default', fontWeight: 500 }}
+                  >Confirm</button>
+                  <button onClick={() => setPostponeTaskId(null)} style={{ fontSize: 11, padding: '2px 6px', borderRadius: 6, border: '0.5px solid var(--btn-border)', background: 'transparent', color: 'var(--text-2)', cursor: 'pointer' }}>Cancel</button>
+                </div>
+              )}
             </div>
           )
         })}
       </Card>
-    </div>
   )
 
   return (
     <div>
-      <h1 style={{ margin: '0 0 20px', fontSize: 22, fontWeight: 500, color: 'var(--text)' }}>Dashboard</h1>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: '0 0 20px' }}>
+        <h1 style={{ margin: 0, fontSize: 22, fontWeight: 500, color: 'var(--text)' }}>Dashboard</h1>
+        <button
+          onClick={() => setEditMode(v => !v)}
+          style={{
+            display: 'flex', alignItems: 'center', gap: 6,
+            padding: '7px 14px', borderRadius: 8, fontSize: 13, fontWeight: 500,
+            border: `0.5px solid ${editMode ? 'var(--blue-border)' : 'var(--btn-border)'}`,
+            background: editMode ? 'var(--blue-bg)' : 'transparent',
+            color: editMode ? 'var(--blue)' : 'var(--text-2)',
+            cursor: 'pointer',
+          }}
+        >
+          <Pencil size={13} />
+          {editMode ? 'Done' : 'Edit Dashboard'}
+        </button>
+      </div>
 
-      {statsRow}
+      <DashboardSection id="stats" editMode={editMode} layout={dashboardLayout} onToggle={toggleSection}>
+        {statsRow}
+      </DashboardSection>
 
-      <div style={{ display: 'flex', gap: 20, alignItems: 'flex-start' }}>
-        <div style={{ flex: 1, minWidth: 0 }}>
+      <DashboardSection id="tanks" editMode={editMode} layout={dashboardLayout} onToggle={toggleSection}>
+        <div style={{ marginTop: 24 }}>
           <p style={{ fontWeight: 500, fontSize: 15, margin: '0 0 12px', color: 'var(--text)' }}>Your Tanks</p>
           <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(2, 1fr)', gap: 16 }}>
             {orderedTanks.map((t, i) => (
               <TankOverviewCard
                 key={t.id}
                 tank={t}
+                isMobile={isMobile}
+                editMode={editMode}
                 drag={{
                   isDragging: dragId === t.id,
                   isDragOver: dragOverId === t.id,
@@ -528,64 +723,76 @@ export default function Dashboard() {
                 }}
               />
             ))}
+            {editMode && canCreateTanks && (
+              <button
+                onClick={() => setShowForm(true)}
+                style={{
+                  display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                  gap: 8, minHeight: 160,
+                  background: 'transparent', borderRadius: 14, cursor: 'pointer',
+                  border: '1.5px dashed var(--border)', color: 'var(--text-3)',
+                  transition: 'border-color 0.15s, color 0.15s',
+                }}
+                onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--blue-border)'; e.currentTarget.style.color = 'var(--blue)' }}
+                onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.color = 'var(--text-3)' }}
+              >
+                <Plus size={24} />
+                <span style={{ fontSize: 13, fontWeight: 500 }}>Add Tank</span>
+              </button>
+            )}
+          </div>
+        </div>
+      </DashboardSection>
+
+      <DashboardSection id="tasks" editMode={editMode} layout={dashboardLayout} onToggle={toggleSection}>
+        <div style={{ marginTop: 24 }}>
+          <p style={{ fontWeight: 500, fontSize: 15, margin: '0 0 12px', color: 'var(--text)' }}>Upcoming Tasks</p>
+          {hasUpcomingTasks ? upcomingTasksContent : (
+            <Card><p style={{ fontSize: 13, color: 'var(--text-2)', margin: 0 }}>Nothing due right now.</p></Card>
+          )}
+        </div>
+      </DashboardSection>
+
+      <DashboardSection id="tap_water" editMode={editMode} layout={dashboardLayout} onToggle={toggleSection}>
+        <div style={{ marginTop: 24 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+            <p style={{ fontWeight: 500, fontSize: 15, margin: 0, color: 'var(--text)' }}>Tap Water</p>
             <button
-              onClick={() => setShowForm(true)}
-              style={{
-                display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-                gap: 8, minHeight: 160,
-                background: 'transparent', borderRadius: 14, cursor: 'pointer',
-                border: '1.5px dashed var(--border)', color: 'var(--text-3)',
-                transition: 'border-color 0.15s, color 0.15s',
-              }}
-              onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--blue-border)'; e.currentTarget.style.color = 'var(--blue)' }}
-              onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.color = 'var(--text-3)' }}
+              onClick={() => setShowTapWaterModal(true)}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 12, padding: '5px 12px', borderRadius: 8, border: '0.5px solid var(--blue-border)', background: 'var(--blue-bg)', color: 'var(--blue)', cursor: 'pointer', fontWeight: 500 }}
             >
-              <Plus size={24} />
-              <span style={{ fontSize: 13, fontWeight: 500 }}>Add Tank</span>
+              <Plus size={13} />Log Test
             </button>
           </div>
-          {upcomingTasks}
+          <Card>
+            {!latestTapWater ? (
+              <p style={{ fontSize: 13, color: 'var(--text-2)', margin: 0 }}>No tap water tests logged yet.</p>
+            ) : (
+              <>
+                <div style={{ display: 'grid', gridTemplateColumns: `repeat(${isMobile ? 3 : 6}, 1fr)`, gap: 8 }}>
+                  {TAP_WATER_PARAMS.map(({ key, label, color, fmt }) => {
+                    const val = latestTapWater[key]
+                    return (
+                      <div key={key} style={{ textAlign: 'center', background: 'var(--surface-2)', borderRadius: 8, padding: '8px 2px', border: '0.5px solid var(--border-sub)' }}>
+                        <p style={{ fontSize: 9, fontWeight: 600, color: 'var(--text-3)', margin: '0 0 5px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                          {label}
+                        </p>
+                        <p style={{ fontSize: 14, fontWeight: 500, margin: 0, color: val != null ? color : 'var(--text-4)' }}>
+                          {val != null ? fmt(val) : '—'}
+                        </p>
+                      </div>
+                    )
+                  })}
+                </div>
+                <p style={{ fontSize: 11, color: 'var(--text-3)', margin: '10px 0 0' }}>
+                  Last tested {formatDate(latestTapWater.recorded_at, dateFormat)}
+                  {latestTapWater.notes && ` · ${latestTapWater.notes}`}
+                </p>
+              </>
+            )}
+          </Card>
         </div>
-      </div>
-
-      <div style={{ marginTop: 24 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-          <p style={{ fontWeight: 500, fontSize: 15, margin: 0, color: 'var(--text)' }}>Tap Water</p>
-          <button
-            onClick={() => setShowTapWaterModal(true)}
-            style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 12, padding: '5px 12px', borderRadius: 8, border: '0.5px solid var(--blue-border)', background: 'var(--blue-bg)', color: 'var(--blue)', cursor: 'pointer', fontWeight: 500 }}
-          >
-            <Plus size={13} />Log Test
-          </button>
-        </div>
-        <Card>
-          {!latestTapWater ? (
-            <p style={{ fontSize: 13, color: 'var(--text-2)', margin: 0 }}>No tap water tests logged yet.</p>
-          ) : (
-            <>
-              <div style={{ display: 'grid', gridTemplateColumns: `repeat(${isMobile ? 3 : 6}, 1fr)`, gap: 8 }}>
-                {TAP_WATER_PARAMS.map(({ key, label, color, fmt }) => {
-                  const val = latestTapWater[key]
-                  return (
-                    <div key={key} style={{ textAlign: 'center', background: 'var(--surface-2)', borderRadius: 8, padding: '8px 2px', border: '0.5px solid var(--border-sub)' }}>
-                      <p style={{ fontSize: 9, fontWeight: 600, color: 'var(--text-3)', margin: '0 0 5px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-                        {label}
-                      </p>
-                      <p style={{ fontSize: 14, fontWeight: 500, margin: 0, color: val != null ? color : 'var(--text-4)' }}>
-                        {val != null ? fmt(val) : '—'}
-                      </p>
-                    </div>
-                  )
-                })}
-              </div>
-              <p style={{ fontSize: 11, color: 'var(--text-3)', margin: '10px 0 0' }}>
-                Last tested {formatDate(latestTapWater.recorded_at, dateFormat)}
-                {latestTapWater.notes && ` · ${latestTapWater.notes}`}
-              </p>
-            </>
-          )}
-        </Card>
-      </div>
+      </DashboardSection>
 
       {showTapWaterModal && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}
@@ -628,6 +835,15 @@ export default function Dashboard() {
                 <FieldLabel>Notes</FieldLabel>
                 <input value={twNotes} onChange={e => setTwNotes(e.target.value)} placeholder="Optional notes…" style={{ width: '100%', boxSizing: 'border-box' }} />
               </div>
+              {groups.length > 0 && (
+                <div>
+                  <FieldLabel>Group</FieldLabel>
+                  <select value={twGroupId} onChange={e => setTwGroupId(e.target.value)} style={{ width: '100%', boxSizing: 'border-box' }}>
+                    <option value="">Personal</option>
+                    {groups.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
+                  </select>
+                </div>
+              )}
             </div>
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, padding: '12px 20px', borderTop: '0.5px solid var(--border)' }}>
               <button onClick={() => setShowTapWaterModal(false)} style={{ fontSize: 13, padding: '7px 16px', borderRadius: 8, border: '0.5px solid var(--border)', background: 'transparent', cursor: 'pointer', color: 'var(--text-2)' }}>
@@ -637,6 +853,46 @@ export default function Dashboard() {
                 onClick={logTapWaterTest}
                 disabled={!hasAnyTwValue}
                 style={{ fontSize: 13, padding: '7px 18px', borderRadius: 8, border: '0.5px solid var(--blue-border)', background: hasAnyTwValue ? 'var(--blue-bg)' : 'var(--surface-2)', cursor: hasAnyTwValue ? 'pointer' : 'default', color: hasAnyTwValue ? 'var(--blue)' : 'var(--text-3)', fontWeight: 500 }}
+              >
+                Save
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {editingStatSlot !== null && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}
+          onClick={e => { if (e.target === e.currentTarget) setEditingStatSlot(null) }}>
+          <div style={{ background: 'var(--surface)', borderRadius: 12, border: '0.5px solid var(--border)', width: '100%', maxWidth: 340, display: 'flex', flexDirection: 'column' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 20px', borderBottom: '0.5px solid var(--border)' }}>
+              <span style={{ fontWeight: 600, fontSize: 15, color: 'var(--text)' }}>Change Stat</span>
+              <button onClick={() => setEditingStatSlot(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-2)', lineHeight: 0 }}><X size={18} /></button>
+            </div>
+            <div style={{ padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <div>
+                <FieldLabel>Show in this slot</FieldLabel>
+                <select
+                  value={statSlotDraft}
+                  onChange={e => setStatSlotDraft(e.target.value)}
+                  style={{ width: '100%', boxSizing: 'border-box' }}
+                >
+                  {STAT_KEYS.map(k => (
+                    <option key={k} value={k}>{STAT_DEFS[k].label}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, padding: '12px 20px 16px' }}>
+              <button
+                onClick={() => setEditingStatSlot(null)}
+                style={{ fontSize: 13, padding: '7px 16px', borderRadius: 8, border: '0.5px solid var(--btn-border)', background: 'transparent', color: 'var(--text)', cursor: 'pointer' }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => { handleStatSlotChange(editingStatSlot, statSlotDraft); setEditingStatSlot(null) }}
+                style={{ fontSize: 13, padding: '7px 18px', borderRadius: 8, fontWeight: 500, border: '0.5px solid var(--blue-border)', background: 'var(--blue-bg)', color: 'var(--blue)', cursor: 'pointer' }}
               >
                 Save
               </button>
@@ -672,6 +928,15 @@ export default function Dashboard() {
                   <option value="brackish">Brackish</option>
                 </select>
               </div>
+              {groups.length > 0 && (
+                <div>
+                  <FieldLabel>Group</FieldLabel>
+                  <select value={groupId} onChange={e => setGroupId(e.target.value)} style={{ width: '100%', boxSizing: 'border-box' }}>
+                    <option value="">Personal</option>
+                    {groups.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
+                  </select>
+                </div>
+              )}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
                 <div>
                   <FieldLabel>Substrate</FieldLabel>
@@ -686,19 +951,28 @@ export default function Dashboard() {
                   <input type="number" value={filterFlow} onChange={e => setFilterFlow(e.target.value)} placeholder="e.g. 600" style={{ width: '100%', boxSizing: 'border-box' }} />
                 </div>
               </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
+              <div>
+                <FieldLabel>Tank Shape</FieldLabel>
+                <select value={shape} onChange={e => setShape(e.target.value as 'rectangle' | 'cylinder')} style={{ width: '100%', boxSizing: 'border-box' }}>
+                  <option value="rectangle">Rectangle / Square</option>
+                  <option value="cylinder">Round / Cylinder</option>
+                </select>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: shape === 'cylinder' ? '1fr 1fr' : '1fr 1fr 1fr', gap: 12 }}>
                 <div>
-                  <FieldLabel>Width ({unitSystem})</FieldLabel>
+                  <FieldLabel>{shape === 'cylinder' ? `Diameter (${unitSystem})` : `Width (${unitSystem})`}</FieldLabel>
                   <input type="number" min="0" step={dimProps.step} value={width} onChange={e => setWidth(e.target.value)} placeholder={dimProps.placeholder} style={{ width: '100%', boxSizing: 'border-box' }} />
                 </div>
                 <div>
                   <FieldLabel>Height ({unitSystem})</FieldLabel>
                   <input type="number" min="0" step={dimProps.step} value={height} onChange={e => setHeight(e.target.value)} placeholder={dimProps.placeholder} style={{ width: '100%', boxSizing: 'border-box' }} />
                 </div>
-                <div>
-                  <FieldLabel>Depth ({unitSystem})</FieldLabel>
-                  <input type="number" min="0" step={dimProps.step} value={depth} onChange={e => setDepth(e.target.value)} placeholder={dimProps.placeholder} style={{ width: '100%', boxSizing: 'border-box' }} />
-                </div>
+                {shape !== 'cylinder' && (
+                  <div>
+                    <FieldLabel>Depth ({unitSystem})</FieldLabel>
+                    <input type="number" min="0" step={dimProps.step} value={depth} onChange={e => setDepth(e.target.value)} placeholder={dimProps.placeholder} style={{ width: '100%', boxSizing: 'border-box' }} />
+                  </div>
+                )}
               </div>
               <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: 'var(--text-label)' }}>
                 <input type="checkbox" checked={co2} onChange={e => setCo2(e.target.checked)} />

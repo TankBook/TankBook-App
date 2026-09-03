@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react'
-import { Fish, Leaf, Upload, Link, Shrimp, Bug, Plus, Pencil, X } from 'lucide-react'
-import { Tag, tabStyle, Card, FieldLabel } from '../components/ui'
-import { api } from '../api/client'
+import { Fish, Leaf, Upload, Link, Shrimp, Bug, Plus, Pencil, Trash2, X, Sparkles } from 'lucide-react'
+import { Tag, tabStyle, Card, FieldLabel, Modal, ConfirmDialog } from '../components/ui'
+import { api, hasPermission } from '../api/client'
 import type { SpeciesBody } from '../api/client'
+import { useAuth } from '../context/AuthContext'
 import { type Species, DifficultyBadge, SpeciesImage, SpeciesDetailModal } from '../components/SpeciesDetail'
 
 // ── Species form ─────────────────────────────────────────────────────────────
@@ -59,6 +60,32 @@ function speciesToForm(s: Species): SpeciesFormData {
   }
 }
 
+function draftToForm(d: SpeciesBody): SpeciesFormData {
+  return {
+    slug: d.slug, common_name: d.common_name, latin_name: d.latin_name, type: d.type,
+    family: d.family ?? '', origin: d.origin ?? '',
+    difficulty: d.care?.difficulty ?? '',
+    min_tank_litres: d.care?.min_tank_litres?.toString() ?? '',
+    shoal_min: d.care?.shoal_min?.toString() ?? '',
+    group_min: d.care?.group_min?.toString() ?? '',
+    max_size_cm: d.care?.max_size_cm?.toString() ?? '',
+    lifespan_years: d.care?.lifespan_years?.toString() ?? '',
+    growth_rate: d.care?.growth_rate ?? '',
+    temp_min: d.water?.temp_c?.min?.toString() ?? '',
+    temp_max: d.water?.temp_c?.max?.toString() ?? '',
+    ph_min: d.water?.ph?.min?.toString() ?? '',
+    ph_max: d.water?.ph?.max?.toString() ?? '',
+    gh_min: d.water?.gh_dgh?.min?.toString() ?? '',
+    gh_max: d.water?.gh_dgh?.max?.toString() ?? '',
+    kh_min: d.water?.kh_dkh?.min?.toString() ?? '',
+    kh_max: d.water?.kh_dkh?.max?.toString() ?? '',
+    temperament: d.compatibility?.temperament ?? '',
+    light_requirement: d.light?.requirement ?? '',
+    co2_required: d.co2_required === true ? 'true' : d.co2_required === false ? 'false' : '',
+    notes: d.notes ?? '',
+  }
+}
+
 function buildSubmitBody(form: SpeciesFormData): SpeciesBody {
   const body: SpeciesBody = {
     slug: form.slug.trim(),
@@ -96,16 +123,21 @@ function buildSubmitBody(form: SpeciesFormData): SpeciesBody {
 
 // ── Species modal ─────────────────────────────────────────────────────────────
 
-function SpeciesModal({ initial, onClose, onSaved }: {
+function SpeciesModal({ initial, initialForm, onClose, onSaved }: {
   initial?: Species | null
+  initialForm?: SpeciesFormData | null
   onClose: () => void
   onSaved: () => void
 }) {
+  const { user } = useAuth()
+  const canDelete = hasPermission(user?.permissions.species, 'delete')
   const isEdit = !!initial
-  const [form, setForm] = useState<SpeciesFormData>(initial ? speciesToForm(initial) : EMPTY_FORM)
+  const [form, setForm] = useState<SpeciesFormData>(initial ? speciesToForm(initial) : initialForm ?? EMPTY_FORM)
   const [slugEdited, setSlugEdited] = useState(isEdit)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [deleting, setDeleting] = useState(false)
+  const [confirmDelete, setConfirmDelete] = useState(false)
   const [imageFile, setImageFile] = useState<File | null>(null)
   const [imagePreview, setImagePreview] = useState<string | null>(null)
   const [hasExistingImage, setHasExistingImage] = useState(!!initial)
@@ -155,6 +187,21 @@ function SpeciesModal({ initial, onClose, onSaved }: {
       setError(e.message ?? 'Failed to save species')
     } finally {
       setSaving(false)
+    }
+  }
+
+  async function handleDelete() {
+    if (!initial) return
+    setDeleting(true)
+    setError(null)
+    try {
+      await api.species.remove(initial.slug)
+      onSaved()
+      onClose()
+    } catch (e: any) {
+      setError(e.message ?? 'Failed to delete species')
+      setDeleting(false)
+      setConfirmDelete(false)
     }
   }
 
@@ -472,6 +519,13 @@ function SpeciesModal({ initial, onClose, onSaved }: {
           {error
             ? <p style={{ margin: 0, fontSize: 12, color: 'var(--red)', flex: 1 }}>{error}</p>
             : <span style={{ flex: 1 }} />}
+          {isEdit && canDelete && (
+            <button onClick={() => setConfirmDelete(true)} disabled={deleting} title="Delete species" style={{
+              padding: '7px 10px', borderRadius: 8, fontSize: 13, cursor: deleting ? 'not-allowed' : 'pointer',
+              border: '0.5px solid var(--red-border)', background: 'transparent', color: 'var(--red)',
+              opacity: deleting ? 0.6 : 1, display: 'inline-flex', alignItems: 'center',
+            }}><Trash2 size={14} /></button>
+          )}
           <div style={{ display: 'flex', gap: 8 }}>
             <button onClick={onClose} style={{
               padding: '7px 16px', borderRadius: 8, fontSize: 13, cursor: 'pointer',
@@ -486,13 +540,98 @@ function SpeciesModal({ initial, onClose, onSaved }: {
           </div>
         </div>
       </div>
+      {confirmDelete && (
+        <ConfirmDialog
+          title="Delete species?"
+          message={`This permanently removes ${initial?.common_name} from the catalog. Fish/plants already logged against it in tanks are unaffected.`}
+          confirmLabel={deleting ? 'Deleting…' : 'Delete'}
+          danger
+          onConfirm={handleDelete}
+          onCancel={() => setConfirmDelete(false)}
+        />
+      )}
     </div>
+  )
+}
+
+// ── AI draft modal ────────────────────────────────────────────────────────────
+
+function AIDraftModal({ onClose, onDraft }: {
+  onClose: () => void
+  onDraft: (draft: SpeciesBody) => void
+}) {
+  const [name, setName] = useState('')
+  const [generating, setGenerating] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  async function handleGenerate() {
+    if (!name.trim()) return
+    setGenerating(true)
+    setError(null)
+    try {
+      const draft = await api.agent.draftSpecies(name.trim())
+      onDraft(draft)
+    } catch (e: any) {
+      setError(e.message ?? 'Could not generate a draft')
+    } finally {
+      setGenerating(false)
+    }
+  }
+
+  return (
+    <Modal title="Draft Species with AI" onClose={onClose} width={420}>
+      <p style={{ margin: '0 0 12px', fontSize: 12, color: 'var(--text-2)' }}>
+        Enter a common or scientific name and the configured AI assistant will draft care-sheet
+        data into the Add Species form — you'll be able to review and edit everything before saving.
+      </p>
+      <FieldLabel>Species name</FieldLabel>
+      <input
+        value={name}
+        onChange={e => setName(e.target.value)}
+        onKeyDown={e => { if (e.key === 'Enter' && !generating) handleGenerate() }}
+        placeholder="e.g. Neon Tetra"
+        autoFocus
+        disabled={generating}
+        style={{ width: '100%', boxSizing: 'border-box' }}
+      />
+
+      {error && (
+        <div style={{ marginTop: 12, background: 'var(--red-bg)', border: '0.5px solid var(--red-border)', borderRadius: 8, padding: '8px 12px' }}>
+          <p style={{ margin: 0, fontSize: 12, color: 'var(--red)' }}>{error}</p>
+        </div>
+      )}
+
+      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 16 }}>
+        <button
+          onClick={onClose}
+          style={{ padding: '7px 16px', borderRadius: 8, fontSize: 13, border: '0.5px solid var(--btn-border)', background: 'transparent', color: 'var(--text)', cursor: 'pointer' }}
+        >
+          Cancel
+        </button>
+        <button
+          onClick={handleGenerate}
+          disabled={generating || !name.trim()}
+          style={{
+            display: 'flex', alignItems: 'center', gap: 6,
+            padding: '7px 16px', borderRadius: 8, fontSize: 13, fontWeight: 500,
+            cursor: generating || !name.trim() ? 'default' : 'pointer',
+            border: '0.5px solid var(--blue-border)',
+            background: generating || !name.trim() ? 'var(--surface-2)' : 'var(--blue-bg)',
+            color: generating || !name.trim() ? 'var(--text-3)' : 'var(--blue)',
+          }}
+        >
+          <Sparkles size={13} />{generating ? 'Generating…' : 'Generate'}
+        </button>
+      </div>
+    </Modal>
   )
 }
 
 // ── Species card ──────────────────────────────────────────────────────────────
 
 function SpeciesCard({ s, onOpen, onEdit }: { s: Species; onOpen: () => void; onEdit: () => void }) {
+  const { user } = useAuth()
+  const canEdit = hasPermission(user?.permissions.species, 'edit')
   const typeStyle: Record<string, { bg: string; color: string; icon: React.ReactNode }> = {
     fish:         { bg: 'var(--cyan-bg)',   color: 'var(--cyan)',   icon: <Fish size={10} /> },
     plant:        { bg: 'var(--green-bg)',  color: 'var(--green)',  icon: <Leaf size={10} /> },
@@ -521,15 +660,17 @@ function SpeciesCard({ s, onOpen, onEdit }: { s: Species; onOpen: () => void; on
             </div>
           </div>
         </div>
-        <button
-          onClick={e => { e.stopPropagation(); onEdit() }}
-          title="Edit species"
-          style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 32, height: 32, background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-3)', padding: 0, lineHeight: 0, borderRadius: 6, flexShrink: 0 }}
-          onMouseEnter={e => (e.currentTarget.style.color = 'var(--blue)')}
-          onMouseLeave={e => (e.currentTarget.style.color = 'var(--text-3)')}
-        >
-          <Pencil size={13} />
-        </button>
+        {canEdit && (
+          <button
+            onClick={e => { e.stopPropagation(); onEdit() }}
+            title="Edit species"
+            style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 32, height: 32, background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-3)', padding: 0, lineHeight: 0, borderRadius: 6, flexShrink: 0 }}
+            onMouseEnter={e => (e.currentTarget.style.color = 'var(--blue)')}
+            onMouseLeave={e => (e.currentTarget.style.color = 'var(--text-3)')}
+          >
+            <Pencil size={13} />
+          </button>
+        )}
       </div>
     </div>
   )
@@ -569,6 +710,9 @@ function typeFilterStyle(type: string, active: boolean): React.CSSProperties {
 }
 
 export default function SpeciesBrowser() {
+  const { user } = useAuth()
+  const canUseAi = hasPermission(user?.permissions.ai, 'use')
+  const canEditSpecies = hasPermission(user?.permissions.species, 'edit')
   const [all, setAll] = useState<Species[]>([])
   const [filter, setFilter] = useState<'all' | 'fish' | 'plant' | 'invertebrate' | 'amphibian'>('all')
   const [search, setSearch] = useState('')
@@ -591,6 +735,9 @@ export default function SpeciesBrowser() {
   const [modalMode, setModalMode] = useState<null | 'add' | 'edit'>(null)
   const [editTarget, setEditTarget] = useState<Species | null>(null)
   const [detailTarget, setDetailTarget] = useState<Species | null>(null)
+
+  const [showAIModal, setShowAIModal] = useState(false)
+  const [aiDraftForm, setAiDraftForm] = useState<SpeciesFormData | null>(null)
 
   const [isMobile, setIsMobile] = useState(() => window.matchMedia('(max-width: 768px)').matches)
   useEffect(() => {
@@ -674,27 +821,41 @@ export default function SpeciesBrowser() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 20 }}>
           <h1 style={{ margin: 0, fontSize: 22, fontWeight: 500, color: 'var(--text)' }}>Species</h1>
           <div style={{ display: 'flex', gap: 8 }}>
-            <button
-              onClick={() => { setEditTarget(null); setModalMode('add') }}
-              style={{ display: 'flex', flex: 1, alignItems: 'center', justifyContent: 'center', gap: 6, fontSize: 14, padding: '8px 12px', borderRadius: 8, border: '0.5px solid var(--blue-border)', background: 'var(--blue-bg)', color: 'var(--blue)', cursor: 'pointer', fontWeight: 500 }}
-            >
-              <Plus size={14} />Add Species
-            </button>
-            <button
-              onClick={() => fetchAllImages(visible)}
-              disabled={fetchAllProgress?.running || visible.length === 0}
-              style={{ display: 'flex', flex: 1, alignItems: 'center', justifyContent: 'center', gap: 6, fontSize: 14, padding: '8px 12px', borderRadius: 8, border: '0.5px solid var(--btn-border)', background: 'transparent', cursor: fetchAllProgress?.running || visible.length === 0 ? 'not-allowed' : 'pointer', color: 'var(--text)', opacity: fetchAllProgress?.running || visible.length === 0 ? 0.5 : 1 }}
-            >
-              {fetchAllProgress?.running
-                ? `Fetching ${fetchAllProgress.current} / ${fetchAllProgress.total}…`
-                : 'Fetch All Images'}
-            </button>
-            <button
-              onClick={() => { setShowUpload(true); setUploadResult(null); setUploadError(null) }}
-              style={{ display: 'flex', flex: 1, alignItems: 'center', justifyContent: 'center', gap: 6, fontSize: 14, padding: '8px 12px', borderRadius: 8, border: '0.5px solid var(--btn-border)', background: 'transparent', cursor: 'pointer', color: 'var(--text)' }}
-            >
-              <Upload size={14} />Upload YAML
-            </button>
+            {canEditSpecies && (
+              <button
+                onClick={() => { setEditTarget(null); setModalMode('add') }}
+                style={{ display: 'flex', flex: 1, alignItems: 'center', justifyContent: 'center', gap: 6, fontSize: 14, padding: '8px 12px', borderRadius: 8, border: '0.5px solid var(--blue-border)', background: 'var(--blue-bg)', color: 'var(--blue)', cursor: 'pointer', fontWeight: 500 }}
+              >
+                <Plus size={14} />Add Species
+              </button>
+            )}
+            {canUseAi && canEditSpecies && (
+              <button
+                onClick={() => setShowAIModal(true)}
+                style={{ display: 'flex', flex: 1, alignItems: 'center', justifyContent: 'center', gap: 6, fontSize: 14, padding: '8px 12px', borderRadius: 8, border: '0.5px solid var(--blue-border)', background: 'transparent', color: 'var(--blue)', cursor: 'pointer', fontWeight: 500 }}
+              >
+                <Sparkles size={14} />AI
+              </button>
+            )}
+            {canEditSpecies && (
+              <button
+                onClick={() => fetchAllImages(visible)}
+                disabled={fetchAllProgress?.running || visible.length === 0}
+                style={{ display: 'flex', flex: 1, alignItems: 'center', justifyContent: 'center', gap: 6, fontSize: 14, padding: '8px 12px', borderRadius: 8, border: '0.5px solid var(--btn-border)', background: 'transparent', cursor: fetchAllProgress?.running || visible.length === 0 ? 'not-allowed' : 'pointer', color: 'var(--text)', opacity: fetchAllProgress?.running || visible.length === 0 ? 0.5 : 1 }}
+              >
+                {fetchAllProgress?.running
+                  ? `Fetching ${fetchAllProgress.current} / ${fetchAllProgress.total}…`
+                  : 'Fetch All Images'}
+              </button>
+            )}
+            {canEditSpecies && (
+              <button
+                onClick={() => { setShowUpload(true); setUploadResult(null); setUploadError(null) }}
+                style={{ display: 'flex', flex: 1, alignItems: 'center', justifyContent: 'center', gap: 6, fontSize: 14, padding: '8px 12px', borderRadius: 8, border: '0.5px solid var(--btn-border)', background: 'transparent', cursor: 'pointer', color: 'var(--text)' }}
+              >
+                <Upload size={14} />Upload YAML
+              </button>
+            )}
           </div>
           {fetchAllProgress && !fetchAllProgress.running && (
             <span style={{ fontSize: 12, textAlign: 'center', color: fetchAllProgress.failed < fetchAllProgress.total ? 'var(--green)' : 'var(--text-3)' }}>
@@ -707,33 +868,47 @@ export default function SpeciesBrowser() {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20, gap: 8 }}>
           <h1 style={{ margin: 0, fontSize: 22, fontWeight: 500, color: 'var(--text)' }}>Species</h1>
           <div style={{ display: 'flex', gap: 8 }}>
-            <button
-              onClick={() => { setEditTarget(null); setModalMode('add') }}
-              style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 14, padding: '8px 16px', borderRadius: 8, border: '0.5px solid var(--blue-border)', background: 'var(--blue-bg)', color: 'var(--blue)', cursor: 'pointer', fontWeight: 500 }}
-            >
-              <Plus size={14} />Add Species
-            </button>
+            {canEditSpecies && (
+              <button
+                onClick={() => { setEditTarget(null); setModalMode('add') }}
+                style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 14, padding: '8px 16px', borderRadius: 8, border: '0.5px solid var(--blue-border)', background: 'var(--blue-bg)', color: 'var(--blue)', cursor: 'pointer', fontWeight: 500 }}
+              >
+                <Plus size={14} />Add Species
+              </button>
+            )}
+            {canUseAi && canEditSpecies && (
+              <button
+                onClick={() => setShowAIModal(true)}
+                style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 14, padding: '8px 16px', borderRadius: 8, border: '0.5px solid var(--blue-border)', background: 'transparent', color: 'var(--blue)', cursor: 'pointer', fontWeight: 500 }}
+              >
+                <Sparkles size={14} />AI
+              </button>
+            )}
             {fetchAllProgress && !fetchAllProgress.running && (
               <span style={{ fontSize: 12, color: fetchAllProgress.failed < fetchAllProgress.total ? 'var(--green)' : 'var(--text-3)', alignSelf: 'center' }}>
                 {fetchAllProgress.total - fetchAllProgress.failed} fetched
                 {fetchAllProgress.failed > 0 && `, ${fetchAllProgress.failed} not found`}
               </span>
             )}
-            <button
-              onClick={() => fetchAllImages(visible)}
-              disabled={fetchAllProgress?.running || visible.length === 0}
-              style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 14, padding: '8px 16px', borderRadius: 8, border: '0.5px solid var(--btn-border)', background: 'transparent', cursor: fetchAllProgress?.running || visible.length === 0 ? 'not-allowed' : 'pointer', color: 'var(--text)', opacity: fetchAllProgress?.running || visible.length === 0 ? 0.5 : 1 }}
-            >
-              {fetchAllProgress?.running
-                ? `Fetching ${fetchAllProgress.current} / ${fetchAllProgress.total}…`
-                : 'Fetch All Images'}
-            </button>
-            <button
-              onClick={() => { setShowUpload(true); setUploadResult(null); setUploadError(null) }}
-              style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 14, padding: '8px 16px', borderRadius: 8, border: '0.5px solid var(--btn-border)', background: 'transparent', cursor: 'pointer', color: 'var(--text)' }}
-            >
-              <Upload size={14} />Upload YAML
-            </button>
+            {canEditSpecies && (
+              <button
+                onClick={() => fetchAllImages(visible)}
+                disabled={fetchAllProgress?.running || visible.length === 0}
+                style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 14, padding: '8px 16px', borderRadius: 8, border: '0.5px solid var(--btn-border)', background: 'transparent', cursor: fetchAllProgress?.running || visible.length === 0 ? 'not-allowed' : 'pointer', color: 'var(--text)', opacity: fetchAllProgress?.running || visible.length === 0 ? 0.5 : 1 }}
+              >
+                {fetchAllProgress?.running
+                  ? `Fetching ${fetchAllProgress.current} / ${fetchAllProgress.total}…`
+                  : 'Fetch All Images'}
+              </button>
+            )}
+            {canEditSpecies && (
+              <button
+                onClick={() => { setShowUpload(true); setUploadResult(null); setUploadError(null) }}
+                style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 14, padding: '8px 16px', borderRadius: 8, border: '0.5px solid var(--btn-border)', background: 'transparent', cursor: 'pointer', color: 'var(--text)' }}
+              >
+                <Upload size={14} />Upload YAML
+              </button>
+            )}
           </div>
         </div>
       )}
@@ -787,15 +962,28 @@ export default function SpeciesBrowser() {
         <SpeciesDetailModal
           s={detailTarget}
           onClose={() => setDetailTarget(null)}
-          onEdit={() => { setDetailTarget(null); setEditTarget(detailTarget); setModalMode('edit') }}
+          onEdit={canEditSpecies ? () => { setDetailTarget(null); setEditTarget(detailTarget); setModalMode('edit') } : undefined}
         />
       )}
 
       {modalMode && (
         <SpeciesModal
           initial={modalMode === 'edit' ? editTarget : null}
-          onClose={() => { setModalMode(null); setEditTarget(null) }}
+          initialForm={modalMode === 'add' ? aiDraftForm : null}
+          onClose={() => { setModalMode(null); setEditTarget(null); setAiDraftForm(null) }}
           onSaved={loadSpecies}
+        />
+      )}
+
+      {showAIModal && (
+        <AIDraftModal
+          onClose={() => setShowAIModal(false)}
+          onDraft={draft => {
+            setAiDraftForm(draftToForm(draft))
+            setShowAIModal(false)
+            setEditTarget(null)
+            setModalMode('add')
+          }}
         />
       )}
 

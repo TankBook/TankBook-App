@@ -1,72 +1,79 @@
 from contextlib import asynccontextmanager
+import asyncio
+import contextlib
 from pathlib import Path
 import os
+import secrets
 
 from fastapi import FastAPI, Depends
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
+from starlette.middleware.sessions import SessionMiddleware
 
-from app.routers import tanks, fish, plants, parameters, alerts, species, maintenance, settings, daily_tasks, journal, backup, images, spending, inventory, rooms, tap_water
-from app.services.species import species_service
+from app.routers import tanks, fish, plants, parameters, alerts, species, maintenance, settings, daily_tasks, journal, backup, images, spending, inventory, rooms, tap_water, agent, auth, push, health_cases, groups
+from app.services.species import species_service, check_compatibility
+from app.services.auth import get_current_user
+from app.services.push import notification_loop
+from app.services.ownership import require_tank_view
 from app.database import get_db
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     species_service.load()
+    sweep_task = asyncio.create_task(notification_loop())
     yield
+    sweep_task.cancel()
+    with contextlib.suppress(asyncio.CancelledError):
+        await sweep_task
 
 
 app = FastAPI(
     title="TankBook API",
-    version="0.7.2",
+    version="1.0.0",
     lifespan=lifespan,
     docs_url="/api/docs",
     redoc_url="/api/redoc",
     openapi_url="/api/openapi.json",
 )
 
-app.include_router(tanks.router, prefix="/api/tanks", tags=["tanks"])
-app.include_router(fish.router, prefix="/api/fish", tags=["fish"])
-app.include_router(plants.router, prefix="/api/plants", tags=["plants"])
-app.include_router(parameters.router, prefix="/api/parameters", tags=["parameters"])
-app.include_router(alerts.router, prefix="/api/alerts", tags=["alerts"])
-app.include_router(species.router, prefix="/api/species", tags=["species"])
-app.include_router(maintenance.router, prefix="/api/tanks", tags=["maintenance"])
-app.include_router(daily_tasks.router, prefix="/api/tanks", tags=["daily_tasks"])
-app.include_router(settings.router, prefix="/api/settings", tags=["settings"])
-app.include_router(journal.router, prefix="/api/tanks", tags=["journal"])
-app.include_router(backup.router, prefix="/api/backup", tags=["backup"])
-app.include_router(images.router, prefix="/api/images", tags=["images"])
-app.include_router(spending.router, prefix="/api", tags=["spending"])
-app.include_router(inventory.router, prefix="/api/inventory", tags=["inventory"])
-app.include_router(rooms.router, prefix="/api/rooms", tags=["rooms"])
-app.include_router(tap_water.router, prefix="/api/tap-water", tags=["tap_water"])
+# Only used to hold the short-lived OIDC state/nonce during the login redirect round-trip —
+# unrelated to the app's own session cookie, which is a DB-backed opaque token (see services/auth.py).
+app.add_middleware(
+    SessionMiddleware,
+    secret_key=os.environ.get("SECRET_KEY") or secrets.token_hex(32),
+    session_cookie="tankbook_oauth_state",
+)
+
+authenticated = [Depends(get_current_user)]
+
+app.include_router(auth.router, prefix="/api/auth", tags=["auth"])
+app.include_router(tanks.router, prefix="/api/tanks", tags=["tanks"], dependencies=authenticated)
+app.include_router(fish.router, prefix="/api/fish", tags=["fish"], dependencies=authenticated)
+app.include_router(plants.router, prefix="/api/plants", tags=["plants"], dependencies=authenticated)
+app.include_router(parameters.router, prefix="/api/parameters", tags=["parameters"], dependencies=authenticated)
+app.include_router(alerts.router, prefix="/api/alerts", tags=["alerts"], dependencies=authenticated)
+app.include_router(species.router, prefix="/api/species", tags=["species"], dependencies=authenticated)
+app.include_router(species.public_router, prefix="/api/species", tags=["species"])
+app.include_router(maintenance.router, prefix="/api/tanks", tags=["maintenance"], dependencies=authenticated)
+app.include_router(daily_tasks.router, prefix="/api/tanks", tags=["daily_tasks"], dependencies=authenticated)
+app.include_router(settings.router, prefix="/api/settings", tags=["settings"], dependencies=authenticated)
+app.include_router(journal.router, prefix="/api/tanks", tags=["journal"], dependencies=authenticated)
+app.include_router(health_cases.router, prefix="/api/tanks", tags=["health_cases"], dependencies=authenticated)
+app.include_router(backup.router, prefix="/api/backup", tags=["backup"], dependencies=authenticated)
+app.include_router(images.router, prefix="/api/images", tags=["images"], dependencies=authenticated)
+app.include_router(spending.router, prefix="/api", tags=["spending"], dependencies=authenticated)
+app.include_router(inventory.router, prefix="/api/inventory", tags=["inventory"], dependencies=authenticated)
+app.include_router(rooms.router, prefix="/api/rooms", tags=["rooms"], dependencies=authenticated)
+app.include_router(tap_water.router, prefix="/api/tap-water", tags=["tap_water"], dependencies=authenticated)
+app.include_router(agent.router, prefix="/api/agent", tags=["agent"], dependencies=authenticated)
+app.include_router(push.router, prefix="/api/push", tags=["push"], dependencies=authenticated)
+app.include_router(groups.router, prefix="/api/groups", tags=["groups"], dependencies=authenticated)
 
 
 @app.get("/api/tanks/{tank_id}/compatibility")
-def check_compatibility(tank_id: str, slug: str, db=Depends(get_db)):
-    """Check if a species slug is compatible with existing fish in a tank."""
-    from app.models.models import TankFish
-    incoming = species_service.get(slug)
-    if not incoming:
-        return {"warnings": [], "errors": [f"Unknown species: {slug}"]}
-
-    existing_fish = db.query(TankFish).filter_by(tank_id=tank_id).all()
-    warnings = []
-    for row in existing_fish:
-        existing = species_service.get(row.species_slug)
-        if not existing:
-            continue
-        compat = incoming.get("compatibility", {})
-        incompat_list = compat.get("incompatible_with", [])
-        if existing["slug"] in incompat_list:
-            warnings.append(f"{incoming['common_name']} is incompatible with {existing['common_name']} already in this tank.")
-        existing_incompat = existing.get("compatibility", {}).get("incompatible_with", [])
-        if incoming["slug"] in existing_incompat:
-            warnings.append(f"{existing['common_name']} (already in tank) is incompatible with {incoming['common_name']}.")
-
-    return {"warnings": list(set(warnings)), "errors": []}
+def get_compatibility(tank_id: str, slug: str, db=Depends(get_db), _tank=Depends(require_tank_view)):
+    return check_compatibility(db, tank_id, slug)
 
 
 @app.get("/api/health")
@@ -75,24 +82,55 @@ def health():
 
 
 @app.get("/api/dashboard")
-def dashboard_stats(db=Depends(get_db)):
-    from app.models.models import Tank, TankFish, TankPlant, WaterParameter, MaintenanceTask, Alert
+def dashboard_stats(db=Depends(get_db), _user=Depends(get_current_user)):
+    from app.models.models import Tank, TankShare, TankFish, TankPlant, WaterParameter, MaintenanceTask, Alert
     from sqlalchemy import func
-    from datetime import datetime
+    from datetime import datetime, timedelta
+    from app.services.groups import user_group_ids
 
-    tanks = db.query(Tank).order_by(Tank.sort_order, Tank.created_at).all()
+    group_ids = user_group_ids(db, _user.id)
+    owned = db.query(Tank).filter_by(owner_id=_user.id).all()
+    shared_ids = [r[0] for r in db.query(TankShare.tank_id).filter_by(user_id=_user.id).all()]
+    shared = db.query(Tank).filter(Tank.id.in_(shared_ids)).all() if shared_ids else []
+    grouped = db.query(Tank).filter(Tank.group_id.in_(group_ids)).all() if group_ids else []
+    tanks = list({t.id: t for t in owned + shared + grouped}.values())
+    tanks.sort(key=lambda t: (t.sort_order, t.created_at))
     tank_ids = [t.id for t in tanks]
+    my_access_by_tank = {t.id: "owner" for t in owned}
+    for t in grouped:
+        my_access_by_tank.setdefault(t.id, "edit")
+    if shared:
+        shares_by_tank = {s.tank_id: s.level for s in db.query(TankShare).filter_by(user_id=_user.id).all()}
+        for t in shared:
+            my_access_by_tank.setdefault(t.id, shares_by_tank.get(t.id, "view"))
 
     today_start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+    today_end = today_start + timedelta(days=1)
 
-    fish_count = db.query(func.sum(TankFish.quantity)).filter(TankFish.tank_id.in_(tank_ids), TankFish.fish_status == "added").scalar() or 0
-    plant_count = db.query(func.sum(TankPlant.quantity)).filter(TankPlant.tank_id.in_(tank_ids)).scalar() or 0
-    species_count = db.query(func.count(func.distinct(TankFish.species_slug))).filter(TankFish.tank_id.in_(tank_ids), TankFish.fish_status == "added").scalar() or 0
+    def _species_count(organism_type: str) -> int:
+        return db.query(func.count(func.distinct(TankFish.species_slug))).filter(
+            TankFish.tank_id.in_(tank_ids), TankFish.fish_status == "added",
+            TankFish.organism_type == organism_type,
+        ).scalar() or 0
+
+    fish_count = db.query(func.sum(TankFish.quantity)).filter(
+        TankFish.tank_id.in_(tank_ids), TankFish.fish_status == "added", TankFish.organism_type == "fish",
+    ).scalar() or 0
+    fish_species = _species_count("fish")
+    invertebrate_species = _species_count("invertebrate")
+    amphibian_species = _species_count("amphibian")
+    plant_species = db.query(func.count(func.distinct(TankPlant.species_slug))).filter(TankPlant.tank_id.in_(tank_ids)).scalar() or 0
     unack_alerts = db.query(Alert).filter(Alert.tank_id.in_(tank_ids), Alert.acknowledged == False).count()
     overdue_tasks = db.query(MaintenanceTask).filter(
         MaintenanceTask.tank_id.in_(tank_ids),
         MaintenanceTask.status == "pending",
         MaintenanceTask.due_at < today_start
+    ).count()
+    tasks_due_today = db.query(MaintenanceTask).filter(
+        MaintenanceTask.tank_id.in_(tank_ids),
+        MaintenanceTask.status == "pending",
+        MaintenanceTask.due_at >= today_start,
+        MaintenanceTask.due_at < today_end,
     ).count()
     upcoming_tasks = db.query(MaintenanceTask).filter(
         MaintenanceTask.tank_id.in_(tank_ids),
@@ -114,6 +152,7 @@ def dashboard_stats(db=Depends(get_db)):
         tank_summaries.append({
             "id": tank.id,
             "name": tank.name,
+            "my_access": my_access_by_tank[tank.id],
             "volume_litres": tank.volume_litres,
             "water_type": tank.water_type,
             "co2_injection": tank.co2_injection,
@@ -139,11 +178,14 @@ def dashboard_stats(db=Depends(get_db)):
 
     return {
         "total_tanks": len(tanks),
-        "total_fish": fish_count,
-        "total_species": species_count,
-        "total_plants": plant_count,
+        "fish_count": fish_count,
+        "fish_species": fish_species,
+        "invertebrate_species": invertebrate_species,
+        "amphibian_species": amphibian_species,
+        "plant_species": plant_species,
         "unack_alerts": unack_alerts,
         "overdue_tasks": overdue_tasks,
+        "tasks_due_today": tasks_due_today,
         "upcoming_tasks": [
             {
                 "id": t.id, "tank_id": t.tank_id, "task_type": t.task_type,
@@ -160,9 +202,14 @@ _static = Path("/app/static")
 if _static.is_dir():
     app.mount("/assets", StaticFiles(directory=_static / "assets"), name="assets")
 
+    _static_resolved = _static.resolve()
+
     @app.get("/{full_path:path}")
     async def spa_fallback(full_path: str):
-        candidate = _static / full_path
-        if candidate.is_file():
+        # full_path is attacker-controlled — resolve it and verify it's still inside
+        # _static before ever touching the filesystem, or "../../etc/passwd"-style
+        # traversal serves arbitrary files off the container.
+        candidate = (_static / full_path).resolve()
+        if candidate.is_relative_to(_static_resolved) and candidate.is_file():
             return FileResponse(candidate)
         return FileResponse(_static / "index.html")

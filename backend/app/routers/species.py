@@ -1,15 +1,26 @@
 import urllib.request
 import urllib.error
-from fastapi import APIRouter, Query, UploadFile, File, HTTPException
+from fastapi import APIRouter, Depends, Query, UploadFile, File, HTTPException
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
-from app.services.species import species_service
+from app.services.species import species_service, is_safe_slug
+from app.services.permissions import require_permission
+from app.services.url_safety import fetch_guard, UnsafeUrlError
 import yaml
 
 REQUIRED_FIELDS = ("slug", "type", "common_name", "latin_name")
 VALID_TYPES = {"fish", "plant", "invertebrate", "amphibian"}
+MAX_YAML_BYTES = 1 * 1024 * 1024
 
 router = APIRouter()
+require_species_edit = Depends(require_permission("species", "edit"))
+require_species_delete = Depends(require_permission("species", "delete"))
+
+# Mounted in main.py without the app-wide `authenticated` dependency — species YAML is
+# shared reference data, not per-user data, and this lets one self-hosted instance pull
+# a species definition straight from another (e.g. `species/upload-url` pointed at a
+# peer instance) without needing a login on the source instance.
+public_router = APIRouter()
 
 
 def _parse_and_save(contents: bytes) -> dict:
@@ -29,7 +40,10 @@ def _parse_and_save(contents: bytes) -> dict:
     if species_type not in VALID_TYPES:
         raise HTTPException(status_code=400, detail=f"type must be one of: {', '.join(sorted(VALID_TYPES))}")
 
-    species_service.save_yaml(data["slug"], species_type, contents)
+    try:
+        species_service.save_yaml(data["slug"], species_type, contents)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
     species_service.load()
     return {"ok": True, "slug": data["slug"], "common_name": data["common_name"], "type": species_type}
 
@@ -139,10 +153,12 @@ def list_species(type: str | None = Query(None), search: str | None = Query(None
 
 
 @router.post("/upload")
-async def upload_species(file: UploadFile = File(...)):
+async def upload_species(file: UploadFile = File(...), _perm=require_species_edit):
     if not file.filename or not file.filename.lower().endswith((".yaml", ".yml")):
         raise HTTPException(status_code=400, detail="File must be a .yaml or .yml file")
     contents = await file.read()
+    if len(contents) > MAX_YAML_BYTES:
+        raise HTTPException(status_code=413, detail=f"File too large (max {MAX_YAML_BYTES // (1024 * 1024)}MB)")
     return _parse_and_save(contents)
 
 
@@ -151,7 +167,7 @@ class UrlImportBody(BaseModel):
 
 
 @router.post("/upload-url")
-async def upload_species_from_url(body: UrlImportBody):
+async def upload_species_from_url(body: UrlImportBody, _perm=require_species_edit):
     url = body.url.strip()
     if not url.startswith(("http://", "https://")):
         raise HTTPException(status_code=400, detail="URL must start with http:// or https://")
@@ -160,18 +176,30 @@ async def upload_species_from_url(body: UrlImportBody):
         url = url.replace("github.com", "raw.githubusercontent.com").replace("/blob/", "/")
 
     try:
-        req = urllib.request.Request(url, headers={"User-Agent": "TankBook/0.5.0"})
-        with urllib.request.urlopen(req, timeout=10) as response:
-            contents = response.read()
+        # Species import should only ever reach the public internet — block anything
+        # that resolves to a private/loopback/link-local address (SSRF hardening), and
+        # pin DNS for the duration of the fetch so the address checked is the address
+        # connected to (closes a DNS-rebinding bypass of that check).
+        with fetch_guard(url):
+            req = urllib.request.Request(url, headers={"User-Agent": "TankBook/0.5.0"})
+            with urllib.request.urlopen(req, timeout=10) as response:
+                # Read one byte past the cap so an oversized response is caught below
+                # rather than trusting a (spoofable) Content-Length header.
+                contents = response.read(MAX_YAML_BYTES + 1)
+    except UnsafeUrlError as e:
+        raise HTTPException(status_code=400, detail=f"Refusing to fetch this URL: {e}")
     except urllib.error.HTTPError as e:
         raise HTTPException(status_code=400, detail=f"HTTP {e.code} fetching URL: {e.reason}")
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Failed to fetch URL: {e}")
 
+    if len(contents) > MAX_YAML_BYTES:
+        raise HTTPException(status_code=413, detail=f"File too large (max {MAX_YAML_BYTES // (1024 * 1024)}MB)")
+
     return _parse_and_save(contents)
 
 
-@router.get("/{slug}/yaml")
+@public_router.get("/{slug}/yaml")
 def download_species_yaml(slug: str):
     path = species_service.get_yaml_path(slug)
     if not path:
@@ -180,27 +208,41 @@ def download_species_yaml(slug: str):
 
 
 @router.post("/create")
-def create_species(body: SpeciesBody):
+def create_species(body: SpeciesBody, _perm=require_species_edit):
     if body.type not in VALID_TYPES:
         raise HTTPException(400, f"type must be one of: {', '.join(sorted(VALID_TYPES))}")
     if not body.slug.strip() or not body.common_name.strip() or not body.latin_name.strip():
         raise HTTPException(400, "slug, common_name, and latin_name are required")
     data = _build_species_dict(body)
     contents = yaml.dump(data, allow_unicode=True, sort_keys=False, default_flow_style=False).encode()
-    species_service.save_yaml(body.slug, body.type, contents)
+    try:
+        species_service.save_yaml(body.slug, body.type, contents)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
     species_service.load()
     return {"ok": True, "slug": body.slug, "common_name": body.common_name, "type": body.type}
 
 
 @router.put("/{slug}")
-def update_species(slug: str, body: SpeciesBody):
+def update_species(slug: str, body: SpeciesBody, _perm=require_species_edit):
     if not species_service.validate_slug(slug):
         raise HTTPException(404, f"Species not found: {slug}")
     if body.type not in VALID_TYPES:
         raise HTTPException(400, f"type must be one of: {', '.join(sorted(VALID_TYPES))}")
+    if not is_safe_slug(body.slug):
+        raise HTTPException(status_code=400, detail=f"Invalid slug: {body.slug!r} (use lowercase letters, digits, and hyphens only)")
     species_service.delete_yaml_for_slug(slug)
     data = _build_species_dict(body)
     contents = yaml.dump(data, allow_unicode=True, sort_keys=False, default_flow_style=False).encode()
     species_service.save_yaml(body.slug, body.type, contents)
     species_service.load()
     return {"ok": True, "slug": body.slug, "common_name": body.common_name, "type": body.type}
+
+
+@router.delete("/{slug}")
+def delete_species(slug: str, _perm=require_species_delete):
+    if not species_service.validate_slug(slug):
+        raise HTTPException(404, f"Species not found: {slug}")
+    species_service.delete_yaml_for_slug(slug)
+    species_service.load()
+    return {"ok": True}

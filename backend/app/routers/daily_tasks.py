@@ -2,19 +2,20 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models.models import DailyTask
+from app.models.models import DailyTask, Tank
 from app.schemas.schemas import DailyTaskCreate, DailyTaskOut, DailyTaskUpdate
+from app.services.ownership import require_tank_view, require_tank_edit
 
 router = APIRouter()
 
 
 @router.get("/{tank_id}/daily", response_model=list[DailyTaskOut])
-def list_daily_tasks(tank_id: str, db: Session = Depends(get_db)):
+def list_daily_tasks(tank_id: str, db: Session = Depends(get_db), _tank: Tank = Depends(require_tank_view)):
     return db.query(DailyTask).filter_by(tank_id=tank_id).order_by(DailyTask.hour, DailyTask.minute).all()
 
 
 @router.post("/{tank_id}/daily", response_model=DailyTaskOut, status_code=201)
-def create_daily_task(tank_id: str, body: DailyTaskCreate, db: Session = Depends(get_db)):
+def create_daily_task(tank_id: str, body: DailyTaskCreate, db: Session = Depends(get_db), _tank: Tank = Depends(require_tank_edit)):
     task = DailyTask(tank_id=tank_id, **body.model_dump())
     db.add(task)
     db.commit()
@@ -23,7 +24,7 @@ def create_daily_task(tank_id: str, body: DailyTaskCreate, db: Session = Depends
 
 
 @router.patch("/{tank_id}/daily/{task_id}", response_model=DailyTaskOut)
-def update_daily_task(tank_id: str, task_id: str, body: DailyTaskUpdate, db: Session = Depends(get_db)):
+def update_daily_task(tank_id: str, task_id: str, body: DailyTaskUpdate, db: Session = Depends(get_db), _tank: Tank = Depends(require_tank_edit)):
     task = db.query(DailyTask).filter_by(id=task_id, tank_id=tank_id).first()
     if not task:
         raise HTTPException(404, "Task not found")
@@ -35,7 +36,7 @@ def update_daily_task(tank_id: str, task_id: str, body: DailyTaskUpdate, db: Ses
 
 
 @router.delete("/{tank_id}/daily/{task_id}", status_code=204)
-def delete_daily_task(tank_id: str, task_id: str, db: Session = Depends(get_db)):
+def delete_daily_task(tank_id: str, task_id: str, db: Session = Depends(get_db), _tank: Tank = Depends(require_tank_edit)):
     task = db.query(DailyTask).filter_by(id=task_id, tank_id=tank_id).first()
     if not task:
         raise HTTPException(404, "Task not found")

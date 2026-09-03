@@ -1,17 +1,38 @@
 import json
 from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models.models import (
     Tank, TankFish, TankPlant, WaterParameter, MaintenanceTask,
-    Alert, DailyTask, JournalEntry, AppSettings, Expense, InventoryItem,
-    Room, RoomTankPosition,
+    Alert, DailyTask, JournalEntry, HealthCase, AppSettings, Expense, InventoryItem,
+    Room, RoomTankPosition, TapWaterTest, User, Group,
 )
+from app.services.permissions import require_permission
 
 router = APIRouter()
 
+require_general_edit = Depends(require_permission("general", "edit"))
+
 BACKUP_VERSION = 1
+
+
+class ExportSelection(BaseModel):
+    tanks: bool = True
+    tank_fish: bool = True
+    tank_plants: bool = True
+    tank_parameters: bool = True
+    tank_maintenance: bool = True
+    tank_daily_tasks: bool = True
+    tank_alerts: bool = True
+    tank_journal: bool = True
+    tank_health_cases: bool = True
+    rooms: bool = True
+    expenses: bool = True
+    inventory: bool = True
+    tap_water: bool = True
+    settings: bool = True
 
 
 def _dt(dt: datetime | None) -> str | None:
@@ -27,149 +48,210 @@ def _parse_dt(s: str | None) -> datetime | None:
         return None
 
 
-@router.get("/export")
-def export_backup(db: Session = Depends(get_db)):
-    settings = db.query(AppSettings).filter_by(id="default").first()
-
-    tanks_out = []
-    for tank in db.query(Tank).all():
-        fish = db.query(TankFish).filter_by(tank_id=tank.id).all()
-        plants = db.query(TankPlant).filter_by(tank_id=tank.id).all()
-        parameters = db.query(WaterParameter).filter_by(tank_id=tank.id).all()
-        tasks = db.query(MaintenanceTask).filter_by(tank_id=tank.id).all()
-        alerts = db.query(Alert).filter_by(tank_id=tank.id).all()
-        daily_tasks = db.query(DailyTask).filter_by(tank_id=tank.id).all()
-        journal = db.query(JournalEntry).filter_by(tank_id=tank.id).all()
-
-        tanks_out.append({
-            "id": tank.id, "name": tank.name, "volume_litres": tank.volume_litres,
-            "water_type": tank.water_type, "sort_order": tank.sort_order,
-            "substrate": tank.substrate, "lighting": tank.lighting,
-            "has_filter": tank.has_filter, "filter_flow_lph": tank.filter_flow_lph,
-            "width_mm": tank.width_mm, "height_mm": tank.height_mm, "depth_mm": tank.depth_mm,
-            "co2_injection": tank.co2_injection,
-            "co2_source": tank.co2_source, "co2_method": tank.co2_method,
-            "has_heater": tank.has_heater, "heater_watts": tank.heater_watts,
-            "has_lighting": tank.has_lighting,
-            "light_intensity": tank.light_intensity, "light_watts": tank.light_watts,
-            "light_technology": tank.light_technology,
-            "setup_date": _dt(tank.setup_date), "created_at": _dt(tank.created_at),
-            "fish": [{"id": r.id, "species_slug": r.species_slug, "quantity": r.quantity,
-                      "organism_type": r.organism_type, "fish_status": r.fish_status,
-                      "health_status": r.health_status, "food_types": r.food_types,
-                      "feeding_times_per_day": r.feeding_times_per_day,
-                      "feeding_amount": r.feeding_amount,
-                      "notes": r.notes, "added_at": _dt(r.added_at)}
-                     for r in fish],
-            "plants": [{"id": r.id, "species_slug": r.species_slug, "quantity": r.quantity,
-                        "plant_status": r.plant_status,
-                        "notes": r.notes, "added_at": _dt(r.added_at)}
-                       for r in plants],
-            "parameters": [{"id": r.id, "ph": r.ph, "ammonia_ppm": r.ammonia_ppm,
-                             "nitrite_ppm": r.nitrite_ppm, "nitrate_ppm": r.nitrate_ppm,
-                             "temperature_c": r.temperature_c, "gh_dgh": r.gh_dgh, "kh_dkh": r.kh_dkh,
-                             "salinity_ppt": r.salinity_ppt, "specific_gravity": r.specific_gravity,
-                             "notes": r.notes, "recorded_at": _dt(r.recorded_at)}
-                            for r in parameters],
-            "maintenance_tasks": [{"id": r.id, "task_type": r.task_type, "description": r.description,
-                                    "due_at": _dt(r.due_at), "completed_at": _dt(r.completed_at),
-                                    "status": r.status, "is_recurring": r.is_recurring,
-                                    "recur_every_weeks": r.recur_every_weeks,
-                                    "recur_day_of_week": r.recur_day_of_week,
-                                    "parent_task_id": r.parent_task_id}
-                                   for r in tasks],
-            "alerts": [{"id": r.id, "parameter_log_id": r.parameter_log_id, "alert_type": r.alert_type,
-                        "message": r.message, "severity": r.severity, "acknowledged": r.acknowledged,
-                        "triggered_at": _dt(r.triggered_at)}
-                       for r in alerts],
-            "daily_tasks": [{"id": r.id, "name": r.name, "hour": r.hour, "minute": r.minute,
-                              "days": r.days, "color": r.color}
-                             for r in daily_tasks],
-            "journal_entries": [{"id": r.id, "tank_fish_id": r.tank_fish_id, "event_type": r.event_type,
-                                  "notes": r.notes, "occurred_at": _dt(r.occurred_at),
-                                  "created_at": _dt(r.created_at)}
-                                 for r in journal],
-        })
-
-    inventory_out = [
-        {"id": i.id, "name": i.name, "category": i.category, "quantity": i.quantity,
-         "low_stock_threshold": i.low_stock_threshold, "unit_label": i.unit_label,
-         "notes": i.notes, "created_at": _dt(i.created_at)}
-        for i in db.query(InventoryItem).all()
-    ]
-
-    expenses_out = [
-        {"id": e.id, "tank_id": e.tank_id, "inventory_item_id": e.inventory_item_id,
-         "amount": e.amount, "category": e.category,
-         "description": e.description, "purchase_date": e.purchase_date,
-         "notes": e.notes, "created_at": _dt(e.created_at)}
-        for e in db.query(Expense).all()
-    ]
-
-    rooms_out = [
-        {"id": r.id, "name": r.name, "width_m": r.width_m, "length_m": r.length_m,
-         "tank_positions": [{"tank_id": p.tank_id, "x": p.x, "y": p.y} for p in r.tank_positions]}
-        for r in db.query(Room).all()
-    ]
-
-    return {
+@router.post("/export")
+def export_backup(body: ExportSelection = ExportSelection(), db: Session = Depends(get_db), _perm=require_general_edit):
+    result: dict = {
         "exported_at": datetime.utcnow().isoformat(),
         "version": BACKUP_VERSION,
-        "settings": {
-            "date_format": settings.date_format if settings else "DD/MM/YYYY",
-            "unit_system": settings.unit_system if settings else "cm",
-            "default_tank_id": settings.default_tank_id if settings else None,
+    }
+
+    if body.settings:
+        settings = db.query(AppSettings).filter_by(id="default").first()
+        result["settings"] = {
             "alert_retention_days": settings.alert_retention_days if settings else None,
             "app_url": settings.app_url if settings else None,
             "feeding_amount_presets": settings.feeding_amount_presets if settings else [],
-        },
-        "tanks": tanks_out,
-        "expenses": expenses_out,
-        "inventory_items": inventory_out,
-        "rooms": rooms_out,
-    }
+        }
+
+    if body.tanks:
+        tanks_out = []
+        for tank in db.query(Tank).all():
+            entry = {
+                "id": tank.id, "name": tank.name, "volume_litres": tank.volume_litres,
+                "owner_id": tank.owner_id, "group_id": tank.group_id,
+                "water_type": tank.water_type, "sort_order": tank.sort_order,
+                "substrate": tank.substrate, "lighting": tank.lighting,
+                "has_filter": tank.has_filter, "filter_flow_lph": tank.filter_flow_lph,
+                "width_mm": tank.width_mm, "height_mm": tank.height_mm, "depth_mm": tank.depth_mm,
+                "co2_injection": tank.co2_injection,
+                "co2_source": tank.co2_source, "co2_method": tank.co2_method,
+                "has_heater": tank.has_heater, "heater_watts": tank.heater_watts,
+                "has_lighting": tank.has_lighting,
+                "light_intensity": tank.light_intensity, "light_watts": tank.light_watts,
+                "light_technology": tank.light_technology,
+                "setup_date": _dt(tank.setup_date), "created_at": _dt(tank.created_at),
+            }
+            if body.tank_fish:
+                fish = db.query(TankFish).filter_by(tank_id=tank.id).all()
+                entry["fish"] = [{"id": r.id, "species_slug": r.species_slug, "quantity": r.quantity,
+                                   "organism_type": r.organism_type, "fish_status": r.fish_status,
+                                   "health_status": r.health_status, "food_types": r.food_types,
+                                   "feeding_times_per_day": r.feeding_times_per_day,
+                                   "feeding_amount": r.feeding_amount,
+                                   "notes": r.notes, "added_at": _dt(r.added_at)}
+                                  for r in fish]
+            if body.tank_plants:
+                plants = db.query(TankPlant).filter_by(tank_id=tank.id).all()
+                entry["plants"] = [{"id": r.id, "species_slug": r.species_slug, "quantity": r.quantity,
+                                     "plant_status": r.plant_status,
+                                     "notes": r.notes, "added_at": _dt(r.added_at)}
+                                    for r in plants]
+            if body.tank_parameters:
+                parameters = db.query(WaterParameter).filter_by(tank_id=tank.id).all()
+                entry["parameters"] = [{"id": r.id, "ph": r.ph, "ammonia_ppm": r.ammonia_ppm,
+                                         "nitrite_ppm": r.nitrite_ppm, "nitrate_ppm": r.nitrate_ppm,
+                                         "temperature_c": r.temperature_c, "gh_dgh": r.gh_dgh, "kh_dkh": r.kh_dkh,
+                                         "salinity_ppt": r.salinity_ppt, "specific_gravity": r.specific_gravity,
+                                         "notes": r.notes, "recorded_at": _dt(r.recorded_at)}
+                                        for r in parameters]
+            if body.tank_maintenance:
+                tasks = db.query(MaintenanceTask).filter_by(tank_id=tank.id).all()
+                entry["maintenance_tasks"] = [{"id": r.id, "task_type": r.task_type, "description": r.description,
+                                                "due_at": _dt(r.due_at), "completed_at": _dt(r.completed_at),
+                                                "status": r.status, "is_recurring": r.is_recurring,
+                                                "recur_every_weeks": r.recur_every_weeks,
+                                                "recur_day_of_week": r.recur_day_of_week,
+                                                "parent_task_id": r.parent_task_id}
+                                               for r in tasks]
+            if body.tank_alerts:
+                alerts = db.query(Alert).filter_by(tank_id=tank.id).all()
+                entry["alerts"] = [{"id": r.id, "parameter_log_id": r.parameter_log_id, "alert_type": r.alert_type,
+                                     "message": r.message, "severity": r.severity, "acknowledged": r.acknowledged,
+                                     "triggered_at": _dt(r.triggered_at)}
+                                    for r in alerts]
+            if body.tank_daily_tasks:
+                daily_tasks = db.query(DailyTask).filter_by(tank_id=tank.id).all()
+                entry["daily_tasks"] = [{"id": r.id, "name": r.name, "hour": r.hour, "minute": r.minute,
+                                          "days": r.days, "color": r.color}
+                                         for r in daily_tasks]
+            if body.tank_health_cases:
+                cases = db.query(HealthCase).filter_by(tank_id=tank.id).all()
+                entry["health_cases"] = [{"id": r.id, "tank_fish_id": r.tank_fish_id, "title": r.title,
+                                           "status": r.status, "started_at": _dt(r.started_at),
+                                           "treatment": r.treatment, "resolved_at": _dt(r.resolved_at),
+                                           "created_at": _dt(r.created_at)}
+                                          for r in cases]
+            if body.tank_journal:
+                journal = db.query(JournalEntry).filter_by(tank_id=tank.id).all()
+                entry["journal_entries"] = [{"id": r.id, "tank_fish_id": r.tank_fish_id, "case_id": r.case_id,
+                                              "event_type": r.event_type,
+                                              "notes": r.notes, "occurred_at": _dt(r.occurred_at),
+                                              "created_at": _dt(r.created_at)}
+                                             for r in journal]
+            tanks_out.append(entry)
+        result["tanks"] = tanks_out
+
+    if body.expenses:
+        result["expenses"] = [
+            {"id": e.id, "tank_id": e.tank_id, "inventory_item_id": e.inventory_item_id,
+             "amount": e.amount, "quantity": e.quantity, "category": e.category,
+             "description": e.description, "purchase_date": e.purchase_date,
+             "notes": e.notes, "created_at": _dt(e.created_at),
+             "owner_id": e.owner_id, "group_id": e.group_id}
+            for e in db.query(Expense).all()
+        ]
+
+    if body.inventory:
+        result["inventory_items"] = [
+            {"id": i.id, "name": i.name, "category": i.category, "quantity": i.quantity,
+             "low_stock_threshold": i.low_stock_threshold, "unit_label": i.unit_label,
+             "notes": i.notes, "created_at": _dt(i.created_at),
+             "owner_id": i.owner_id, "group_id": i.group_id}
+            for i in db.query(InventoryItem).all()
+        ]
+
+    if body.rooms:
+        result["rooms"] = [
+            {"id": r.id, "name": r.name, "width_m": r.width_m, "length_m": r.length_m,
+             "owner_id": r.owner_id, "group_id": r.group_id,
+             "tank_positions": [{"tank_id": p.tank_id, "x": p.x, "y": p.y} for p in r.tank_positions]}
+            for r in db.query(Room).all()
+        ]
+
+    if body.tap_water:
+        result["tap_water_tests"] = [
+            {"id": t.id, "ph": t.ph, "gh_dgh": t.gh_dgh, "kh_dkh": t.kh_dkh,
+             "chlorine_ppm": t.chlorine_ppm, "nitrate_ppm": t.nitrate_ppm, "tds_ppm": t.tds_ppm,
+             "recorded_at": _dt(t.recorded_at), "notes": t.notes,
+             "owner_id": t.owner_id, "group_id": t.group_id}
+            for t in db.query(TapWaterTest).all()
+        ]
+
+    return result
 
 
 @router.post("/import")
-def import_backup(payload: dict, db: Session = Depends(get_db)):
+def import_backup(payload: dict, db: Session = Depends(get_db), user: User = require_general_edit):
     if payload.get("version") != BACKUP_VERSION:
         raise HTTPException(400, f"Unsupported backup version: {payload.get('version')}. Expected {BACKUP_VERSION}.")
 
-    # Wipe existing data — ORM delete cascades all children.
-    # MaintenanceTask.parent_task_id self-references another task in the same
-    # cascade, so null those out first or the FK constraint blocks the delete
-    # for any tank with a completed recurring task history.
-    db.query(MaintenanceTask).update({MaintenanceTask.parent_task_id: None})
-    db.commit()
-    for tank in db.query(Tank).all():
-        db.delete(tank)
-    for expense in db.query(Expense).all():
-        db.delete(expense)
-    for item in db.query(InventoryItem).all():
-        db.delete(item)
-    for room in db.query(Room).all():
-        db.delete(room)
-    db.commit()
+    # Only categories actually present in the file are wiped and restored — a backup
+    # made with some categories deselected leaves the matching current data alone
+    # instead of deleting it with nothing in the file to replace it.
+    restore_tanks = "tanks" in payload
+    restore_expenses = "expenses" in payload
+    restore_inventory = "inventory_items" in payload
+    restore_rooms = "rooms" in payload
+    restore_tap_water = "tap_water_tests" in payload
+    restore_settings = "settings" in payload
 
-    # Restore settings
-    src_settings = payload.get("settings", {})
-    s = db.query(AppSettings).filter_by(id="default").first()
-    if not s:
-        s = AppSettings(id="default")
-        db.add(s)
-    s.date_format = src_settings.get("date_format", "DD/MM/YYYY")
-    s.unit_system = src_settings.get("unit_system", "cm")
-    s.default_tank_id = src_settings.get("default_tank_id")
-    s.alert_retention_days = src_settings.get("alert_retention_days")
-    s.app_url = src_settings.get("app_url")
-    presets = src_settings.get("feeding_amount_presets")
-    s.feeding_amount_presets_json = json.dumps(presets) if presets else None
-    db.commit()
+    if restore_tanks:
+        # ORM delete cascades all children. MaintenanceTask.parent_task_id
+        # self-references another task in the same cascade, so null those out
+        # first or the FK constraint blocks the delete for any tank with a
+        # completed recurring task history.
+        db.query(MaintenanceTask).update({MaintenanceTask.parent_task_id: None})
+        db.commit()
+        for tank in db.query(Tank).all():
+            db.delete(tank)
+        db.commit()
+    if restore_expenses:
+        for expense in db.query(Expense).all():
+            db.delete(expense)
+        db.commit()
+    if restore_inventory:
+        for item in db.query(InventoryItem).all():
+            db.delete(item)
+        db.commit()
+    if restore_rooms:
+        for room in db.query(Room).all():
+            db.delete(room)
+        db.commit()
+    if restore_tap_water:
+        for test in db.query(TapWaterTest).all():
+            db.delete(test)
+        db.commit()
+
+    if restore_settings:
+        src_settings = payload.get("settings", {})
+        s = db.query(AppSettings).filter_by(id="default").first()
+        if not s:
+            s = AppSettings(id="default")
+            db.add(s)
+        s.alert_retention_days = src_settings.get("alert_retention_days")
+        s.app_url = src_settings.get("app_url")
+        presets = src_settings.get("feeding_amount_presets")
+        s.feeding_amount_presets_json = json.dumps(presets) if presets else None
+        db.commit()
+
+    valid_user_ids = {u.id for u in db.query(User.id).all()}
+    valid_group_ids = {g.id for g in db.query(Group.id).all()}
+
+    def _owner_id(raw: str | None) -> str:
+        # Backup predates ownership, or was made on a different instance —
+        # fall back to whoever is running this restore.
+        return raw if raw in valid_user_ids else user.id
+
+    def _group_id(raw: str | None) -> str | None:
+        # Group doesn't exist on this instance (different instance's backup, or the
+        # group's since been deleted) — restore as personally-owned instead of failing.
+        return raw if raw in valid_group_ids else None
 
     tanks_restored = 0
-    for t in payload.get("tanks", []):
+    for t in (payload.get("tanks", []) if restore_tanks else []):
         tank = Tank(
-            id=t["id"], name=t["name"], volume_litres=t["volume_litres"],
+            id=t["id"], name=t["name"], volume_litres=t["volume_litres"], owner_id=_owner_id(t.get("owner_id")),
+            group_id=_group_id(t.get("group_id")),
             water_type=t.get("water_type", "freshwater"), sort_order=t.get("sort_order", 0),
             substrate=t.get("substrate"), lighting=t.get("lighting"),
             has_filter=t.get("has_filter", False), filter_flow_lph=t.get("filter_flow_lph"),
@@ -247,9 +329,20 @@ def import_backup(payload: dict, db: Session = Depends(get_db)):
                 hour=d["hour"], minute=d.get("minute", 0), days=d["days"], color=d.get("color"),
             ))
 
+        # Health cases — flush so journal entries can reference their IDs
+        for hc in t.get("health_cases", []):
+            db.add(HealthCase(
+                id=hc["id"], tank_id=tank.id, tank_fish_id=hc.get("tank_fish_id"),
+                title=hc["title"], status=hc.get("status", "active"),
+                started_at=_parse_dt(hc.get("started_at")) or datetime.utcnow(),
+                treatment=hc.get("treatment"), resolved_at=_parse_dt(hc.get("resolved_at")),
+                created_at=_parse_dt(hc.get("created_at")) or datetime.utcnow(),
+            ))
+        db.flush()
+
         for j in t.get("journal_entries", []):
             db.add(JournalEntry(
-                id=j["id"], tank_id=tank.id, tank_fish_id=j.get("tank_fish_id"),
+                id=j["id"], tank_id=tank.id, tank_fish_id=j.get("tank_fish_id"), case_id=j.get("case_id"),
                 event_type=j["event_type"], notes=j["notes"],
                 occurred_at=_parse_dt(j.get("occurred_at")) or datetime.utcnow(),
                 created_at=_parse_dt(j.get("created_at")) or datetime.utcnow(),
@@ -257,34 +350,48 @@ def import_backup(payload: dict, db: Session = Depends(get_db)):
 
         tanks_restored += 1
 
-    # Restore inventory items before expenses, since expenses may reference them
-    for i in payload.get("inventory_items", []):
-        db.add(InventoryItem(
-            id=i["id"], name=i["name"], category=i["category"],
-            quantity=i.get("quantity", 0), low_stock_threshold=i.get("low_stock_threshold", 1),
-            unit_label=i.get("unit_label"), notes=i.get("notes"),
-            created_at=_parse_dt(i.get("created_at")) or datetime.utcnow(),
-        ))
-    db.flush()
+    if restore_inventory:
+        # Restore inventory items before expenses, since expenses may reference them
+        for i in payload.get("inventory_items", []):
+            db.add(InventoryItem(
+                id=i["id"], name=i["name"], category=i["category"],
+                quantity=i.get("quantity", 0), low_stock_threshold=i.get("low_stock_threshold", 1),
+                unit_label=i.get("unit_label"), notes=i.get("notes"),
+                created_at=_parse_dt(i.get("created_at")) or datetime.utcnow(),
+                owner_id=_owner_id(i.get("owner_id")), group_id=_group_id(i.get("group_id")),
+            ))
+        db.flush()
 
-    # Restore expenses (top-level, not per-tank)
-    for e in payload.get("expenses", []):
-        db.add(Expense(
-            id=e["id"], tank_id=e.get("tank_id"), inventory_item_id=e.get("inventory_item_id"),
-            amount=e["amount"], category=e["category"], description=e.get("description"),
-            purchase_date=e["purchase_date"], notes=e.get("notes"),
-            created_at=_parse_dt(e.get("created_at")) or datetime.utcnow(),
-        ))
+    if restore_expenses:
+        for e in payload.get("expenses", []):
+            db.add(Expense(
+                id=e["id"], tank_id=e.get("tank_id"), inventory_item_id=e.get("inventory_item_id"),
+                amount=e["amount"], quantity=e.get("quantity", 1), category=e["category"], description=e.get("description"),
+                purchase_date=e["purchase_date"], notes=e.get("notes"),
+                created_at=_parse_dt(e.get("created_at")) or datetime.utcnow(),
+                owner_id=_owner_id(e.get("owner_id")), group_id=_group_id(e.get("group_id")),
+            ))
 
-    # Restore rooms and tank positions (after tanks so tank_id FKs resolve)
-    for r in payload.get("rooms", []):
-        room = Room(
-            id=r["id"], name=r["name"],
-            width_m=r.get("width_m", 3.0), length_m=r.get("length_m", 2.4),
-        )
-        db.add(room)
-        for p in r.get("tank_positions", []):
-            db.add(RoomTankPosition(room_id=room.id, tank_id=p["tank_id"], x=p["x"], y=p["y"]))
+    if restore_rooms:
+        # After tanks so tank_id FKs on room positions resolve
+        for r in payload.get("rooms", []):
+            room = Room(
+                id=r["id"], name=r["name"],
+                width_m=r.get("width_m", 3.0), length_m=r.get("length_m", 2.4),
+                owner_id=_owner_id(r.get("owner_id")), group_id=_group_id(r.get("group_id")),
+            )
+            db.add(room)
+            for p in r.get("tank_positions", []):
+                db.add(RoomTankPosition(room_id=room.id, tank_id=p["tank_id"], x=p["x"], y=p["y"]))
+
+    if restore_tap_water:
+        for t in payload.get("tap_water_tests", []):
+            db.add(TapWaterTest(
+                id=t["id"], ph=t.get("ph"), gh_dgh=t.get("gh_dgh"), kh_dkh=t.get("kh_dkh"),
+                chlorine_ppm=t.get("chlorine_ppm"), nitrate_ppm=t.get("nitrate_ppm"), tds_ppm=t.get("tds_ppm"),
+                recorded_at=_parse_dt(t.get("recorded_at")) or datetime.utcnow(), notes=t.get("notes"),
+                owner_id=_owner_id(t.get("owner_id")), group_id=_group_id(t.get("group_id")),
+            ))
 
     db.commit()
     return {"ok": True, "tanks_restored": tanks_restored}

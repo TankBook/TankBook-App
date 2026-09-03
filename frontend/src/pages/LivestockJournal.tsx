@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
-import { NotebookPen, Trash2, Plus, Pencil, ChevronDown, Layers } from 'lucide-react'
+import { NotebookPen, Trash2, Plus, Pencil, ChevronDown, Layers, Stethoscope } from 'lucide-react'
 import { Tag, Card, FieldLabel, Modal, RichTextarea, renderNotes } from '../components/ui'
-import { api, JournalEntry, Tank, TankFish } from '../api/client'
+import { api, canEditTank, JournalEntry, HealthCase, Tank, TankFish } from '../api/client'
 import { useSettings, formatDate } from '../context/SettingsContext'
 
 const EVENT_TYPES = [
@@ -114,7 +114,7 @@ function EntryFormFields({
   setForm,
   fishList,
 }: {
-  form: { tank_fish_id: string; event_type: string; notes: string; occurred_at: string }
+  form: { tank_fish_id: string; case_id: string; event_type: string; notes: string; occurred_at: string }
   setForm: (updater: (f: typeof form) => typeof form) => void
   fishList: TankFish[]
 }) {
@@ -166,12 +166,27 @@ function localNow(): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
 }
 
+function todayIso(): string {
+  const d = new Date()
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
+}
+
+function daysSince(dateStr: string): number {
+  const start = new Date(dateStr); start.setHours(0, 0, 0, 0)
+  const today = new Date(); today.setHours(0, 0, 0, 0)
+  return Math.max(0, Math.round((today.getTime() - start.getTime()) / 86400000))
+}
+
 export default function LivestockJournal() {
   const { dateFormat, defaultTank } = useSettings()
   const [tanks, setTanks] = useState<Tank[]>([])
   const [selectedTank, setSelectedTank] = useState<string>('')
   const [entries, setEntries] = useState<JournalEntry[]>([])
   const [fishList, setFishList] = useState<TankFish[]>([])
+  const [cases, setCases] = useState<HealthCase[]>([])
+  const [expandedCaseId, setExpandedCaseId] = useState<string | null>(null)
+  const [showResolvedCases, setShowResolvedCases] = useState(false)
   const [filterType, setFilterType] = useState<string>('all')
   const [loading, setLoading] = useState(false)
   const [isMobile, setIsMobile] = useState(() => window.matchMedia('(max-width: 768px)').matches)
@@ -189,6 +204,7 @@ export default function LivestockJournal() {
   const [showModal, setShowModal] = useState(false)
   const [form, setForm] = useState({
     tank_fish_id: '',
+    case_id: '',
     event_type: 'observation',
     notes: '',
     occurred_at: localNow(),
@@ -198,9 +214,16 @@ export default function LivestockJournal() {
 
   // Inline edit
   const [editingId, setEditingId] = useState<string | null>(null)
-  const [editForm, setEditForm] = useState({ tank_fish_id: '', event_type: 'observation', notes: '', occurred_at: '' })
+  const [editForm, setEditForm] = useState({ tank_fish_id: '', case_id: '', event_type: 'observation', notes: '', occurred_at: '' })
   const [editSaving, setEditSaving] = useState(false)
   const [editError, setEditError] = useState<string | null>(null)
+
+  // New case modal
+  const [showCaseModal, setShowCaseModal] = useState(false)
+  const [caseForm, setCaseForm] = useState({ tank_fish_id: '', title: '', started_at: todayIso(), treatment: '' })
+  const [caseSaving, setCaseSaving] = useState(false)
+  const [caseSaveError, setCaseSaveError] = useState<string | null>(null)
+  const [resolvingId, setResolvingId] = useState<string | null>(null)
 
   useEffect(() => {
     api.tanks.list().then(list => {
@@ -213,19 +236,27 @@ export default function LivestockJournal() {
   }, [defaultTank])
 
   useEffect(() => {
-    if (!selectedTank) { setEntries([]); setFishList([]); return }
+    if (!selectedTank) { setEntries([]); setFishList([]); setCases([]); return }
     setLoading(true)
     Promise.all([
       api.journal.list(selectedTank),
       api.fish.list(selectedTank),
-    ]).then(([j, f]) => {
+      api.healthCases.list(selectedTank),
+    ]).then(([j, f, c]) => {
       setEntries(j)
       setFishList(f)
+      setCases(c)
     }).finally(() => setLoading(false))
   }, [selectedTank])
 
   function openModal() {
-    setForm({ tank_fish_id: '', event_type: 'observation', notes: '', occurred_at: localNow() })
+    setForm({ tank_fish_id: '', case_id: '', event_type: 'observation', notes: '', occurred_at: localNow() })
+    setSaveError(null)
+    setShowModal(true)
+  }
+
+  function openAddUpdate(c: HealthCase) {
+    setForm({ tank_fish_id: c.tank_fish_id ?? '', case_id: c.id, event_type: 'observation', notes: '', occurred_at: localNow() })
     setSaveError(null)
     setShowModal(true)
   }
@@ -237,6 +268,7 @@ export default function LivestockJournal() {
     try {
       const entry = await api.journal.add(selectedTank, {
         tank_fish_id: form.tank_fish_id || null,
+        case_id: form.case_id || null,
         event_type: form.event_type,
         notes: form.notes.trim(),
         occurred_at: form.occurred_at,
@@ -254,6 +286,7 @@ export default function LivestockJournal() {
     setEditingId(entry.id)
     setEditForm({
       tank_fish_id: entry.tank_fish_id ?? '',
+      case_id: entry.case_id ?? '',
       event_type: entry.event_type,
       notes: entry.notes,
       occurred_at: entry.occurred_at.slice(0, 16),
@@ -268,6 +301,7 @@ export default function LivestockJournal() {
     try {
       const updated = await api.journal.update(selectedTank, entry.id, {
         tank_fish_id: editForm.tank_fish_id || null,
+        case_id: editForm.case_id || null,
         event_type: editForm.event_type,
         notes: editForm.notes.trim(),
         occurred_at: editForm.occurred_at,
@@ -286,18 +320,221 @@ export default function LivestockJournal() {
     setEntries(prev => prev.filter(e => e.id !== entry.id))
   }
 
+  function openCaseModal() {
+    setCaseForm({ tank_fish_id: '', title: '', started_at: todayIso(), treatment: '' })
+    setCaseSaveError(null)
+    setShowCaseModal(true)
+  }
+
+  async function handleAddCase() {
+    if (!selectedTank || !caseForm.title.trim()) return
+    setCaseSaving(true)
+    setCaseSaveError(null)
+    try {
+      const created = await api.healthCases.add(selectedTank, {
+        tank_fish_id: caseForm.tank_fish_id || null,
+        title: caseForm.title.trim(),
+        started_at: new Date(caseForm.started_at).toISOString(),
+        treatment: caseForm.treatment.trim() || null,
+      })
+      setCases(prev => [created, ...prev])
+      setExpandedCaseId(created.id)
+      setShowCaseModal(false)
+    } catch (e: any) {
+      setCaseSaveError(e.message ?? 'Save failed')
+    } finally {
+      setCaseSaving(false)
+    }
+  }
+
+  async function toggleCaseStatus(c: HealthCase) {
+    setResolvingId(c.id)
+    try {
+      const updated = await api.healthCases.update(selectedTank, c.id, {
+        status: c.status === 'active' ? 'resolved' : 'active',
+      })
+      setCases(prev => prev.map(x => x.id === c.id ? updated : x))
+    } finally {
+      setResolvingId(null)
+    }
+  }
+
+  async function handleDeleteCase(c: HealthCase) {
+    await api.healthCases.delete(selectedTank, c.id)
+    setCases(prev => prev.filter(x => x.id !== c.id))
+  }
+
   const visible = filterType === 'all' ? entries : entries.filter(e => e.event_type === filterType)
-  const tankName = tanks.find(t => t.id === selectedTank)?.name ?? ''
+  const selectedTankObj = tanks.find(t => t.id === selectedTank)
+  const canEdit = selectedTankObj ? canEditTank(selectedTankObj) : false
+  const tankName = selectedTankObj?.name ?? ''
+  const activeCases = cases.filter(c => c.status === 'active')
+  const resolvedCases = cases.filter(c => c.status === 'resolved')
+  const modalCase = form.case_id ? cases.find(c => c.id === form.case_id) : null
 
   // Filter buttons: all + each type, laid out in a full-width grid (2 rows)
   const allFilters = ['all', ...EVENT_TYPES]
   const cols = Math.ceil(allFilters.length / 2)
 
+  function renderEntryRow(entry: JournalEntry) {
+    const relatedCase = entry.case_id ? cases.find(c => c.id === entry.case_id) : null
+    return (
+      <div
+        key={entry.id}
+        style={{
+          background: 'var(--surface)',
+          border: `0.5px solid ${editingId === entry.id ? 'var(--blue-border)' : 'var(--border)'}`,
+          borderRadius: 12, padding: '12px 16px',
+        }}
+      >
+        {editingId === entry.id ? (
+          <div>
+            <EntryFormFields form={editForm} setForm={setEditForm} fishList={fishList} />
+            {editError && <p style={{ fontSize: 12, color: 'var(--red)', margin: '10px 0 0' }}>{editError}</p>}
+            <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
+              <button
+                onClick={() => handleEdit(entry)}
+                disabled={!editForm.notes.trim() || editSaving}
+                style={{
+                  fontSize: 12, padding: '6px 16px', borderRadius: 8, fontWeight: 500,
+                  border: '0.5px solid var(--blue-border)', background: 'var(--blue-bg)', color: 'var(--blue)',
+                  cursor: editForm.notes.trim() && !editSaving ? 'pointer' : 'not-allowed',
+                  opacity: editForm.notes.trim() && !editSaving ? 1 : 0.45,
+                }}
+              >{editSaving ? 'Saving…' : 'Save Changes'}</button>
+              <button
+                onClick={() => setEditingId(null)}
+                style={{ fontSize: 12, padding: '6px 12px', borderRadius: 8, border: '0.5px solid var(--btn-border)', background: 'transparent', color: 'var(--text-2)', cursor: 'pointer' }}
+              >Cancel</button>
+            </div>
+          </div>
+        ) : (
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 6, flexWrap: 'wrap' }}>
+                <EventBadge type={entry.event_type} />
+                {entry.common_name && (
+                  <Tag bg="var(--tag-bg)" color="var(--text-2)">{entry.common_name}</Tag>
+                )}
+                {relatedCase && (
+                  <Tag bg="var(--red-bg)" color="var(--red)">{relatedCase.title}</Tag>
+                )}
+                <span style={{ fontSize: 11, color: 'var(--text-3)' }}>
+                  {formatDate(entry.occurred_at, dateFormat)}
+                  {' '}
+                  {new Date(entry.occurred_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                </span>
+              </div>
+              <div style={{ fontSize: 13, color: 'var(--text)', margin: 0, lineHeight: 1.5 }} dangerouslySetInnerHTML={{ __html: renderNotes(entry.notes) }} />
+            </div>
+            <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
+              {canEdit && (
+              <button
+                onClick={() => startEdit(entry)}
+                title="Edit entry"
+                style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 32, height: 32, padding: 0, borderRadius: 6, border: '0.5px solid var(--border)', background: 'transparent', cursor: 'pointer', color: 'var(--text-3)' }}
+              >
+                <Pencil size={13} />
+              </button>
+              )}
+              {canEdit && (
+              <button
+                onClick={() => handleDelete(entry)}
+                title="Delete entry"
+                style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 32, height: 32, padding: 0, borderRadius: 6, border: '0.5px solid var(--border)', background: 'transparent', cursor: 'pointer', color: 'var(--text-3)' }}
+              >
+                <Trash2 size={13} />
+              </button>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+    )
+  }
+
+  function renderCaseCard(c: HealthCase) {
+    const expanded = expandedCaseId === c.id
+    const caseEntries = entries
+      .filter(e => e.case_id === c.id)
+      .sort((a, b) => new Date(b.occurred_at).getTime() - new Date(a.occurred_at).getTime())
+    return (
+      <Card key={c.id} style={{ marginBottom: 8 }}>
+        <div
+          onClick={() => setExpandedCaseId(expanded ? null : c.id)}
+          style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8, cursor: 'pointer' }}
+        >
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginBottom: 4 }}>
+              <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)' }}>{c.title}</span>
+              {c.common_name && <Tag bg="var(--tag-bg)" color="var(--text-2)">{c.common_name}</Tag>}
+              <Tag
+                bg={c.status === 'active' ? 'var(--red-bg)' : 'var(--green-bg)'}
+                color={c.status === 'active' ? 'var(--red)' : 'var(--green)'}
+              >
+                {c.status === 'active' ? `Day ${daysSince(c.started_at)}` : `Resolved ${formatDate(c.resolved_at ?? c.started_at, dateFormat)}`}
+              </Tag>
+            </div>
+            {c.treatment && <p style={{ fontSize: 12, color: 'var(--text-2)', margin: 0 }}>{c.treatment}</p>}
+          </div>
+          <ChevronDown size={16} style={{ transform: expanded ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s', flexShrink: 0, marginTop: 2 }} />
+        </div>
+
+        {expanded && (
+          <div style={{ marginTop: 12, paddingTop: 12, borderTop: '0.5px solid var(--border-sub)' }}>
+            {canEdit && (
+            <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
+              <button
+                onClick={() => openAddUpdate(c)}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 6,
+                  fontSize: 12, padding: '6px 12px', borderRadius: 8, fontWeight: 500,
+                  border: '0.5px solid var(--blue-border)', background: 'var(--blue-bg)', color: 'var(--blue)', cursor: 'pointer',
+                }}
+              >
+                <Plus size={12} />Add Update
+              </button>
+              <button
+                onClick={() => toggleCaseStatus(c)}
+                disabled={resolvingId === c.id}
+                style={{
+                  fontSize: 12, padding: '6px 12px', borderRadius: 8, fontWeight: 500,
+                  border: `0.5px solid ${c.status === 'active' ? 'var(--green-border)' : 'var(--btn-border)'}`,
+                  background: c.status === 'active' ? 'var(--green-bg)' : 'transparent',
+                  color: c.status === 'active' ? 'var(--green)' : 'var(--text-2)',
+                  cursor: resolvingId === c.id ? 'default' : 'pointer',
+                  opacity: resolvingId === c.id ? 0.6 : 1,
+                }}
+              >
+                {resolvingId === c.id ? 'Saving…' : c.status === 'active' ? 'Mark Resolved' : 'Reopen'}
+              </button>
+              <button
+                onClick={() => handleDeleteCase(c)}
+                title="Delete case"
+                style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 30, height: 30, padding: 0, borderRadius: 6, border: '0.5px solid var(--border)', background: 'transparent', cursor: 'pointer', color: 'var(--text-3)' }}
+              >
+                <Trash2 size={13} />
+              </button>
+            </div>
+            )}
+            {caseEntries.length === 0 ? (
+              <p style={{ fontSize: 12, color: 'var(--text-3)', margin: 0 }}>No updates logged yet.</p>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {caseEntries.map(entry => renderEntryRow(entry))}
+              </div>
+            )}
+          </div>
+        )}
+      </Card>
+    )
+  }
+
   return (
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
         <h1 style={{ margin: 0, fontSize: 22, fontWeight: 500, color: 'var(--text)' }}>Tank Journal</h1>
-        {selectedTank && (
+        {selectedTank && canEdit && (
           <button
             onClick={openModal}
             style={{
@@ -361,6 +598,58 @@ export default function LivestockJournal() {
           )}
         </div>
       </Card>
+
+      {/* Quarantine / Disease cases */}
+      {selectedTank && (
+        <div style={{ marginBottom: 20 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+            <p style={{ fontWeight: 500, fontSize: 15, margin: 0, color: 'var(--text)', display: 'flex', alignItems: 'center', gap: 6 }}>
+              <Stethoscope size={15} />Quarantine / Disease
+            </p>
+            {canEdit && (
+            <button
+              onClick={openCaseModal}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 6,
+                fontSize: 12, padding: '6px 12px', borderRadius: 8, fontWeight: 500,
+                border: '0.5px solid var(--blue-border)', background: 'var(--blue-bg)', color: 'var(--blue)',
+                cursor: 'pointer',
+              }}
+            >
+              <Plus size={12} />New Case
+            </button>
+            )}
+          </div>
+
+          {cases.length === 0 ? (
+            <p style={{ fontSize: 13, color: 'var(--text-3)', margin: 0 }}>No cases logged for this tank.</p>
+          ) : (
+            <>
+              {activeCases.length === 0 && (
+                <p style={{ fontSize: 13, color: 'var(--text-3)', margin: '0 0 8px' }}>No active cases.</p>
+              )}
+              {activeCases.map(c => renderCaseCard(c))}
+
+              {resolvedCases.length > 0 && (
+                <>
+                  <button
+                    onClick={() => setShowResolvedCases(v => !v)}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: 4,
+                      fontSize: 12, color: 'var(--text-2)', background: 'none', border: 'none',
+                      cursor: 'pointer', padding: '4px 0', marginTop: 4,
+                    }}
+                  >
+                    <ChevronDown size={13} style={{ transform: showResolvedCases ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s' }} />
+                    {resolvedCases.length} resolved case{resolvedCases.length === 1 ? '' : 's'}
+                  </button>
+                  {showResolvedCases && resolvedCases.map(c => renderCaseCard(c))}
+                </>
+              )}
+            </>
+          )}
+        </div>
+      )}
 
       {/* Filter bar — dropdown on mobile (the button grid overflows narrow screens), equal-width grid of buttons on desktop */}
       {selectedTank && entries.length > 0 && (
@@ -465,77 +754,12 @@ export default function LivestockJournal() {
       )}
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-        {visible.map(entry => (
-          <div
-            key={entry.id}
-            style={{
-              background: 'var(--surface)',
-              border: `0.5px solid ${editingId === entry.id ? 'var(--blue-border)' : 'var(--border)'}`,
-              borderRadius: 12, padding: '12px 16px',
-            }}
-          >
-            {editingId === entry.id ? (
-              <div>
-                <EntryFormFields form={editForm} setForm={setEditForm} fishList={fishList} />
-                {editError && <p style={{ fontSize: 12, color: 'var(--red)', margin: '10px 0 0' }}>{editError}</p>}
-                <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
-                  <button
-                    onClick={() => handleEdit(entry)}
-                    disabled={!editForm.notes.trim() || editSaving}
-                    style={{
-                      fontSize: 12, padding: '6px 16px', borderRadius: 8, fontWeight: 500,
-                      border: '0.5px solid var(--blue-border)', background: 'var(--blue-bg)', color: 'var(--blue)',
-                      cursor: editForm.notes.trim() && !editSaving ? 'pointer' : 'not-allowed',
-                      opacity: editForm.notes.trim() && !editSaving ? 1 : 0.45,
-                    }}
-                  >{editSaving ? 'Saving…' : 'Save Changes'}</button>
-                  <button
-                    onClick={() => setEditingId(null)}
-                    style={{ fontSize: 12, padding: '6px 12px', borderRadius: 8, border: '0.5px solid var(--btn-border)', background: 'transparent', color: 'var(--text-2)', cursor: 'pointer' }}
-                  >Cancel</button>
-                </div>
-              </div>
-            ) : (
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 6, flexWrap: 'wrap' }}>
-                    <EventBadge type={entry.event_type} />
-                    {entry.common_name && (
-                      <Tag bg="var(--tag-bg)" color="var(--text-2)">{entry.common_name}</Tag>
-                    )}
-                    <span style={{ fontSize: 11, color: 'var(--text-3)' }}>
-                      {formatDate(entry.occurred_at, dateFormat)}
-                      {' '}
-                      {new Date(entry.occurred_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                    </span>
-                  </div>
-                  <div style={{ fontSize: 13, color: 'var(--text)', margin: 0, lineHeight: 1.5 }} dangerouslySetInnerHTML={{ __html: renderNotes(entry.notes) }} />
-                </div>
-                <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
-                  <button
-                    onClick={() => startEdit(entry)}
-                    title="Edit entry"
-                    style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 32, height: 32, padding: 0, borderRadius: 6, border: '0.5px solid var(--border)', background: 'transparent', cursor: 'pointer', color: 'var(--text-3)' }}
-                  >
-                    <Pencil size={13} />
-                  </button>
-                  <button
-                    onClick={() => handleDelete(entry)}
-                    title="Delete entry"
-                    style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 32, height: 32, padding: 0, borderRadius: 6, border: '0.5px solid var(--border)', background: 'transparent', cursor: 'pointer', color: 'var(--text-3)' }}
-                  >
-                    <Trash2 size={13} />
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
-        ))}
+        {visible.map(entry => renderEntryRow(entry))}
       </div>
 
       {/* Add entry modal */}
       {showModal && (
-        <Modal title={`New Entry — ${tankName}`} onClose={() => setShowModal(false)}>
+        <Modal title={modalCase ? `New Update — ${modalCase.title}` : `New Entry — ${tankName}`} onClose={() => setShowModal(false)}>
           <EntryFormFields form={form} setForm={setForm} fishList={fishList} />
           {saveError && <p style={{ fontSize: 13, color: 'var(--red)', margin: '10px 0 0' }}>{saveError}</p>}
           <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
@@ -551,6 +775,72 @@ export default function LivestockJournal() {
             >{saving ? 'Saving…' : 'Save Entry'}</button>
             <button
               onClick={() => setShowModal(false)}
+              style={{ fontSize: 13, padding: '7px 14px', borderRadius: 8, border: '0.5px solid var(--btn-border)', background: 'transparent', color: 'var(--text-2)', cursor: 'pointer' }}
+            >Cancel</button>
+          </div>
+        </Modal>
+      )}
+
+      {/* New case modal */}
+      {showCaseModal && (
+        <Modal title={`New Case — ${tankName}`} onClose={() => setShowCaseModal(false)}>
+          <div style={{ marginBottom: 12 }}>
+            <FieldLabel>Title</FieldLabel>
+            <input
+              value={caseForm.title}
+              onChange={e => setCaseForm(f => ({ ...f, title: e.target.value }))}
+              placeholder="e.g. Fin rot, Ich outbreak"
+              style={{ width: '100%', boxSizing: 'border-box' }}
+            />
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
+            <div>
+              <FieldLabel>Species (Optional)</FieldLabel>
+              <select
+                value={caseForm.tank_fish_id}
+                onChange={e => setCaseForm(f => ({ ...f, tank_fish_id: e.target.value }))}
+                style={{ width: '100%' }}
+              >
+                <option value="">— tank-wide —</option>
+                {fishList.map(f => (
+                  <option key={f.id} value={f.id}>{f.common_name ?? f.species_slug} ×{f.quantity}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <FieldLabel>First Noticed</FieldLabel>
+              <input
+                type="date"
+                value={caseForm.started_at}
+                max={todayIso()}
+                onChange={e => setCaseForm(f => ({ ...f, started_at: e.target.value }))}
+                style={{ width: '100%', boxSizing: 'border-box' }}
+              />
+            </div>
+          </div>
+          <div>
+            <FieldLabel>Treatment (Optional)</FieldLabel>
+            <RichTextarea
+              value={caseForm.treatment}
+              onChange={v => setCaseForm(f => ({ ...f, treatment: v }))}
+              rows={3}
+              placeholder="What treatment are you giving?"
+            />
+          </div>
+          {caseSaveError && <p style={{ fontSize: 13, color: 'var(--red)', margin: '10px 0 0' }}>{caseSaveError}</p>}
+          <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
+            <button
+              onClick={handleAddCase}
+              disabled={!caseForm.title.trim() || caseSaving}
+              style={{
+                fontSize: 13, padding: '7px 20px', borderRadius: 8, fontWeight: 500,
+                border: '0.5px solid var(--blue-border)', background: 'var(--blue-bg)', color: 'var(--blue)',
+                cursor: caseForm.title.trim() && !caseSaving ? 'pointer' : 'not-allowed',
+                opacity: caseForm.title.trim() && !caseSaving ? 1 : 0.45,
+              }}
+            >{caseSaving ? 'Saving…' : 'Save Case'}</button>
+            <button
+              onClick={() => setShowCaseModal(false)}
               style={{ fontSize: 13, padding: '7px 14px', borderRadius: 8, border: '0.5px solid var(--btn-border)', background: 'transparent', color: 'var(--text-2)', cursor: 'pointer' }}
             >Cancel</button>
           </div>

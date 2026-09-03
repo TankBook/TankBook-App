@@ -44,6 +44,9 @@ Thumbs.db
 *.swp
 *.swo
 
+# Claude Code — local permission allowlist, not shared
+.claude/settings.json
+
 # Local docs — not part of the published repo
 RELEASE.md
 RELEASE-NOTES-*.md

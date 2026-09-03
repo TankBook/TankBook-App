@@ -1,8 +1,9 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Building, Plus, Pencil, Trash2, ChevronRight, Columns } from 'lucide-react'
 import { useRoomLayoutState } from '../hooks/useRoomLayout'
 import { Card, FieldLabel, Modal } from '../components/ui'
+import { api, type Group } from '../api/client'
 
 export default function RoomLayout() {
   const navigate = useNavigate()
@@ -16,12 +17,17 @@ export default function RoomLayout() {
   const [draftName, setDraftName] = useState('')
   const [draftWidth, setDraftWidth] = useState('3')
   const [draftLength, setDraftLength] = useState('2.4')
+  const [draftGroupId, setDraftGroupId] = useState('')
   const [creating, setCreating] = useState(false)
+
+  const [groups, setGroups] = useState<Group[]>([])
+  useEffect(() => { api.groups.list().then(setGroups) }, [])
 
   function openCreateModal() {
     setDraftName('')
     setDraftWidth('3')
     setDraftLength('2.4')
+    setDraftGroupId('')
     setShowCreateModal(true)
   }
 
@@ -29,7 +35,7 @@ export default function RoomLayout() {
     const trimmed = draftName.trim()
     if (!trimmed || creating) return
     setCreating(true)
-    const id = await addRoom(trimmed, Number(draftWidth) || undefined, Number(draftLength) || undefined)
+    const id = await addRoom(trimmed, Number(draftWidth) || undefined, Number(draftLength) || undefined, draftGroupId || null)
     setCreating(false)
     setShowCreateModal(false)
     if (id) navigate(`/rooms/${id}`)
@@ -164,6 +170,19 @@ export default function RoomLayout() {
                 />
               </div>
             </div>
+            {groups.length > 0 && (
+              <div>
+                <FieldLabel>Group</FieldLabel>
+                <select
+                  value={draftGroupId}
+                  onChange={e => setDraftGroupId(e.target.value)}
+                  style={{ width: '100%', padding: '10px 12px', borderRadius: 10, border: '0.5px solid var(--border)', background: 'var(--surface-2)', color: 'var(--text)', boxSizing: 'border-box' }}
+                >
+                  <option value="">Personal</option>
+                  {groups.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
+                </select>
+              </div>
+            )}
           </div>
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 20 }}>
             <button

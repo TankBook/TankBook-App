@@ -9,6 +9,7 @@ class TankCreate(BaseModel):
     name: str
     volume_litres: int
     water_type: str = "freshwater"
+    shape: Literal["rectangle", "cylinder"] = "rectangle"
     substrate: str | None = None
     lighting: str | None = None
     has_filter: bool = False
@@ -26,12 +27,55 @@ class TankCreate(BaseModel):
     light_watts: int | None = None
     light_technology: str | None = None
     setup_date: datetime | None = None
+    group_id: str | None = None
 
 
 class TankOut(TankCreate):
     id: str
     created_at: datetime
+    owner_id: str
+    my_access: Literal["owner", "edit", "view"]
     model_config = {"from_attributes": True}
+
+
+class TankShareOut(BaseModel):
+    user_id: str
+    email: str
+    display_name: str | None = None
+    level: Literal["view", "edit"]
+
+
+class TankShareCreate(BaseModel):
+    email: str
+    level: Literal["view", "edit"]
+
+
+# --- Groups ---
+
+class GroupMemberOut(BaseModel):
+    user_id: str
+    email: str
+    display_name: str | None = None
+    role: Literal["owner", "member"]
+
+
+class GroupOut(BaseModel):
+    id: str
+    name: str
+    my_role: Literal["owner", "member"]
+    members: list[GroupMemberOut] = []
+
+
+class GroupCreate(BaseModel):
+    name: str
+
+
+class GroupUpdate(BaseModel):
+    name: str
+
+
+class GroupMemberAdd(BaseModel):
+    email: str
 
 
 # --- Fish ---
@@ -128,11 +172,13 @@ class TapWaterTestCreate(BaseModel):
     nitrate_ppm: float | None = None
     tds_ppm: float | None = None
     notes: str | None = None
+    group_id: str | None = None
 
 
 class TapWaterTestOut(TapWaterTestCreate):
     id: str
     recorded_at: datetime
+    owner_id: str
     model_config = {"from_attributes": True}
 
 
@@ -159,8 +205,31 @@ class MaintenanceTaskOut(MaintenanceTaskCreate):
 class MaintenanceTaskSkip(BaseModel):
     times: int
 
+class MaintenanceTaskPostpone(BaseModel):
+    due_at: datetime
+
 class MaintenanceTaskCompletionUpdate(BaseModel):
     completed_at: datetime
+
+
+# --- Push notifications ---
+
+class PushSubscriptionKeys(BaseModel):
+    p256dh: str
+    auth: str
+
+
+class PushSubscriptionCreate(BaseModel):
+    endpoint: str
+    keys: PushSubscriptionKeys
+
+
+class PushSubscriptionDelete(BaseModel):
+    endpoint: str
+
+
+class VapidPublicKeyOut(BaseModel):
+    public_key: str
 
 # --- Alerts ---
 
@@ -204,6 +273,7 @@ class DailyTaskOut(DailyTaskCreate):
 
 class JournalEntryCreate(BaseModel):
     tank_fish_id: str | None = None
+    case_id: str | None = None
     event_type: str
     notes: str
     occurred_at: datetime | None = None
@@ -211,6 +281,7 @@ class JournalEntryCreate(BaseModel):
 
 class JournalEntryUpdate(BaseModel):
     tank_fish_id: str | None = None
+    case_id: str | None = None
     event_type: str | None = None
     notes: str | None = None
     occurred_at: datetime | None = None
@@ -220,6 +291,7 @@ class JournalEntryOut(BaseModel):
     id: str
     tank_id: str
     tank_fish_id: str | None
+    case_id: str | None = None
     event_type: str
     notes: str
     occurred_at: datetime
@@ -229,21 +301,46 @@ class JournalEntryOut(BaseModel):
     model_config = {"from_attributes": True}
 
 
+# --- Health cases (quarantine / disease tracking) ---
+
+class HealthCaseCreate(BaseModel):
+    tank_fish_id: str | None = None
+    title: str
+    started_at: datetime | None = None
+    treatment: str | None = None
+
+
+class HealthCaseUpdate(BaseModel):
+    tank_fish_id: str | None = None
+    title: str | None = None
+    status: str | None = None
+    started_at: datetime | None = None
+    treatment: str | None = None
+
+
+class HealthCaseOut(BaseModel):
+    id: str
+    tank_id: str
+    tank_fish_id: str | None
+    title: str
+    status: str
+    started_at: datetime
+    treatment: str | None
+    resolved_at: datetime | None
+    created_at: datetime
+    common_name: str | None = None
+    species_slug: str | None = None
+
+
 # --- App settings ---
 
 class AppSettingsUpdate(BaseModel):
-    date_format: str | None = None
-    unit_system: str | None = None
-    default_tank_id: str | None = None
     alert_retention_days: int | None = None
     app_url: str | None = None
     feeding_amount_presets: list[str] | None = None
 
 
 class AppSettingsOut(BaseModel):
-    date_format: str
-    unit_system: str
-    default_tank_id: str | None = None
     alert_retention_days: int | None = None
     app_url: str | None = None
     feeding_amount_presets: list[str] = []
@@ -257,18 +354,121 @@ class SettingsStatsOut(BaseModel):
     storage_bytes: int
 
 
+# --- Agent ---
+
+class AgentSettingsUpdate(BaseModel):
+    provider: Literal["anthropic", "openai", "ollama"] | None = None
+    model: str | None = None
+    base_url: str | None = None
+    api_key: str | None = None
+
+
+class AgentSettingsOut(BaseModel):
+    provider: str | None = None
+    model: str | None = None
+    base_url: str | None = None
+    api_key_set: bool = False
+    updated_at: datetime
+    model_config = {"from_attributes": True}
+
+
+class ChatMessage(BaseModel):
+    role: Literal["user", "assistant"]
+    content: str
+
+
+class AgentChatRequest(BaseModel):
+    conversation_id: str | None = None
+    message: str
+
+
+class AgentChatResponse(BaseModel):
+    conversation_id: str
+    reply: str
+
+
+class SpeciesDraftRequest(BaseModel):
+    name: str
+
+
+class SpeciesDraftRange(BaseModel):
+    min: float | None = None
+    max: float | None = None
+
+
+class SpeciesDraftCare(BaseModel):
+    difficulty: str | None = None
+    min_tank_litres: float | None = None
+    shoal_min: int | None = None
+    group_min: int | None = None
+    max_size_cm: float | None = None
+    lifespan_years: float | None = None
+    growth_rate: str | None = None
+
+
+class SpeciesDraftWater(BaseModel):
+    temp_c: SpeciesDraftRange | None = None
+    ph: SpeciesDraftRange | None = None
+    gh_dgh: SpeciesDraftRange | None = None
+    kh_dkh: SpeciesDraftRange | None = None
+
+
+class SpeciesDraftCompatibility(BaseModel):
+    temperament: str | None = None
+
+
+class SpeciesDraftLight(BaseModel):
+    requirement: str | None = None
+
+
+class SpeciesDraftOut(BaseModel):
+    slug: str
+    common_name: str
+    latin_name: str
+    type: str
+    family: str | None = None
+    origin: str | None = None
+    care: SpeciesDraftCare | None = None
+    water: SpeciesDraftWater | None = None
+    compatibility: SpeciesDraftCompatibility | None = None
+    light: SpeciesDraftLight | None = None
+    co2_required: bool | None = None
+    notes: str | None = None
+
+
+class ConversationOut(BaseModel):
+    id: str
+    title: str | None = None
+    created_at: datetime
+    updated_at: datetime
+    model_config = {"from_attributes": True}
+
+
+class ConversationMessageOut(BaseModel):
+    role: str
+    content: str
+    created_at: datetime
+    model_config = {"from_attributes": True}
+
+
+class ConversationDetailOut(ConversationOut):
+    messages: list[ConversationMessageOut] = []
+
+
 # --- Rooms ---
 
 class RoomCreate(BaseModel):
     name: str
     width_m: float = 3.0
     length_m: float = 2.4
+    group_id: str | None = None
 
 
 class RoomUpdate(BaseModel):
     name: str | None = None
     width_m: float | None = None
     length_m: float | None = None
+    group_id: str | None = None
 
 
 class RoomTankPositionOut(BaseModel):
@@ -283,6 +483,8 @@ class RoomOut(BaseModel):
     name: str
     width_m: float
     length_m: float
+    owner_id: str
+    group_id: str | None = None
     tank_positions: list[RoomTankPositionOut] = []
     model_config = {"from_attributes": True}
 
@@ -299,25 +501,30 @@ class ExpenseCreate(BaseModel):
     tank_id: str | None = None
     inventory_item_id: str | None = None
     amount: float
+    quantity: int = 1
     category: str
     description: str | None = None
     purchase_date: str
     notes: str | None = None
+    group_id: str | None = None
 
 
 class ExpenseUpdate(BaseModel):
     tank_id: str | None = None
     inventory_item_id: str | None = None
     amount: float | None = None
+    quantity: int | None = None
     category: str | None = None
     description: str | None = None
     purchase_date: str | None = None
     notes: str | None = None
+    group_id: str | None = None
 
 
 class ExpenseOut(ExpenseCreate):
     id: str
     created_at: datetime
+    owner_id: str
     model_config = {"from_attributes": True}
 
 
@@ -330,6 +537,7 @@ class InventoryItemCreate(BaseModel):
     low_stock_threshold: int = 1
     unit_label: str | None = None
     notes: str | None = None
+    group_id: str | None = None
 
 
 class InventoryItemUpdate(BaseModel):
@@ -338,11 +546,13 @@ class InventoryItemUpdate(BaseModel):
     low_stock_threshold: int | None = None
     unit_label: str | None = None
     notes: str | None = None
+    group_id: str | None = None
 
 
 class InventoryItemOut(InventoryItemCreate):
     id: str
     created_at: datetime
+    owner_id: str
     model_config = {"from_attributes": True}
 
 
@@ -354,3 +564,103 @@ class InventoryRestock(BaseModel):
     quantity: int
     amount: float | None = None
     purchase_date: str | None = None
+
+
+# --- Auth ---
+
+class RegisterRequest(BaseModel):
+    email: str
+    password: str
+    display_name: str | None = None
+
+
+class LoginRequest(BaseModel):
+    email: str
+    password: str
+
+
+class ChangePasswordRequest(BaseModel):
+    current_password: str | None = None
+    new_password: str
+
+
+class DashboardSectionLayout(BaseModel):
+    id: str
+    visible: bool
+
+
+class UserOut(BaseModel):
+    id: str
+    email: str
+    display_name: str | None = None
+    has_password: bool
+    permissions: dict[str, str] = {}
+    date_format: str
+    unit_system: str
+    default_tank_id: str | None = None
+    notifications_enabled: bool
+    dashboard_layout: list[DashboardSectionLayout] = []
+    dashboard_stats: list[str] = []
+
+
+class ProfileUpdate(BaseModel):
+    date_format: str | None = None
+    unit_system: str | None = None
+    default_tank_id: str | None = None
+    notifications_enabled: bool | None = None
+    dashboard_layout: list[DashboardSectionLayout] | None = None
+    dashboard_stats: list[str] | None = None
+
+
+class UserListItemOut(BaseModel):
+    id: str
+    email: str
+    display_name: str | None = None
+    has_password: bool
+    has_oidc: bool
+    created_at: datetime
+    last_login_at: datetime | None = None
+
+
+class UserUpdateRequest(BaseModel):
+    email: str | None = None
+    display_name: str | None = None
+
+
+class AuthConfigOut(BaseModel):
+    allow_registration_effective: bool
+    oidc_enabled: bool
+    oidc_label: str | None = None
+
+
+class AuthSettingsOut(BaseModel):
+    allow_registration: bool
+    oidc_issuer_url: str | None = None
+    oidc_client_id: str | None = None
+    oidc_client_secret_set: bool = False
+    oidc_display_name: str | None = None
+    updated_at: datetime
+
+
+class AuthSettingsUpdate(BaseModel):
+    allow_registration: bool | None = None
+    oidc_issuer_url: str | None = None
+    oidc_client_id: str | None = None
+    oidc_client_secret: str | None = None
+    oidc_display_name: str | None = None
+
+
+class PermissionsOut(BaseModel):
+    ai: Literal["none", "use", "edit"]
+    general: Literal["none", "use", "edit"]
+    users: Literal["none", "use", "edit"]
+    species: Literal["none", "use", "edit", "delete"]
+    tanks: Literal["none", "use", "edit"]
+
+
+class PermissionsUpdate(BaseModel):
+    ai: Literal["none", "use", "edit"] | None = None
+    general: Literal["none", "use", "edit"] | None = None
+    users: Literal["none", "use", "edit"] | None = None
+    species: Literal["none", "use", "edit", "delete"] | None = None
+    tanks: Literal["none", "use", "edit"] | None = None
